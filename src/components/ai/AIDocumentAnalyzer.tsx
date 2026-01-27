@@ -36,32 +36,17 @@ export function AIDocumentAnalyzer() {
 
     setAnalyzing(true)
     try {
-      // Simulate AI analysis - in production, this would call your AI service
+      // TODO: Replace with actual AI service integration
       await new Promise(resolve => setTimeout(resolve, 3000))
       
-      const mockAnalysis = {
-        documentType: "Pay Stub",
-        extractedData: {
-          employerName: "Halo Business Finance Corp",
-          grossIncome: "$8,500.00",
-          netIncome: "$6,200.00",
-          payPeriod: "Bi-weekly",
-          ytdGross: "$178,500.00"
-        },
-        riskScore: 85,
-        recommendations: [
-          "Income appears stable and sufficient for requested loan amount",
-          "Consider verifying employment with employer",
-          "Request additional pay stubs for income verification"
-        ],
-        confidence: 94
-      }
-
-      setAnalysis(mockAnalysis)
+      // For now, show a message that this feature requires AI service setup
       toast({
-        title: "Analysis Complete",
-        description: "Document has been successfully analyzed by AI",
+        title: "AI Service Required",
+        description: "Document analysis requires AI service integration. Please contact your administrator.",
+        variant: "destructive",
       })
+      
+      setAnalysis(null)
     } catch (error) {
       toast({
         title: "Analysis Failed",

@@ -2,16 +2,16 @@ import { useState, useEffect } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import { supabase } from "@/integrations/supabase/client"
 import { useAuth } from "@/components/auth/AuthProvider"
-import Layout from "@/components/Layout"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+// Badge component removed - using plain text instead
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/hooks/use-toast"
 import { useDocuments, LeadDocument } from "@/hooks/useDocuments"
 import { DocumentUploadModal } from "@/components/DocumentUploadModal"
 import { DocumentViewer } from "@/components/DocumentViewer"
 import { formatDistanceToNow } from "date-fns"
+import { formatPhoneNumber } from "@/lib/utils"
 import { 
   ArrowLeft, 
   Search, 
@@ -25,6 +25,7 @@ import {
   Calendar,
   Eye
 } from "lucide-react"
+import { IBMPageHeader } from "@/components/ui/IBMPageHeader"
 
 export default function LeadDocuments() {
   const { leadId } = useParams<{ leadId: string }>()
@@ -40,14 +41,23 @@ export default function LeadDocuments() {
   const [selectedDocument, setSelectedDocument] = useState<LeadDocument | null>(null)
   const [showDocumentViewer, setShowDocumentViewer] = useState(false)
 
+  // Validate leadId from route
   useEffect(() => {
-    if (leadId && user) {
-      fetchLeadDetails()
+    if (!user) return
+    const isValidUuid = (v?: string) => !!v && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v)
+
+    if (!isValidUuid(leadId) || leadId === ':leadId') {
+      navigate('/leads', { replace: true })
+      return
     }
+
+    fetchLeadDetails()
   }, [leadId, user])
 
   const fetchLeadDetails = async () => {
-    if (!leadId) return
+    // Guard for invalid route param
+    const isValidUuid = (v?: string) => !!v && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v)
+    if (!isValidUuid(leadId)) return
 
     try {
       const { data, error } = await supabase
@@ -56,7 +66,7 @@ export default function LeadDocuments() {
           id,
           contact_entity_id,
           user_id,
-          contact_entity:contact_entities(
+          contact_entity:contact_entities!contact_entity_id(
             name,
             email,
             phone,
@@ -153,52 +163,42 @@ export default function LeadDocuments() {
 
   if (loading) {
     return (
-      <Layout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-lg">Loading documents...</div>
-        </div>
-      </Layout>
+      <div className="flex items-center justify-center h-64 p-6">
+        <div className="text-lg">Loading documents...</div>
+      </div>
     )
   }
 
   if (!lead) {
     return (
-      <Layout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-lg">Lead not found</div>
-        </div>
-      </Layout>
+      <div className="flex items-center justify-center h-64 p-6">
+        <div className="text-lg">Lead not found</div>
+      </div>
     )
   }
 
   return (
-    <Layout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center gap-4">
-          <Button 
-            variant="outline" 
-            onClick={() => navigate(`/leads/${leadId}`)}
-            className="gap-2"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Lead
-          </Button>
-          
-          <div className="flex-1">
-            <h1 className="text-3xl font-bold text-foreground">
-              Document Portal - {lead.contact_entity?.name || 'Unknown Lead'}
-            </h1>
-            <p className="text-muted-foreground">
-              Manage financial documents for this lead
-            </p>
-          </div>
-          
-          <Button onClick={() => setShowUploadModal(true)} className="gap-2">
-            <Upload className="h-4 w-4" />
-            Upload Document
-          </Button>
-        </div>
+    <div className="space-y-6 p-6">
+      <IBMPageHeader 
+        title={`Document Portal - ${lead.contact_entity?.name || 'Unknown Lead'}`}
+        subtitle="Manage financial documents for this lead"
+        actions={
+          <>
+            <Button 
+              variant="outline" 
+              onClick={() => navigate(`/leads/${leadId}`)}
+              className="gap-2"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Lead
+            </Button>
+            <Button onClick={() => setShowUploadModal(true)} className="gap-2">
+              <Upload className="h-4 w-4" />
+              Upload Document
+            </Button>
+          </>
+        }
+      />
 
         {/* Lead Information Card */}
         <Card className="shadow-soft">
@@ -218,7 +218,9 @@ export default function LeadDocuments() {
               <div>
                 <div className="text-sm text-muted-foreground">Business</div>
                 <div className="font-medium">{lead.contact_entity?.business_name || 'Not specified'}</div>
-                <div className="text-sm text-muted-foreground">{lead.contact_entity?.phone}</div>
+                <div className="text-sm text-muted-foreground">
+                  {lead.contact_entity?.phone ? formatPhoneNumber(lead.contact_entity.phone) : 'No phone'}
+                </div>
               </div>
               <div>
                 <div className="text-sm text-muted-foreground">Loan Details</div>
@@ -229,9 +231,9 @@ export default function LeadDocuments() {
                 </div>
                 <div className="text-sm text-muted-foreground">
                   {lead.contact_entity?.loan_type || 'Type not specified'} • 
-                  <Badge variant="outline" className="ml-1 text-xs">
+                  <span className="ml-1 text-xs font-medium">
                     {lead.contact_entity?.stage || 'No stage'}
-                  </Badge>
+                  </span>
                 </div>
               </div>
             </div>
@@ -246,7 +248,7 @@ export default function LeadDocuments() {
                 <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search documents..."
-                  className="pl-10"
+                  className="pl-10 border-[#0A1628]"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
@@ -331,17 +333,17 @@ export default function LeadDocuments() {
                       <div className="space-y-1">
                         <div className="flex items-center gap-3">
                           <h3 className="font-semibold text-foreground">{document.document_name}</h3>
-                          <Badge variant="secondary" className="text-xs">
+                          <span className="text-xs font-medium">
                             {document.document_type}
-                          </Badge>
+                          </span>
                         </div>
                         <p className="text-muted-foreground">Document ID: {document.id.slice(0, 8)}</p>
                       </div>
                       
                       <div className="text-right space-y-1">
-                        <Badge variant={getStatusColor(document.status)}>
+                        <span className="text-sm font-medium">
                           {document.status.charAt(0).toUpperCase() + document.status.slice(1)}
-                        </Badge>
+                        </span>
                         <div className="text-sm text-muted-foreground">
                           {formatDate(document.uploaded_at)}
                         </div>
@@ -460,7 +462,6 @@ export default function LeadDocuments() {
           preSelectedLeadId={leadId}
         />
 
-        {/* Document Viewer */}
         <DocumentViewer
           document={selectedDocument}
           isOpen={showDocumentViewer}
@@ -469,7 +470,6 @@ export default function LeadDocuments() {
             setSelectedDocument(null)
           }}
         />
-      </div>
-    </Layout>
+    </div>
   )
 }

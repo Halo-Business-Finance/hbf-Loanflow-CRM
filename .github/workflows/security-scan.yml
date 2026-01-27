@@ -1,0 +1,291 @@
+name: "Security Scan"
+
+on:
+  push:
+    branches: [ "main", "develop" ]
+  pull_request:
+    branches: [ "main", "develop" ]
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+jobs:
+  dependency-scan:
+    name: Dependency Vulnerability Scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: NPM Audit
+        run: |
+          npm audit --audit-level=moderate || echo "::warning::Vulnerabilities found in dependencies"
+          npm audit --json > npm-audit-report.json || true
+
+      - name: Upload NPM Audit Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-audit-report
+          path: npm-audit-report.json
+          retention-days: 30
+
+      - name: Check for outdated critical packages
+        run: |
+          echo "Checking for outdated security-critical packages..."
+          npm outdated @supabase/supabase-js @tanstack/react-query react react-dom || true
+
+  static-analysis:
+    name: Static Code Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint Security Scan
+        run: |
+          npx eslint . --ext .ts,.tsx --format json --output-file eslint-security-report.json || true
+          echo "ESLint scan complete"
+
+      - name: Check for hardcoded secrets
+        run: |
+          echo "Scanning for potential hardcoded secrets..."
+          
+          # Check for potential API keys (excluding test/mock files)
+          if grep -rn --include="*.ts" --include="*.tsx" --exclude-dir=node_modules \
+            -E "(api[_-]?key|secret[_-]?key|password|access[_-]?token)['\"]?\s*[:=]\s*['\"][a-zA-Z0-9]{20,}" . ; then
+            echo "::error::Potential hardcoded secrets found! Review the files above."
+            exit 1
+          else
+            echo "✓ No obvious hardcoded secrets detected"
+          fi
+
+      - name: Check for unsafe eval/innerHTML usage
+        run: |
+          echo "Checking for dangerous code patterns..."
+          
+          DANGEROUS_PATTERNS_FOUND=0
+          
+          # Check for eval
+          if grep -rn --include="*.ts" --include="*.tsx" --exclude-dir=node_modules "eval(" src/; then
+            echo "::error::Found eval() usage - potential XSS vector"
+            DANGEROUS_PATTERNS_FOUND=1
+          fi
+          
+          # Check for innerHTML
+          if grep -rn --include="*.ts" --include="*.tsx" --exclude-dir=node_modules "innerHTML" src/; then
+            echo "::error::Found innerHTML usage - potential XSS vector"
+            DANGEROUS_PATTERNS_FOUND=1
+          fi
+          
+          # Check for dangerouslySetInnerHTML
+          if grep -rn --include="*.ts" --include="*.tsx" --exclude-dir=node_modules "dangerouslySetInnerHTML" src/; then
+            echo "::warning::Found dangerouslySetInnerHTML - ensure content is sanitized"
+          fi
+          
+          if [ $DANGEROUS_PATTERNS_FOUND -eq 0 ]; then
+            echo "✓ No dangerous code patterns detected"
+          else
+            exit 1
+          fi
+
+      - name: Upload Static Analysis Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: static-analysis-report
+          path: eslint-security-report.json
+          retention-days: 30
+
+  rls-policy-validation:
+    name: RLS Policy Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate RLS Policies in Migrations
+        run: |
+          echo "Validating Row Level Security policies..."
+          
+          POLICY_ERRORS=0
+          
+          # Check that critical tables have RLS enabled
+          CRITICAL_TABLES=("leads" "contact_entities" "profiles" "lead_documents" "loans" "clients")
+          
+          for table in "${CRITICAL_TABLES[@]}"; do
+            if ! grep -rq "ALTER TABLE.*${table}.*ENABLE ROW LEVEL SECURITY" supabase/migrations/; then
+              echo "::error::Critical table '${table}' may not have RLS enabled"
+              POLICY_ERRORS=1
+            else
+              echo "✓ RLS enabled for table: ${table}"
+            fi
+          done
+          
+          # Check for policies without auth.uid() checks (potential security issue)
+          echo ""
+          echo "Checking for policies with proper auth checks..."
+          
+          if grep -rn "CREATE POLICY" supabase/migrations/ | grep -v "auth\.uid()" | grep -v "public\." | grep -v "-- " > /tmp/policies_without_auth.txt; then
+            echo "::warning::Found policies that might not check auth.uid() - review these manually:"
+            cat /tmp/policies_without_auth.txt
+          fi
+          
+          # Count total policies
+          POLICY_COUNT=$(grep -r "CREATE POLICY" supabase/migrations/ | wc -l)
+          echo ""
+          echo "Total RLS policies found: ${POLICY_COUNT}"
+          
+          # Check for SECURITY DEFINER functions without search_path
+          echo ""
+          echo "Checking SECURITY DEFINER functions..."
+          
+          if grep -rn "SECURITY DEFINER" supabase/migrations/ | grep -v "search_path" | grep -v "-- " > /tmp/unsafe_definer.txt; then
+            if [ -s /tmp/unsafe_definer.txt ]; then
+              echo "::error::Found SECURITY DEFINER functions without search_path - potential SQL injection risk:"
+              cat /tmp/unsafe_definer.txt
+              POLICY_ERRORS=1
+            fi
+          fi
+          
+          if [ $POLICY_ERRORS -eq 0 ]; then
+            echo ""
+            echo "✓ RLS policy validation passed"
+          else
+            echo ""
+            echo "✗ RLS policy validation failed"
+            exit 1
+          fi
+
+      - name: Check for common RLS anti-patterns
+        run: |
+          echo "Checking for RLS anti-patterns..."
+          
+          # Check for policies that might cause infinite recursion
+          if grep -rn "CREATE POLICY" supabase/migrations/ | grep "SELECT.*FROM.*profiles.*WHERE.*id = auth.uid()" > /tmp/potential_recursion.txt; then
+            if [ -s /tmp/potential_recursion.txt ]; then
+              echo "::warning::Found policies that might cause infinite recursion - ensure using SECURITY DEFINER functions:"
+              cat /tmp/potential_recursion.txt
+            fi
+          fi
+          
+          # Check for overly permissive policies
+          if grep -rn "CREATE POLICY" supabase/migrations/ | grep -E "USING.*true|WITH CHECK.*true" | grep -v "-- "; then
+            echo "::warning::Found potentially overly permissive policies (USING true or WITH CHECK true)"
+          fi
+          
+          echo "✓ Anti-pattern check complete"
+
+  edge-function-security:
+    name: Edge Function Security Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check JWT verification config
+        run: |
+          echo "Validating edge function JWT configuration..."
+          
+          if [ ! -f "supabase/config.toml" ]; then
+            echo "::error::supabase/config.toml not found"
+            exit 1
+          fi
+          
+          # Check that critical functions have verify_jwt = true
+          CRITICAL_FUNCTIONS=("admin-get-users" "admin-create-user" "admin-update-user" "admin-delete-user" "secure-document-manager" "secure-profile-access")
+          
+          for func in "${CRITICAL_FUNCTIONS[@]}"; do
+            if grep -A1 "\[functions\.${func}\]" supabase/config.toml | grep -q "verify_jwt = true"; then
+              echo "✓ ${func} has JWT verification enabled"
+            else
+              echo "::error::${func} missing JWT verification!"
+              exit 1
+            fi
+          done
+
+      - name: Check for SecureLogger usage
+        run: |
+          echo "Checking edge functions for SecureLogger usage..."
+          
+          MISSING_SECURE_LOGGER=0
+          
+          for func_dir in supabase/functions/*/; do
+            func_name=$(basename "$func_dir")
+            
+            # Skip _shared directory
+            if [ "$func_name" = "_shared" ]; then
+              continue
+            fi
+            
+            index_file="${func_dir}index.ts"
+            
+            if [ -f "$index_file" ]; then
+              # Check if function uses console.log but not SecureLogger
+              if grep -q "console\\.log\\|console\\.error\\|console\\.warn" "$index_file"; then
+                if ! grep -q "SecureLogger" "$index_file"; then
+                  echo "::warning::${func_name} uses console logging instead of SecureLogger"
+                  MISSING_SECURE_LOGGER=1
+                fi
+              fi
+            fi
+          done
+          
+          if [ $MISSING_SECURE_LOGGER -eq 0 ]; then
+            echo "✓ All edge functions use appropriate logging"
+          fi
+
+  security-summary:
+    name: Security Summary
+    runs-on: ubuntu-latest
+    needs: [dependency-scan, static-analysis, rls-policy-validation, edge-function-security]
+    if: always()
+    steps:
+      - name: Generate Security Report
+        run: |
+          echo "# Security Scan Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Scan Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Dependency Scan:** ${{ needs.dependency-scan.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Static Analysis:** ${{ needs.static-analysis.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **RLS Policy Validation:** ${{ needs.rls-policy-validation.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Edge Function Security:** ${{ needs.edge-function-security.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.dependency-scan.result }}" = "success" ] && \
+             [ "${{ needs.static-analysis.result }}" = "success" ] && \
+             [ "${{ needs.rls-policy-validation.result }}" = "success" ] && \
+             [ "${{ needs.edge-function-security.result }}" = "success" ]; then
+            echo "✅ **All security checks passed!**" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Some security checks failed - review above**" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Check overall status
+        run: |
+          if [ "${{ needs.dependency-scan.result }}" != "success" ] || \
+             [ "${{ needs.static-analysis.result }}" != "success" ] || \
+             [ "${{ needs.rls-policy-validation.result }}" != "success" ] || \
+             [ "${{ needs.edge-function-security.result }}" != "success" ]; then
+            echo "Security checks failed!"
+            exit 1
+          fi

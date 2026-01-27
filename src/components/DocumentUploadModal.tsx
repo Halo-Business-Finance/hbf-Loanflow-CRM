@@ -8,12 +8,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Upload, FileText } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
+import { useToast } from '@/hooks/use-toast';
 
 interface Lead {
   id: string;
   contact_entity_id: string;
   contact_entity: {
     name: string;
+    business_name: string;
   };
 }
 
@@ -25,16 +27,16 @@ interface DocumentUploadModalProps {
 }
 
 const documentTypes = [
-  'Income Statement',
-  'Bank Statement',
-  'Credit Report',
-  'Employment Verification',
-  'Tax Returns',
-  'Property Appraisal',
-  'Loan Application',
-  'Insurance Documentation',
-  'Business License',
-  'Financial Statement',
+  'Business Tax Returns',
+  'Personal Tax Returns',
+  'P&L and Balance Sheet',
+  'Bank Statements',
+  'Debt Schedule and Notes',
+  'Loan Application & Driver\'s License',
+  'AR & AP',
+  'Projections, Resume & Business Plan',
+  'SBA & Bank Documents',
+  'Corp Articles, Operating Agreement & EIN Form',
   'Other'
 ];
 
@@ -47,6 +49,7 @@ export function DocumentUploadModal({ isOpen, onClose, onUpload, preSelectedLead
   const [leads, setLeads] = useState<Lead[]>([]);
   const [uploading, setUploading] = useState(false);
   const { user } = useAuth();
+  const { toast } = useToast();
 
   useEffect(() => {
     if (isOpen && user) {
@@ -67,7 +70,7 @@ export function DocumentUploadModal({ isOpen, onClose, onUpload, preSelectedLead
         .select(`
           id,
           contact_entity_id,
-          contact_entity:contact_entities(name)
+          contact_entity:contact_entities!contact_entity_id(name, business_name)
         `)
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
@@ -80,14 +83,38 @@ export function DocumentUploadModal({ isOpen, onClose, onUpload, preSelectedLead
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
-      // Auto-populate document name with file name (without extension)
-      if (!documentName) {
-        const nameWithoutExtension = file.name.replace(/\.[^/.]+$/, '');
-        setDocumentName(nameWithoutExtension);
+    try {
+      const file = e.target.files?.[0];
+      if (file) {
+        const allowedTypes = [
+          'application/pdf',
+          'application/msword',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'image/jpeg',
+          'image/png',
+          'application/vnd.ms-excel',
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        ];
+        const maxSize = 10 * 1024 * 1024; // 10MB
+
+        if (!allowedTypes.includes(file.type)) {
+          toast({ title: 'Invalid file type', description: 'Allowed: PDF, DOC, DOCX, XLS, XLSX, PNG, JPG', variant: 'destructive' });
+          return;
+        }
+        if (file.size > maxSize) {
+          toast({ title: 'File too large', description: 'Maximum size is 10MB', variant: 'destructive' });
+          return;
+        }
+
+        setSelectedFile(file);
+        if (!documentName) {
+          const nameWithoutExtension = file.name.replace(/\.[^/.]+$/, '');
+          setDocumentName(nameWithoutExtension);
+        }
       }
+    } catch (error) {
+      console.error('Error processing file:', error);
+      toast({ title: 'Error', description: 'Failed to process file. Please try again.', variant: 'destructive' });
     }
   };
 
@@ -155,60 +182,77 @@ export function DocumentUploadModal({ isOpen, onClose, onUpload, preSelectedLead
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Upload Document</DialogTitle>
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+        <DialogHeader className="space-y-1 pb-4 border-b">
+          <DialogTitle className="text-xl font-semibold">Upload Document</DialogTitle>
+          <p className="text-sm text-muted-foreground">
+            Upload documents for loan processing and underwriting review
+          </p>
         </DialogHeader>
         
-        <div className="space-y-4">
+        <div className="space-y-5 pt-4">
           <div className="space-y-2">
-            <Label htmlFor="lead-select">Select Lead</Label>
+            <Label htmlFor="lead-select" className="text-sm font-medium">
+              Borrower / Company
+            </Label>
             <Select value={selectedLead} onValueChange={setSelectedLead} disabled={!!preSelectedLeadId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Choose a lead..." />
+              <SelectTrigger className="h-11">
+                <SelectValue placeholder="Select borrower or company..." />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-background">
                 {leads.map((lead) => (
                   <SelectItem key={lead.id} value={lead.id}>
-                    {lead.contact_entity?.name || 'Unnamed Lead'}
+                    {lead.contact_entity?.business_name || lead.contact_entity?.name || 'Unnamed Lead'}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
             {preSelectedLeadId && (
-              <p className="text-xs text-muted-foreground">Lead is pre-selected for this portal</p>
+              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary"></span>
+                Pre-selected for this loan application
+              </p>
             )}
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="document-type">Document Type</Label>
-            <Select value={documentType} onValueChange={setDocumentType}>
-              <SelectTrigger>
-                <SelectValue placeholder="Choose document type..." />
-              </SelectTrigger>
-              <SelectContent>
-                {documentTypes.map((type) => (
-                  <SelectItem key={type} value={type}>
-                    {type}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="document-type" className="text-sm font-medium">
+                Document Type
+              </Label>
+              <Select value={documentType} onValueChange={setDocumentType}>
+                <SelectTrigger className="h-11">
+                  <SelectValue placeholder="Select type..." />
+                </SelectTrigger>
+                <SelectContent className="bg-background">
+                  {documentTypes.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {type}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="document-name" className="text-sm font-medium">
+                Document Name
+              </Label>
+              <Input
+                id="document-name"
+                placeholder="Enter name..."
+                value={documentName}
+                onChange={(e) => setDocumentName(e.target.value)}
+                className="h-11"
+              />
+            </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="document-name">Document Name</Label>
-            <Input
-              id="document-name"
-              placeholder="Enter document name..."
-              value={documentName}
-              onChange={(e) => setDocumentName(e.target.value)}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="file-upload">Select File</Label>
-            <div className="border-2 border-dashed border-border rounded-lg p-6 text-center">
+            <Label htmlFor="file-upload" className="text-sm font-medium">
+              File Upload
+            </Label>
+            <div className="border-2 border-dashed rounded-lg p-8 text-center bg-muted/30 hover:bg-muted/50 transition-colors">
               <input
                 id="file-upload"
                 type="file"
@@ -218,13 +262,15 @@ export function DocumentUploadModal({ isOpen, onClose, onUpload, preSelectedLead
               />
               <label
                 htmlFor="file-upload"
-                className="cursor-pointer flex flex-col items-center space-y-2"
+                className="cursor-pointer flex flex-col items-center space-y-3"
               >
                 {selectedFile ? (
-                  <div className="flex items-center space-x-2">
-                    <FileText className="h-8 w-8 text-primary" />
-                    <div>
-                      <div className="font-medium">{selectedFile.name}</div>
+                  <div className="flex items-center gap-3 p-4 bg-background rounded-lg border w-full">
+                    <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                      <FileText className="h-6 w-6 text-primary" />
+                    </div>
+                    <div className="flex-1 text-left min-w-0">
+                      <div className="font-medium truncate">{selectedFile.name}</div>
                       <div className="text-sm text-muted-foreground">
                         {formatFileSize(selectedFile.size)}
                       </div>
@@ -232,12 +278,16 @@ export function DocumentUploadModal({ isOpen, onClose, onUpload, preSelectedLead
                   </div>
                 ) : (
                   <>
-                    <Upload className="h-8 w-8 text-muted-foreground" />
-                    <div className="text-sm text-muted-foreground">
-                      Click to upload or drag and drop
+                    <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                      <Upload className="h-8 w-8 text-primary" />
                     </div>
-                    <div className="text-xs text-muted-foreground">
-                      PDF, DOC, JPG, PNG, XLS (max 10MB)
+                    <div>
+                      <div className="text-sm font-medium">
+                        Click to upload or drag and drop
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        PDF, DOC, JPG, PNG, XLS (max 10MB)
+                      </div>
                     </div>
                   </>
                 )}
@@ -246,25 +296,38 @@ export function DocumentUploadModal({ isOpen, onClose, onUpload, preSelectedLead
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="notes">Notes (Optional)</Label>
+            <Label htmlFor="notes" className="text-sm font-medium">
+              Additional Notes <span className="text-muted-foreground font-normal">(Optional)</span>
+            </Label>
             <Textarea
               id="notes"
-              placeholder="Add any notes about this document..."
+              placeholder="Add any relevant notes or comments about this document..."
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
+              className="resize-none"
             />
           </div>
 
-          <div className="flex justify-end space-x-2 pt-4">
-            <Button variant="outline" onClick={onClose}>
+          <div className="flex justify-end gap-3 pt-4 border-t">
+            <Button variant="outline" onClick={onClose} className="min-w-[100px]">
               Cancel
             </Button>
             <Button
               onClick={handleUpload}
               disabled={!selectedFile || !selectedLead || !documentType || !documentName || uploading}
+              className="min-w-[140px]"
             >
-              {uploading ? 'Uploading...' : 'Upload Document'}
+              {uploading ? (
+                <>
+                  <span className="animate-pulse">Uploading...</span>
+                </>
+              ) : (
+                <>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Upload Document
+                </>
+              )}
             </Button>
           </div>
         </div>

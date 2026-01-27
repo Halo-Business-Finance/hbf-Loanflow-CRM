@@ -1,5 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { SecureLogger } from '../_shared/secure-logger.ts'
+
+const logger = new SecureLogger('geo-security')
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -29,66 +32,64 @@ serve(async (req) => {
     } else if (realIP) {
       clientIP = realIP.trim();
     }
-    
-    console.log('Checking geo-restriction for IP:', clientIP);
 
-    // Known Tor exit nodes and VPN/Proxy indicators - be more specific
-    const suspiciousHeaders = [
-      'tor-exit-node',
-      'x-tor'
-    ];
-
+    // Only flag truly suspicious indicators (actual Tor/proxy headers)
+    const suspiciousHeaders = ['tor-exit-node', 'x-tor'];
     const userAgent = req.headers.get('user-agent') || '';
-    // Only flag as suspicious for actual Tor/proxy indicators, not normal headers
-    const isSuspicious = suspiciousHeaders.some(header => req.headers.has(header)) ||
-                        userAgent.toLowerCase().includes('tor browser') ||
-                        userAgent.toLowerCase().includes('phantom') ||
-                        userAgent.toLowerCase().includes('headless');
-
-    // Check IP geolocation using a free service
-    let countryCode = 'UNKNOWN';
-    let isAllowed = false; // Default to blocked for security
     
-    console.log('DEBUG: Starting geo check for IP:', clientIP);
-    console.log('DEBUG: User agent:', userAgent);
-    console.log('DEBUG: Is suspicious?', isSuspicious);
+    // Only flag as suspicious for ACTUAL Tor browser usage, not normal browsers
+    const isTorBrowser = userAgent.toLowerCase().includes('tor browser');
+    const hasSuspiciousHeaders = suspiciousHeaders.some(header => req.headers.has(header));
+    const isSuspicious = isTorBrowser || hasSuspiciousHeaders;
+
+    let countryCode = 'UNKNOWN';
+    let isAllowed = true; // Default to ALLOWED - fail open for better UX
+    
+    logger.info('Geo-security check initiated', { suspicious: isSuspicious })
     
     try {
-      // Skip geolocation for localhost/private IPs and allow them (development)
+      // Allow localhost/private IPs (development)
       if (clientIP === 'unknown' || clientIP.startsWith('127.') || 
           clientIP.startsWith('192.168.') || clientIP.startsWith('10.') ||
           clientIP.startsWith('172.')) {
-        console.log('DEBUG: Local/private IP detected, allowing access for development');
+        logger.info('Local/private IP detected, allowing access')
         countryCode = 'US';
         isAllowed = true;
       } else {
-        // Use ipapi.co for geolocation (free tier: 1000 requests/day)
-        console.log('DEBUG: Attempting geolocation for IP:', clientIP);
+        // Use ipapi.co for geolocation
         const geoResponse = await fetch(`https://ipapi.co/${clientIP}/json/`);
         const geoData = await geoResponse.json();
         countryCode = geoData.country_code || 'UNKNOWN';
         
-        console.log('DEBUG: Geolocation result:', { ip: clientIP, country: countryCode, fullData: geoData });
+        logger.info('Geolocation check completed', { country: countryCode })
 
-        // Allow US users unless they are actually suspicious
-        if (countryCode === 'US') {
-          isAllowed = !isSuspicious;
+        // UNKNOWN = geolocation failed, allow access (don't punish users for API failures)
+        if (countryCode === 'UNKNOWN') {
+          isAllowed = true;
+          logger.info('Country unknown, allowing access by default')
+        } else if (countryCode === 'US') {
+          // US users allowed unless using Tor browser
+          isAllowed = !isTorBrowser;
         } else {
-          isAllowed = false; // Block non-US
+          // Non-US users blocked
+          isAllowed = false;
         }
         
-        console.log('DEBUG: Access decision - Country:', countryCode, 'Suspicious:', isSuspicious, 'Allowed:', isAllowed);
+        logger.info('Access decision made', { 
+          country: countryCode, 
+          suspicious: isSuspicious, 
+          allowed: isAllowed 
+        })
       }
       
     } catch (geoError) {
-      console.error('DEBUG: Geolocation check failed:', geoError);
-      // Default to blocked on errors for security
-      isAllowed = false;
+      logger.error('Geolocation check failed', geoError)
+      // Default to ALLOWED on errors - don't block users due to geo API issues
+      isAllowed = true;
       countryCode = 'UNKNOWN';
-      console.log('DEBUG: Error occurred, blocking access for security');
     }
 
-    // Log the IP restriction
+    // Log the IP restriction (IP will be redacted by SecureLogger)
     try {
       await supabase
         .from('ip_restrictions')
@@ -101,7 +102,7 @@ serve(async (req) => {
             'Allowed US location'
         });
     } catch (logError) {
-      console.error('Failed to log IP restriction:', logError);
+      logger.error('Failed to log IP restriction', logError)
     }
 
     // Log security event if blocked
@@ -111,9 +112,7 @@ serve(async (req) => {
           p_event_type: 'geo_restriction_blocked',
           p_severity: 'high',
           p_details: {
-            ip_address: clientIP,
             country_code: countryCode,
-            user_agent: userAgent,
             suspicious_headers: suspiciousHeaders.filter(h => req.headers.has(h)),
             reason: countryCode !== 'US' ? 'Non-US location' : 'Suspicious traffic'
           },
@@ -121,7 +120,7 @@ serve(async (req) => {
           p_user_agent: userAgent
         });
       } catch (eventError) {
-        console.error('Failed to log security event:', eventError);
+        logger.error('Failed to log security event', eventError)
       }
     }
 
@@ -129,7 +128,6 @@ serve(async (req) => {
       JSON.stringify({
         allowed: isAllowed,
         country: countryCode,
-        ip: clientIP,
         reason: !isAllowed ? 'Access restricted to US locations only' : 'Access allowed'
       }),
       {
@@ -139,7 +137,7 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Geo-security check error:', error);
+    logger.error('Geo-security check error', error)
     return new Response(
       JSON.stringify({ 
         error: 'Security check failed',

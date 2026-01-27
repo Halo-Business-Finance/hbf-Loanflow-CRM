@@ -1,4 +1,4 @@
-import { ReactNode, useEffect } from 'react'
+import { Component, ErrorInfo, ReactNode } from 'react'
 import { ErrorBoundary } from './ErrorBoundary'
 
 interface AsyncErrorBoundaryProps {
@@ -7,53 +7,49 @@ interface AsyncErrorBoundaryProps {
   onError?: (error: Error) => void
 }
 
-// Simple wrapper that just uses ErrorBoundary for now
-// This eliminates any complex React hook issues
-export function AsyncErrorBoundary({ children, fallback, onError }: AsyncErrorBoundaryProps) {
-  useEffect(() => {
-    // Handle unhandled promise rejections
-    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
-      // Only log critical errors to reduce noise
-      if (event.reason?.name !== 'AbortError') {
-        console.error('Unhandled promise rejection:', event.reason)
-      }
-      
-      // Convert promise rejection to Error if it isn't already
-      const error = event.reason instanceof Error 
-        ? event.reason 
-        : new Error(String(event.reason))
-      
-      onError?.(error)
-      
-      // Prevent the default browser handling
-      event.preventDefault()
+// Class-based wrapper to avoid hook initialization issues
+export class AsyncErrorBoundary extends Component<AsyncErrorBoundaryProps> {
+  private handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+    // Only log critical errors to reduce noise
+    if (event.reason?.name !== 'AbortError') {
+      console.error('Unhandled promise rejection:', event.reason)
     }
+    
+    const error = event.reason instanceof Error 
+      ? event.reason 
+      : new Error(String(event.reason))
+    
+    this.props.onError?.(error)
+    event.preventDefault()
+  }
 
-    const handleError = (event: ErrorEvent) => {
-      // Filter out non-critical errors
-      if (!event.error?.message?.includes('ResizeObserver')) {
-        console.error('Unhandled error:', event.error)
-      }
-      
-      const error = event.error instanceof Error 
-        ? event.error 
-        : new Error(event.message)
-      
-      onError?.(error)
+  private handleError = (event: ErrorEvent) => {
+    if (!event.error?.message?.includes('ResizeObserver')) {
+      console.error('Unhandled error:', event.error)
     }
+    
+    const error = event.error instanceof Error 
+      ? event.error 
+      : new Error(event.message)
+    
+    this.props.onError?.(error)
+  }
 
-    window.addEventListener('unhandledrejection', handleUnhandledRejection)
-    window.addEventListener('error', handleError)
+  componentDidMount() {
+    window.addEventListener('unhandledrejection', this.handleUnhandledRejection)
+    window.addEventListener('error', this.handleError)
+  }
 
-    return () => {
-      window.removeEventListener('unhandledrejection', handleUnhandledRejection)
-      window.removeEventListener('error', handleError)
-    }
-  }, [onError])
+  componentWillUnmount() {
+    window.removeEventListener('unhandledrejection', this.handleUnhandledRejection)
+    window.removeEventListener('error', this.handleError)
+  }
 
-  return (
-    <ErrorBoundary fallback={fallback} onError={onError}>
-      {children}
-    </ErrorBoundary>
-  )
+  render() {
+    return (
+      <ErrorBoundary fallback={this.props.fallback} onError={this.props.onError}>
+        {this.props.children}
+      </ErrorBoundary>
+    )
+  }
 }

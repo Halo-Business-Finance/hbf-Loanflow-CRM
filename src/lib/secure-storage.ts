@@ -26,29 +26,87 @@ class SecureStorage {
     const encoder = new TextEncoder();
     const data = encoder.encode(text);
     
-    // Use a simple XOR encryption for client-side (better than plain text)
-    const keyBytes = new TextEncoder().encode(this.encryptionKey);
-    const encrypted = new Uint8Array(data.length);
+    // Generate a random IV for AES-GCM
+    const iv = crypto.getRandomValues(new Uint8Array(12));
     
-    for (let i = 0; i < data.length; i++) {
-      encrypted[i] = data[i] ^ keyBytes[i % keyBytes.length];
-    }
+    // Derive key using PBKDF2
+    const keyMaterial = await crypto.subtle.importKey(
+      'raw',
+      new TextEncoder().encode(this.encryptionKey),
+      'PBKDF2',
+      false,
+      ['deriveBits', 'deriveKey']
+    );
     
-    return btoa(String.fromCharCode(...encrypted));
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const key = await crypto.subtle.deriveKey(
+      {
+        name: 'PBKDF2',
+        salt: salt,
+        iterations: 100000,
+        hash: 'SHA-256'
+      },
+      keyMaterial,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['encrypt']
+    );
+    
+    // Encrypt using AES-GCM
+    const encrypted = await crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv: iv },
+      key,
+      data
+    );
+    
+    // Combine salt, IV, and encrypted data
+    const combined = new Uint8Array(salt.length + iv.length + encrypted.byteLength);
+    combined.set(salt, 0);
+    combined.set(iv, salt.length);
+    combined.set(new Uint8Array(encrypted), salt.length + iv.length);
+    
+    return btoa(String.fromCharCode(...combined));
   }
 
   private async decrypt(encryptedText: string): Promise<string> {
     try {
-      const encrypted = new Uint8Array(
+      const combined = new Uint8Array(
         atob(encryptedText).split('').map(char => char.charCodeAt(0))
       );
       
-      const keyBytes = new TextEncoder().encode(this.encryptionKey);
-      const decrypted = new Uint8Array(encrypted.length);
+      // Extract salt, IV, and encrypted data
+      const salt = combined.slice(0, 16);
+      const iv = combined.slice(16, 28);
+      const encrypted = combined.slice(28);
       
-      for (let i = 0; i < encrypted.length; i++) {
-        decrypted[i] = encrypted[i] ^ keyBytes[i % keyBytes.length];
-      }
+      // Derive the same key using PBKDF2
+      const keyMaterial = await crypto.subtle.importKey(
+        'raw',
+        new TextEncoder().encode(this.encryptionKey),
+        'PBKDF2',
+        false,
+        ['deriveBits', 'deriveKey']
+      );
+      
+      const key = await crypto.subtle.deriveKey(
+        {
+          name: 'PBKDF2',
+          salt: salt,
+          iterations: 100000,
+          hash: 'SHA-256'
+        },
+        keyMaterial,
+        { name: 'AES-GCM', length: 256 },
+        false,
+        ['decrypt']
+      );
+      
+      // Decrypt using AES-GCM
+      const decrypted = await crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv: iv },
+        key,
+        encrypted
+      );
       
       return new TextDecoder().decode(decrypted);
     } catch (error) {

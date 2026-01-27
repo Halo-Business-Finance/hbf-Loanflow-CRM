@@ -106,17 +106,25 @@ export class FieldEncryption {
     }
   }
 
-  // Get or generate master encryption key
+  // DEPRECATED: Client-side key storage is insecure
+  // TODO: Migrate to server-side encryption via Edge Functions
+  // @see: src/lib/server-encryption.ts for secure alternative
   private static async getMasterKey(): Promise<string> {
-    const stored = localStorage.getItem('_master_enc_key');
-    if (stored) return stored;
+    console.warn('[SECURITY] field-encryption.ts uses deprecated client-side keys. Migrate to server-encryption.ts');
     
-    // Generate new master key
+    // Ephemeral in-memory cache ONLY (no sessionStorage persistence)
+    // @ts-ignore
+    if ((FieldEncryption as any)._ephemeralMasterKey) {
+      return (FieldEncryption as any)._ephemeralMasterKey as string;
+    }
+
+    // Generate new ephemeral key (memory only, no persistence)
     const key = Array.from(crypto.getRandomValues(new Uint8Array(64)))
       .map(b => b.toString(16).padStart(2, '0'))
       .join('');
-    
-    localStorage.setItem('_master_enc_key', key);
+
+    // @ts-ignore - Store in memory only
+    (FieldEncryption as any)._ephemeralMasterKey = key;
     return key;
   }
 
@@ -200,8 +208,14 @@ export class FieldEncryption {
 
   // Clear all encryption keys (security measure)
   static clearKeys(): void {
-    localStorage.removeItem('_master_enc_key');
-    localStorage.removeItem('_enc_key');
+    try {
+      // Clear memory-only key (sessionStorage no longer used)
+      // @ts-ignore
+      if ((FieldEncryption as any)._ephemeralMasterKey) {
+        // @ts-ignore
+        delete (FieldEncryption as any)._ephemeralMasterKey;
+      }
+    } catch {}
   }
 }
 

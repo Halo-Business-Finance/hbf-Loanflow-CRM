@@ -1,7 +1,9 @@
 import { useState } from "react"
-import { Plus, Phone, Mail, Calendar, User, Users, FileText, BarChart3, Bell, Settings, Zap } from "lucide-react"
+import { Plus, Phone, Mail, Calendar, User, Users, FileText, BarChart3, Bell, Settings, Zap, AlertTriangle } from "lucide-react"
+import { supabase } from "@/integrations/supabase/client"
+import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   DropdownMenu,
@@ -34,6 +36,7 @@ export function QuickActionsImproved() {
   const [isOpen, setIsOpen] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState<'all' | 'create' | 'view' | 'manage'>('all')
   const navigate = useNavigate()
+  const { toast } = useToast()
 
   const quickActions: QuickAction[] = [
     // Create Actions
@@ -44,7 +47,7 @@ export function QuickActionsImproved() {
       icon: User,
       route: '/leads',
       category: 'create',
-      color: 'bg-blue-500',
+      color: 'bg-navy',
       priority: 1
     },
     {
@@ -110,6 +113,16 @@ export function QuickActionsImproved() {
       category: 'manage',
       color: 'bg-gray-500',
       priority: 7
+    },
+    {
+      id: 'emergency-lockdown',
+      label: 'Emergency Lockdown',
+      description: 'Immediate security lockdown',
+      icon: AlertTriangle,
+      route: '',
+      category: 'manage',
+      color: 'bg-red-600',
+      priority: 8
     }
   ]
 
@@ -124,8 +137,47 @@ export function QuickActionsImproved() {
     ? quickActions 
     : quickActions.filter(action => action.category === selectedCategory)
 
-  const handleAction = (action: QuickAction) => {
-    navigate(action.route)
+  const handleAction = async (action: QuickAction) => {
+    console.log('Quick action clicked:', action.id)
+    
+    if (action.id === 'emergency-lockdown') {
+      console.log('Emergency lockdown triggered')
+      
+      // Immediate lockdown without confirmation for emergency situations
+      try {
+        // Step 1: Clear all local storage immediately
+        console.log('Clearing localStorage...')
+        localStorage.clear()
+        sessionStorage.clear()
+        
+        // Step 2: Clear any cookies
+        document.cookie.split(";").forEach(function(c) { 
+          document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+        })
+        
+        // Step 3: Force sign out
+        console.log('Signing out...')
+        await supabase.auth.signOut({ scope: 'global' })
+        
+        // Step 4: Show immediate notification
+        toast({
+          title: "🚨 EMERGENCY LOCKDOWN ACTIVATED",
+          description: "All sessions terminated. Redirecting to secure page...",
+          variant: "destructive",
+        })
+        
+        // Step 5: Force immediate redirect
+        console.log('Redirecting...')
+        window.location.replace('/')
+        
+      } catch (error) {
+        console.error('Emergency lockdown error:', error)
+        // Force redirect even if error occurs
+        window.location.replace('/')
+      }
+    } else {
+      navigate(action.route)
+    }
     setIsOpen(false)
   }
 
@@ -151,7 +203,7 @@ export function QuickActionsImproved() {
               </div>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-72 p-2">
+          <DropdownMenuContent align="end" className="w-72 p-2 bg-background border shadow-lg z-50">
             <DropdownMenuLabel className="text-lg font-semibold">Quick Actions</DropdownMenuLabel>
             <DropdownMenuSeparator />
             
@@ -162,7 +214,12 @@ export function QuickActionsImproved() {
                 return (
                   <DropdownMenuItem
                     key={action.id}
-                    onClick={() => handleAction(action)}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      console.log('Dropdown item clicked:', action.id);
+                      handleAction(action);
+                    }}
                     className="p-3 cursor-pointer hover:bg-accent/50 rounded-md"
                   >
                     <div className="flex items-center gap-3 w-full">
@@ -180,13 +237,18 @@ export function QuickActionsImproved() {
             </div>
             
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => setIsOpen(true)} className="p-3">
+            <DropdownMenuItem onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              console.log('View all actions clicked');
+              setIsOpen(true);
+            }} className="p-3">
               <div className="flex items-center gap-2 w-full">
                 <Calendar className="h-4 w-4" />
                 <span className="font-medium">View All Actions</span>
-                <Badge variant="secondary" className="ml-auto">
+                <span className="ml-auto text-sm">
                   {quickActions.length}
-                </Badge>
+                </span>
               </div>
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -202,9 +264,9 @@ export function QuickActionsImproved() {
           >
             <Zap className="mr-2 h-4 w-4" />
             Quick Actions
-            <Badge variant="secondary" className="ml-2">
+            <span className="ml-2 text-sm">
               {quickActions.length}
-            </Badge>
+            </span>
           </Button>
         </div>
       </div>
@@ -227,9 +289,9 @@ export function QuickActionsImproved() {
                 className="whitespace-nowrap"
               >
                 {category.label}
-                <Badge variant="secondary" className="ml-2">
+                <span className="ml-2 text-sm">
                   {category.count}
-                </Badge>
+                </span>
               </Button>
             ))}
           </div>
@@ -242,7 +304,12 @@ export function QuickActionsImproved() {
                 <Card
                   key={action.id}
                   className="cursor-pointer hover:bg-accent/50 transition-all duration-200 hover:scale-105 hover:shadow-md"
-                  onClick={() => handleAction(action)}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('Card clicked:', action.id);
+                    handleAction(action);
+                  }}
                 >
                   <CardContent className="p-4">
                     <div className="flex items-start gap-3">
@@ -266,7 +333,7 @@ export function QuickActionsImproved() {
           <div className="mt-6 pt-4 border-t border-border/50">
             <div className="flex items-center justify-between text-sm text-muted-foreground">
               <span>Total Actions Available</span>
-              <Badge variant="outline">{quickActions.length}</Badge>
+              <span className="text-sm">{quickActions.length}</span>
             </div>
           </div>
         </DialogContent>

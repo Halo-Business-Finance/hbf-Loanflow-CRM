@@ -3,10 +3,11 @@ import { mapClientFields, CLIENT_WITH_CONTACT_QUERY } from "@/lib/field-mapping"
 import { Client } from "@/types/lead"
 import { supabase } from "@/integrations/supabase/client"
 import { useAuth } from "@/components/auth/AuthProvider"
-import Layout from "@/components/Layout"
 import { useNavigate } from "react-router-dom"
+import { IBMPageHeader } from "@/components/ui/IBMPageHeader"
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+// Badge component removed - using plain text instead
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -16,8 +17,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Search, Phone, Mail, MapPin, Calendar, DollarSign, Filter, ChevronDown, ChevronUp, Trash2, Bell, MessageSquare, ShoppingCart, FileText, Eye, Plus, Loader2 } from "lucide-react"
+import { Search, Phone, Mail, MapPin, Calendar, DollarSign, Filter, ChevronDown, ChevronUp, Trash2, Bell, MessageSquare, ShoppingCart, FileText, Eye, Plus, Loader2, Users, CheckCircle2 } from "lucide-react"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
+import { formatPhoneNumber } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { ActionReminder } from "@/components/ActionReminder"
 import { LoanManager } from "@/components/LoanManager"
@@ -69,7 +71,6 @@ export default function Clients() {
     name: "",
     email: "",
     phone: "",
-    location: "",
     business_name: "",
     business_address: "",
     status: "Active"
@@ -359,13 +360,15 @@ export default function Clients() {
   const getStageColor = (stage?: string) => {
     if (!stage) return 'secondary'
     switch (stage) {
+      case 'New Lead': return 'secondary'
       case 'Initial Contact': return 'secondary'
-      case 'Qualified': return 'default'
-      case 'Application': return 'default'
-      case 'Pre-approval': return 'default'
-      case 'Documentation': return 'default'
+      case 'Loan Application Signed': return 'default'
+      case 'Waiting for Documentation': return 'default'
+      case 'Pre-Approved': return 'default'
+      case 'Term Sheet Signed': return 'default'
+      case 'Loan Approved': return 'default'
       case 'Closing': return 'default'
-      case 'Funded': return 'default'
+      case 'Loan Funded': return 'default'
       default: return 'secondary'
     }
   }
@@ -394,7 +397,6 @@ export default function Clients() {
           name: newClient.name.trim(),
           email: newClient.email.trim().toLowerCase(),
           phone: newClient.phone?.trim() || null,
-          location: newClient.location?.trim() || null,
           business_name: newClient.business_name?.trim() || null,
           business_address: newClient.business_address?.trim() || null,
           stage: 'Loan Funded' // Clients are already funded
@@ -427,7 +429,6 @@ export default function Clients() {
         name: "",
         email: "",
         phone: "",
-        location: "",
         business_name: "",
         business_address: "",
         status: "Active"
@@ -448,133 +449,88 @@ export default function Clients() {
 
   if (loading) {
     return (
-      <Layout>
-        <div className="flex items-center justify-center min-h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-        </div>
-      </Layout>
+      <div className="flex items-center justify-center min-h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
     )
   }
 
   return (
-    <Layout>
+    <div className="flex flex-col h-full bg-background">
+      {/* Modern Header */}
+      <div className="p-8 space-y-8 animate-fade-in">
+          <IBMPageHeader 
+            title="Existing Borrowers"
+            subtitle="Manage and track your existing borrower relationships and portfolios"
+            actions={
+              <>
+                <Button variant="outline" size="sm" className="h-8 text-xs font-medium">
+                  <Filter className="h-3 w-3 mr-2" />
+                  Filter
+                </Button>
+                <Button onClick={() => setShowAddDialog(true)} size="sm" className="h-8 text-xs font-medium">
+                  <Plus className="h-3 w-3 mr-2" />
+                  Add Borrower
+                </Button>
+              </>
+            }
+          />
+
+      {/* Content Area */}
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground dark:text-white">Clients</h1>
-            <p className="text-muted-foreground dark:text-white">Manage your client relationships</p>
-          </div>
-          <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-            <DialogTrigger asChild>
-              <Button className="bg-gradient-primary">
-                <Plus className="mr-2 h-4 w-4" />
-                Add Client
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Add New Client</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Name *</Label>
-                    <Input
-                      id="name"
-                      value={newClient.name}
-                      onChange={(e) => setNewClient(prev => ({ ...prev, name: e.target.value }))}
-                      placeholder="Enter client name"
-                      required
-                    />
+        {/* Client Metrics Overview */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <Card className="border border-blue-600 border border-border shadow-sm animate-fade-in">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="text-xs font-medium text-muted-foreground">Total Borrowers</Label>
+                  <div className="flex items-center gap-2 mt-1">
+                    
+                    <p className="text-2xl font-bold">{clients.length}</p>
                   </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email *</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      value={newClient.email}
-                      onChange={(e) => setNewClient(prev => ({ ...prev, email: e.target.value }))}
-                      placeholder="Enter email address"
-                      required
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="phone">Phone</Label>
-                    <Input
-                      id="phone"
-                      value={newClient.phone}
-                      onChange={(e) => setNewClient(prev => ({ ...prev, phone: e.target.value }))}
-                      placeholder="Enter phone number"
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="location">Location</Label>
-                    <Input
-                      id="location"
-                      value={newClient.location}
-                      onChange={(e) => setNewClient(prev => ({ ...prev, location: e.target.value }))}
-                      placeholder="Enter location"
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="business_name">Business Name</Label>
-                    <Input
-                      id="business_name"
-                      value={newClient.business_name}
-                      onChange={(e) => setNewClient(prev => ({ ...prev, business_name: e.target.value }))}
-                      placeholder="Enter business name"
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="status">Status</Label>
-                    <Select
-                      value={newClient.status}
-                      onValueChange={(value) => setNewClient(prev => ({ ...prev, status: value }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Active">Active</SelectItem>
-                        <SelectItem value="Pending">Pending</SelectItem>
-                        <SelectItem value="Inactive">Inactive</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                </div>
+                <span className="text-xs font-medium">
+                  ACTIVE
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Active Borrowers</p>
+                  <p className="text-2xl font-bold text-primary">{activeClients}</p>
                 </div>
                 
-                <div className="space-y-2">
-                  <Label htmlFor="business_address">Business Address</Label>
-                  <Textarea
-                    id="business_address"
-                    value={newClient.business_address}
-                    onChange={(e) => setNewClient(prev => ({ ...prev, business_address: e.target.value }))}
-                    placeholder="Enter business address"
-                    rows={3}
-                  />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Total Loan Value</p>
+                  <p className="text-2xl font-bold text-primary">{formatCurrency(totalLoanValue)}</p>
                 </div>
               </div>
-              
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setShowAddDialog(false)}>
-                  Cancel
-                </Button>
-                <Button 
-                  onClick={addNewClient} 
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  {isSubmitting ? "Adding..." : "Add Client"}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Avg Loan Size</p>
+                  <p className="text-2xl font-bold text-primary">{formatCurrency(avgLoanSize)}</p>
+                </div>
+                
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Search and Filters */}
@@ -583,12 +539,12 @@ export default function Clients() {
             <div className="flex flex-col sm:flex-row gap-4 justify-between">
               <div className="flex gap-4 flex-1">
                 <div className="relative flex-1">
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground dark:text-white" />
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Search clients..."
+                    placeholder="Search borrowers..."
+                    className="pl-10 border-[#0A1628]"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
                   />
                 </div>
                 <Button variant="outline" className="gap-2">
@@ -596,68 +552,9 @@ export default function Clients() {
                   Filter
                 </Button>
               </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-2 border-primary/20 hover:border-primary/50"
-                >
-                  <Eye className="w-4 h-4" />
-                  View All Details
-                </Button>
-                <div className="text-sm text-muted-foreground dark:text-white self-center">
-                  Showing {filteredClients.length} of {clients.length} clients
-                </div>
-              </div>
             </div>
           </CardContent>
         </Card>
-
-        {/* Client Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <Card className="shadow-soft">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium dark:text-white">Total Clients</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold dark:text-white">{formatNumber(clients.length)}</div>
-            </CardContent>
-          </Card>
-          <Card className="shadow-soft">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium dark:text-white">Active Clients</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold dark:text-white">{formatNumber(activeClients)}</div>
-            </CardContent>
-          </Card>
-          <Card className="shadow-soft">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium dark:text-white">Total Loan Value</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-accent">
-                {totalLoanValue >= 1000000 
-                  ? `${formatCurrency((totalLoanValue / 1000000).toFixed(1))}M` 
-                  : formatCurrency(totalLoanValue)
-                }
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="shadow-soft">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium dark:text-white">Avg. Loan Size</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold dark:text-white">
-                {avgLoanSize >= 1000 
-                  ? `${formatCurrency((avgLoanSize / 1000).toFixed(0))}K` 
-                  : formatCurrency(avgLoanSize)
-                }
-              </div>
-            </CardContent>
-          </Card>
-        </div>
 
         {/* Client List */}
         <div className="grid gap-6">
@@ -678,20 +575,22 @@ export default function Clients() {
                       <div className="space-y-2">
                         <div>
                           <button 
-                            onClick={() => navigate(`/clients/${client.id}`)}
+                            onClick={() => navigate(`/existing-borrowers/${client.id}`)}
                             className="hover:underline cursor-pointer"
                           >
-                            <h3 className="font-semibold text-foreground dark:text-white hover:text-primary transition-colors">{client.name}</h3>
+                            <h3 className="font-semibold text-foreground hover:text-primary transition-colors">{client.name}</h3>
                           </button>
-                          <p className="text-sm text-muted-foreground dark:text-white">
-                            Client since {new Date(client.join_date).toLocaleDateString()}
+                          <p className="text-sm text-muted-foreground">
+                            Borrower since {new Date(client.join_date).toLocaleDateString()}
                           </p>
                         </div>
                         
-                         <div className="flex items-center gap-4 text-sm text-muted-foreground dark:text-white">
+                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
                           <EmailComposer 
+                            recipientEmail={client.email}
+                            recipientName={client.name}
                             trigger={
-                              <button className="flex items-center gap-1 text-sm text-muted-foreground dark:text-white hover:text-primary transition-colors">
+                              <button className="flex items-center gap-1 text-sm text-muted-foreground hover:text-primary transition-colors">
                                 <Mail className="h-4 w-4" />
                                 {client.email}
                               </button>
@@ -699,19 +598,14 @@ export default function Clients() {
                           />
                           {client.phone && (
                             <PhoneDialer 
+                              phoneNumber={client.phone}
                               trigger={
-                                <button className="flex items-center gap-1 text-sm text-muted-foreground dark:text-white hover:text-primary transition-colors">
+                                <button className="flex items-center gap-1 text-sm text-muted-foreground hover:text-primary transition-colors">
                                   <Phone className="h-4 w-4" />
-                                  {client.phone}
+                                  {formatPhoneNumber(client.phone)}
                                 </button>
                               }
                             />
-                          )}
-                          {client.location && (
-                            <div className="flex items-center gap-1 dark:text-white">
-                              <MapPin className="h-4 w-4" />
-                              {client.location}
-                            </div>
                           )}
                         </div>
                       </div>
@@ -719,16 +613,16 @@ export default function Clients() {
                     
                     <div className="text-right space-y-2">
                       <div className="flex gap-2">
-                        <Badge variant={getStatusColor(client.status)}>
+                        <span className="text-sm font-medium">
                           {client.status}
-                        </Badge>
+                        </span>
                         {client.stage && (
-                          <Badge variant={getStageColor(client.stage)}>
+                          <span className="text-sm font-medium">
                             {client.stage}
-                          </Badge>
+                          </span>
                         )}
                       </div>
-                      <div className="text-sm text-muted-foreground dark:text-white">
+                      <div className="text-sm text-muted-foreground">
                         Last activity: {new Date(client.last_activity).toLocaleDateString()}
                       </div>
                     </div>
@@ -737,11 +631,11 @@ export default function Clients() {
                   <div className="mt-4 pt-4 border-t flex justify-between items-center">
                     <div className="flex gap-6">
                       <div className="text-center">
-                        <div className="text-sm text-muted-foreground dark:text-white">Total Loans</div>
-                        <div className="font-semibold dark:text-white">{formatNumber(client.total_loans)}</div>
+                        <div className="text-sm text-muted-foreground">Total Loans</div>
+                        <div className="font-semibold">{formatNumber(client.total_loans)}</div>
                       </div>
                       <div className="text-center">
-                        <div className="text-sm text-muted-foreground dark:text-white">Total Value</div>
+                        <div className="text-sm text-muted-foreground">Total Value</div>
                         <div className="font-semibold text-accent">
                           {formatCurrency(client.total_loan_value)}
                         </div>
@@ -766,13 +660,14 @@ export default function Clients() {
                           </>
                         )}
                       </Button>
-                       {/* Quick Action Buttons */}
+                      
                       <PhoneDialer 
+                        phoneNumber={client.phone}
                         trigger={
                           <Button
                             size="sm"
                             variant="outline"
-                            className="h-8 px-3 text-xs bg-gradient-to-r from-blue-500/10 to-blue-500/5 hover:from-blue-500/20 hover:to-blue-500/10 border-blue-500/20"
+                            className="h-8 px-3 text-xs"
                           >
                             <Phone className="w-3 h-3 mr-1" />
                             Call
@@ -780,31 +675,24 @@ export default function Clients() {
                         }
                       />
                       <EmailComposer 
+                        recipientEmail={client.email}
+                        recipientName={client.name}
                         trigger={
                           <Button
                             size="sm"
                             variant="outline"
-                            className="h-8 px-3 text-xs bg-gradient-to-r from-green-500/10 to-green-500/5 hover:from-green-500/20 hover:to-green-500/10 border-green-500/20"
+                            className="h-8 px-3 text-xs"
                           >
                             <Mail className="w-3 h-3 mr-1" />
                             Email
                           </Button>
                         }
                       />
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-8 px-3 text-xs bg-gradient-to-r from-orange-500/10 to-orange-500/5 hover:from-orange-500/20 hover:to-orange-500/10 border-orange-500/20"
-                        onClick={() => navigate('/documents')}
-                      >
-                        <FileText className="w-3 h-3 mr-1" />
-                        Documents
-                      </Button>
                       <Button 
                         size="sm" 
                         variant="outline"
                         onClick={() => setSelectedClientForReminder(client)}
-                        className="h-8 px-3 text-xs bg-gradient-to-r from-primary/10 to-primary/5 hover:from-primary/20 hover:to-primary/10 border-primary/20"
+                        className="h-8 px-3 text-xs"
                       >
                         <Bell className="w-3 h-3 mr-1" />
                         Reminder
@@ -818,8 +706,8 @@ export default function Clients() {
                           </AlertDialogTrigger>
                           <AlertDialogContent>
                             <AlertDialogHeader>
-                              <AlertDialogTitle className="dark:text-white">Delete Client</AlertDialogTitle>
-                              <AlertDialogDescription className="dark:text-white">
+                              <AlertDialogTitle>Delete Borrower</AlertDialogTitle>
+                              <AlertDialogDescription>
                                 Are you sure you want to delete <strong>{client.name}</strong>? This will also delete all associated loans and pipeline entries. This action cannot be undone.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
@@ -866,13 +754,109 @@ export default function Clients() {
           {filteredClients.length === 0 && (
             <Card className="shadow-soft">
               <CardContent className="p-12 text-center">
-                <div className="text-muted-foreground dark:text-white">
-                  {searchTerm ? 'No clients found matching your search.' : 'No clients yet. Convert some leads to get started!'}
+                <div className="text-muted-foreground">
+                  {searchTerm ? 'No borrowers found matching your search.' : 'No borrowers yet. Convert some leads to get started!'}
                 </div>
               </CardContent>
             </Card>
           )}
         </div>
+
+        {/* Add Client Dialog */}
+        <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Add New Borrower</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Name *</Label>
+                  <Input
+                    id="name"
+                    value={newClient.name}
+                    onChange={(e) => setNewClient(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="Enter borrower name"
+                    required
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email *</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={newClient.email}
+                    onChange={(e) => setNewClient(prev => ({ ...prev, email: e.target.value }))}
+                    placeholder="Enter email address"
+                    required
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone</Label>
+                  <Input
+                    id="phone"
+                    value={newClient.phone}
+                    onChange={(e) => setNewClient(prev => ({ ...prev, phone: e.target.value }))}
+                    placeholder="Enter phone number"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="business_name">Business Name</Label>
+                  <Input
+                    id="business_name"
+                    value={newClient.business_name}
+                    onChange={(e) => setNewClient(prev => ({ ...prev, business_name: e.target.value }))}
+                    placeholder="Enter business name"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="status">Status</Label>
+                  <Select
+                    value={newClient.status}
+                    onValueChange={(value) => setNewClient(prev => ({ ...prev, status: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Active">Active</SelectItem>
+                      <SelectItem value="Pending">Pending</SelectItem>
+                      <SelectItem value="Inactive">Inactive</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="business_address">Company Address</Label>
+                <Textarea
+                  id="business_address"
+                  value={newClient.business_address}
+                  onChange={(e) => setNewClient(prev => ({ ...prev, business_address: e.target.value }))}
+                  placeholder="Enter business address"
+                  rows={3}
+                />
+              </div>
+            </div>
+            
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setShowAddDialog(false)}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={addNewClient} 
+                disabled={isSubmitting}
+              >
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {isSubmitting ? "Adding..." : "Add Borrower"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Action Reminder Dialog */}
@@ -885,6 +869,7 @@ export default function Clients() {
           onClose={() => setSelectedClientForReminder(null)}
         />
       )}
-    </Layout>
+      </div>
+    </div>
   )
 }

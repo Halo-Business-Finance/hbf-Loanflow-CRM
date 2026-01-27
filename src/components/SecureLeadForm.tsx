@@ -25,7 +25,7 @@ export const SecureLeadForm: React.FC<SecureLeadFormProps> = ({ children }) => {
   }
 
   return (
-    <SecurityWrapper requireRole="agent">
+    <SecurityWrapper requireRole="loan_originator">
       <div className={isValidating ? 'opacity-50 pointer-events-none' : ''}>
         {children}
       </div>

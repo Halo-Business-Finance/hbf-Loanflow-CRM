@@ -16,7 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Badge } from "@/components/ui/badge"
+
 import { useNavigate } from "react-router-dom"
 
 export function QuickActions() {
@@ -109,8 +109,8 @@ export function QuickActions() {
           <div className="grid grid-cols-2 gap-4">
             {canAccessLeads && (
               <Button 
-                variant="outline" 
-                className="h-20 flex-col gap-2"
+                variant="default" 
+                className="h-20 flex-col gap-2 bg-blue-600 hover:bg-blue-700 text-white"
                 onClick={() => handleAction('new-lead')}
               >
                 <User className="h-6 w-6" />
@@ -119,8 +119,8 @@ export function QuickActions() {
             )}
             {canManageClients && (
               <Button 
-                variant="outline" 
-                className="h-20 flex-col gap-2"
+                variant="default" 
+                className="h-20 flex-col gap-2 bg-blue-600 hover:bg-blue-700 text-white"
                 onClick={() => handleAction('new-client')}
               >
                 <Users className="h-6 w-6" />
@@ -129,8 +129,8 @@ export function QuickActions() {
             )}
             {canViewReports && (
               <Button 
-                variant="outline" 
-                className="h-20 flex-col gap-2"
+                variant="default" 
+                className="h-20 flex-col gap-2 bg-blue-600 hover:bg-blue-700 text-white"
                 onClick={() => handleAction('view-pipeline')}
               >
                 <Calendar className="h-6 w-6" />
@@ -139,8 +139,8 @@ export function QuickActions() {
             )}
             {canViewReports && (
               <Button 
-                variant="outline" 
-                className="h-20 flex-col gap-2"
+                variant="default" 
+                className="h-20 flex-col gap-2 bg-blue-600 hover:bg-blue-700 text-white"
                 onClick={() => handleAction('view-activities')}
               >
                 <Mail className="h-6 w-6" />

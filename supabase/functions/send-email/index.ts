@@ -1,13 +1,13 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { Resend } from "npm:resend@2.0.0";
+import { Resend } from "https://esm.sh/resend@4.0.0";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { getSecurityHeaders, handleSecureOptions, escapeHtml, validateEmail, sanitizeString } from "../_shared/security-headers.ts";
+import { SecureLogger } from "../_shared/secure-logger.ts";
+import { checkRateLimit, RATE_LIMITS } from "../_shared/rate-limit.ts";
+
+const logger = new SecureLogger('send-email');
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
 
 interface EmailRequest {
   to: string;
@@ -21,33 +21,94 @@ interface EmailRequest {
 const handler = async (req: Request): Promise<Response> => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return handleSecureOptions();
   }
 
   try {
+    // Initialize Supabase client for rate limiting
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    // Verify authentication
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: "Authorization required" }),
+        { status: 401, headers: getSecurityHeaders({ "Content-Type": "application/json" }) }
+      );
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+    
+    if (userError || !user) {
+      return new Response(
+        JSON.stringify({ error: "Invalid authentication" }),
+        { status: 401, headers: getSecurityHeaders({ "Content-Type": "application/json" }) }
+      );
+    }
+
+    // Apply rate limiting to prevent email spam
+    const rateLimitResult = await checkRateLimit(supabase, user.id, RATE_LIMITS.SEND_EMAIL);
+    
+    if (!rateLimitResult.allowed) {
+      logger.warn('Rate limit exceeded for send email', { userId: user.id });
+      return new Response(
+        JSON.stringify({ error: rateLimitResult.error }),
+        { status: 429, headers: getSecurityHeaders({ "Content-Type": "application/json" }) }
+      );
+    }
+
     const { to, subject, body, leadName, fromName, replyTo }: EmailRequest = await req.json();
 
-    if (!to || !subject) {
+    // Enhanced input validation
+    if (!to || !subject || !body) {
       return new Response(
-        JSON.stringify({ error: "Missing required fields: to, subject" }),
+        JSON.stringify({ error: "Missing required fields: to, subject, body" }),
         {
           status: 400,
-          headers: {
-            "Content-Type": "application/json",
-            ...corsHeaders,
-          },
+          headers: getSecurityHeaders({ "Content-Type": "application/json" }),
         }
       );
     }
 
-    // Create HTML email content
+    // Validate email format
+    if (!validateEmail(to)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid email address format" }),
+        {
+          status: 400,
+          headers: getSecurityHeaders({ "Content-Type": "application/json" }),
+        }
+      );
+    }
+
+    // Sanitize and validate inputs
+    const sanitizedSubject = sanitizeString(subject, 200);
+    const sanitizedBody = sanitizeString(body, 10000);
+    const sanitizedLeadName = leadName ? sanitizeString(leadName, 100) : undefined;
+    const sanitizedFromName = fromName ? sanitizeString(fromName, 100) : undefined;
+    
+    if (replyTo && !validateEmail(replyTo)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid reply-to email address format" }),
+        {
+          status: 400,
+          headers: getSecurityHeaders({ "Content-Type": "application/json" }),
+        }
+      );
+    }
+
+    // Create HTML email content with proper escaping
     const htmlContent = `
       <!DOCTYPE html>
       <html>
         <head>
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>${subject}</title>
+          <title>${escapeHtml(sanitizedSubject)}</title>
           <style>
             body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
             .container { max-width: 600px; margin: 0 auto; padding: 20px; }
@@ -60,10 +121,10 @@ const handler = async (req: Request): Promise<Response> => {
           <div class="container">
             <div class="header">
               <h2>LoanFlow CRM</h2>
-              ${leadName ? `<p>Re: ${leadName}</p>` : ''}
+              ${sanitizedLeadName ? `<p>Re: ${escapeHtml(sanitizedLeadName)}</p>` : ''}
             </div>
             <div class="content">
-              ${body.replace(/\n/g, '<br>')}
+              ${escapeHtml(sanitizedBody).replace(/\n/g, '<br>')}
             </div>
             <div class="footer">
               <p>This email was sent from LoanFlow CRM</p>
@@ -74,14 +135,14 @@ const handler = async (req: Request): Promise<Response> => {
     `;
 
     const emailResponse = await resend.emails.send({
-      from: fromName ? `${fromName} <noreply@yourdomain.com>` : "LoanFlow CRM <noreply@yourdomain.com>",
+      from: sanitizedFromName ? `${escapeHtml(sanitizedFromName)} <noreply@yourdomain.com>` : "LoanFlow CRM <noreply@yourdomain.com>",
       to: [to],
-      subject: subject,
+      subject: sanitizedSubject,
       html: htmlContent,
       replyTo: replyTo || undefined,
     });
 
-    console.log("Email sent successfully:", emailResponse);
+    logger.info("Email sent successfully", { emailId: emailResponse.data?.id });
 
     return new Response(JSON.stringify({ 
       success: true, 
@@ -89,22 +150,19 @@ const handler = async (req: Request): Promise<Response> => {
       message: "Email sent successfully" 
     }), {
       status: 200,
-      headers: {
-        "Content-Type": "application/json",
-        ...corsHeaders,
-      },
+      headers: getSecurityHeaders({ "Content-Type": "application/json" }),
     });
 
   } catch (error: any) {
-    console.error("Error in send-email function:", error);
+    logger.error("Error in send-email function", error);
     return new Response(
       JSON.stringify({ 
-        error: error.message,
+        error: "Internal server error",
         details: "Failed to send email. Please check your email configuration." 
       }),
       {
         status: 500,
-        headers: { "Content-Type": "application/json", ...corsHeaders },
+        headers: getSecurityHeaders({ "Content-Type": "application/json" }),
       }
     );
   }

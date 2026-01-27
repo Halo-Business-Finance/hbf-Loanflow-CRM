@@ -2,13 +2,13 @@ import { useState, useEffect } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import { supabase } from "@/integrations/supabase/client"
 import { useAuth } from "@/components/auth/AuthProvider"
-import Layout from "@/components/Layout"
+// import HybridLayout from "@/components/HybridLayout"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Badge } from "@/components/ui/badge"
+// Badge component removed - using plain text instead
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
@@ -18,6 +18,8 @@ import { PhoneDialer } from "@/components/PhoneDialer"
 import { EmailComposer } from "@/components/EmailComposer"
 import { LoanManager } from "@/components/LoanManager"
 import LoanRequestManager from "@/components/LoanRequestManager"
+import { ClientScheduler } from "@/components/calendar/ClientScheduler"
+import { formatPhoneNumber } from "@/lib/utils"
 import { formatNumber, formatCurrency } from "@/lib/utils"
 import { 
   ArrowLeft, 
@@ -115,13 +117,23 @@ export default function ClientDetail() {
   const [generalNotes, setGeneralNotes] = useState("")
   const [showReminderDialog, setShowReminderDialog] = useState(false)
   const [userProfile, setUserProfile] = useState<{first_name?: string, last_name?: string} | null>(null)
+  const [notesHistory, setNotesHistory] = useState<Array<{
+    id: string
+    note_type: 'general' | 'call'
+    content: string
+    created_at: string
+    user_name: string
+  }>>([])
   const [editableFields, setEditableFields] = useState({
     name: "",
     email: "",
     phone: "",
-    location: "",
+    
     business_name: "",
     business_address: "",
+    business_city: "",
+    business_state: "",
+    business_zip_code: "",
     naics_code: "",
     ownership_structure: "",
     owns_property: false,
@@ -159,6 +171,12 @@ export default function ClientDetail() {
       fetchUserProfile()
     }
   }, [id, user])
+
+  useEffect(() => {
+    if (client?.contact_entity_id) {
+      fetchNotesHistory()
+    }
+  }, [client?.contact_entity_id])
 
   const fetchUserProfile = async () => {
     try {
@@ -202,9 +220,12 @@ export default function ClientDetail() {
         name: mergedClient.name || "",
         email: mergedClient.email || "",
         phone: mergedClient.phone || "",
-        location: mergedClient.location || "",
+        
         business_name: mergedClient.business_name || "",
         business_address: mergedClient.business_address || "",
+        business_city: mergedClient.business_city || "",
+        business_state: mergedClient.business_state || "",
+        business_zip_code: mergedClient.business_zip_code || "",
         naics_code: mergedClient.naics_code || "",
         ownership_structure: mergedClient.ownership_structure || "",
         owns_property: mergedClient.owns_property || false,
@@ -279,65 +300,72 @@ export default function ClientDetail() {
   }
 
   const saveCallNotes = async () => {
-    if (!client) return
+    if (!client || !user) return
 
     try {
-      const userName = userProfile ? `${userProfile.first_name || ''} ${userProfile.last_name || ''}`.trim() : 'Unknown User'
-      const updatedNotes = callNotes + (newCallNote ? `\n\n${userName} [${new Date().toLocaleString()}]: ${newCallNote}` : "")
+      const trimmed = newCallNote.trim()
+      // If empty, just return silently - user doesn't want to add a note
+      if (!trimmed) return
       
-      // Update the contact_entities table, not the clients table
-      const { error } = await supabase
-        .from('contact_entities')
-        .update({ 
-          call_notes: updatedNotes,
-          updated_at: new Date().toISOString()
+      if (!client.contact_entity_id) {
+        throw new Error('No contact entity ID found for client')
+      }
+      
+      // Insert into history
+      const { error: historyError } = await supabase
+        .from('notes_history')
+        .insert({
+          contact_id: client.contact_entity_id,
+          note_type: 'call',
+          content: trimmed,
+          user_id: user.id
         })
-        .eq('id', client.contact_entity_id)
-
-      if (error) throw error
-
-      // Also update the client's last_activity
+      
+      if (historyError) {
+        console.error('Error saving note history:', historyError)
+        toast({ title: 'Error', description: 'Failed to save note', variant: 'destructive' })
+        return
+      }
+      
+      // Update client's last_activity
       await supabase
         .from('clients')
         .update({ last_activity: new Date().toISOString() })
         .eq('id', client.id)
-
-      setCallNotes(updatedNotes)
-      setNewCallNote("")
-      toast({
-        title: "Success",
-        description: "Call notes saved successfully",
-      })
       
-      // Refresh client data
+      setNewCallNote('')
+      fetchNotesHistory()
+      toast({ title: 'Saved', description: 'Call note added to history' })
       fetchClient()
     } catch (error) {
       console.error('Error saving call notes:', error)
       toast({
         title: "Error",
-        description: "Failed to save call notes",
+        description: `Failed to save call notes: ${error.message}`,
         variant: "destructive",
       })
     }
   }
 
   const saveGeneralNotes = async () => {
-    if (!client) return
+    if (!client || !user) return
 
     try {
+      const trimmed = generalNotes.trim()
+      
+      // Update the contact_entities notes field
       const { error } = await supabase
         .from('contact_entities')
-        .update({ notes: generalNotes })
+        .update({ notes: trimmed })
         .eq('id', client.contact_entity_id)
-
-      if (error) throw error
-
-      toast({
-        title: "Success",
-        description: "General notes saved successfully",
-      })
       
-      // Refresh client data
+      if (error) {
+        console.error('Error saving notes:', error)
+        toast({ title: 'Error', description: 'Failed to save notes', variant: 'destructive' })
+        return
+      }
+      
+      toast({ title: 'Saved', description: 'Notes saved successfully' })
       fetchClient()
     } catch (error) {
       console.error('Error saving general notes:', error)
@@ -349,6 +377,44 @@ export default function ClientDetail() {
     }
   }
 
+  // Fetch notes history
+  const fetchNotesHistory = async () => {
+    if (!client?.contact_entity_id) return
+    const { data, error } = await supabase
+      .from('notes_history')
+      .select(`
+        id,
+        note_type,
+        content,
+        created_at,
+        user_id
+      `)
+      .eq('contact_id', client.contact_entity_id)
+      .order('created_at', { ascending: false })
+    
+    if (error) {
+      console.error('Error fetching notes history:', error)
+      return
+    }
+
+    // Fetch user names
+    const userIds = [...new Set(data.map(n => n.user_id))]
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, first_name, last_name')
+      .in('id', userIds)
+    
+    const profileMap = new Map(profiles?.map(p => [p.id, `${p.first_name || ''} ${p.last_name || ''}`.trim()]) || [])
+    
+    setNotesHistory(data.map(note => ({
+      id: note.id,
+      note_type: note.note_type as 'general' | 'call',
+      content: note.content,
+      created_at: note.created_at,
+      user_name: profileMap.get(note.user_id) || 'Unknown User'
+    })))
+  }
+
   const saveClientChanges = async () => {
     if (!client) return
 
@@ -357,9 +423,12 @@ export default function ClientDetail() {
         name: editableFields.name,
         email: editableFields.email,
         phone: editableFields.phone || null,
-        location: editableFields.location || null,
+        
         business_name: editableFields.business_name || null,
         business_address: editableFields.business_address || null,
+        business_city: editableFields.business_city || null,
+        business_state: editableFields.business_state || null,
+        business_zip_code: editableFields.business_zip_code || null,
         naics_code: editableFields.naics_code || null,
         ownership_structure: editableFields.ownership_structure || null,
         owns_property: editableFields.owns_property,
@@ -390,12 +459,59 @@ export default function ClientDetail() {
         updated_at: new Date().toISOString()
       }
 
-      const { error } = await supabase
+      // Update contact_entities table (where core data lives)
+      const { error: contactError } = await supabase
+        .from('contact_entities')
+        .update({
+          name: updateData.name,
+          email: updateData.email,
+          phone: updateData.phone,
+          business_name: updateData.business_name,
+          business_address: updateData.business_address,
+          business_city: updateData.business_city,
+          business_state: updateData.business_state,
+          business_zip_code: updateData.business_zip_code,
+          naics_code: updateData.naics_code,
+          ownership_structure: updateData.ownership_structure,
+          owns_property: updateData.owns_property,
+          property_payment_amount: updateData.property_payment_amount,
+          year_established: updateData.year_established,
+          priority: updateData.priority,
+          credit_score: updateData.credit_score,
+          net_operating_income: updateData.net_operating_income,
+          bank_lender_name: updateData.bank_lender_name,
+          annual_revenue: updateData.annual_revenue,
+          existing_loan_amount: updateData.existing_loan_amount,
+          income: updateData.income,
+          pos_system: updateData.pos_system,
+          monthly_processing_volume: updateData.monthly_processing_volume,
+          average_transaction_size: updateData.average_transaction_size,
+          processor_name: updateData.processor_name,
+          current_processing_rate: updateData.current_processing_rate,
+          bdo_name: updateData.bdo_name,
+          bdo_telephone: updateData.bdo_telephone,
+          bdo_email: updateData.bdo_email,
+          maturity_date: updateData.maturity_date,
+          interest_rate: updateData.interest_rate,
+          stage: updateData.stage,
+          loan_amount: updateData.loan_amount,
+          loan_type: updateData.loan_type,
+          updated_at: updateData.updated_at
+        })
+        .eq('id', client.contact_entity_id)
+
+      if (contactError) throw contactError
+
+      // Also update client-specific fields in clients table
+      const { error: clientError } = await supabase
         .from('clients')
-        .update(updateData)
+        .update({
+          status: updateData.status,
+          updated_at: updateData.updated_at
+        })
         .eq('id', client.id)
 
-      if (error) throw error
+      if (clientError) throw clientError
 
       setIsEditing(false)
       toast({
@@ -429,12 +545,14 @@ export default function ClientDetail() {
     switch (stage) {
       case 'New Lead': return 'outline'
       case 'Initial Contact': return 'secondary'
-      case 'Qualified': return 'default'
-      case 'Application': return 'secondary'
+      case 'Loan Application Signed': return 'default'
+      case 'Waiting for Documentation': return 'secondary'
+      case 'Pre-Approved': return 'default'
+      case 'Term Sheet Signed': return 'secondary'
       case 'Loan Approved': return 'outline'
-      case 'Documentation': return 'secondary'
       case 'Closing': return 'default'
-      case 'Funded': return 'default'
+      case 'Loan Funded': return 'default'
+      case 'Archive': return 'secondary'
       default: return 'secondary'
     }
   }
@@ -456,31 +574,26 @@ export default function ClientDetail() {
 
   if (loading) {
     return (
-      <Layout>
-        <div className="flex items-center justify-center min-h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-        </div>
-      </Layout>
+      <div className="flex items-center justify-center min-h-64 p-6">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
     )
   }
 
   if (!client) {
     return (
-      <Layout>
-        <div className="text-center py-12">
-          <h2 className="text-2xl font-bold">Client not found</h2>
-          <Button onClick={() => navigate('/clients')} className="mt-4">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Clients
-          </Button>
-        </div>
-      </Layout>
+      <div className="text-center py-12 p-6">
+        <h2 className="text-2xl font-bold">Client not found</h2>
+        <Button onClick={() => navigate('/clients')} className="mt-4">
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Back to Clients
+        </Button>
+      </div>
     )
   }
 
   return (
-    <Layout>
-      <div className="space-y-6">
+    <div className="space-y-6 p-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -503,28 +616,19 @@ export default function ClientDetail() {
                  </div>
                </div>
                <div className="flex items-center gap-3 flex-wrap">
-                 <Badge 
-                   variant={getStatusColor(client.status)}
-                   className="px-3 py-1 rounded-full font-medium shadow-sm"
-                 >
-                   {client.status}
-                 </Badge>
-                 {client.priority && (
-                   <Badge 
-                     variant={getPriorityColor(client.priority)}
-                     className="px-3 py-1 rounded-full font-medium shadow-sm"
-                   >
-                     {client.priority} Priority
-                   </Badge>
-                 )}
-                 {client.stage && (
-                   <Badge 
-                     variant={getStageColor(client.stage)}
-                     className="px-3 py-1 rounded-full font-medium shadow-sm"
-                   >
-                     {client.stage}
-                   </Badge>
-                 )}
+                <span className="px-3 py-1 rounded-full font-medium shadow-sm text-sm">
+                  {client.status}
+                </span>
+                  {client.priority && (
+                    <span className="px-3 py-1 rounded-full font-medium shadow-sm text-sm">
+                      {client.priority} Priority
+                    </span>
+                  )}
+                  {client.stage && (
+                    <span className="px-3 py-1 rounded-full font-medium shadow-sm text-sm">
+                      {client.stage}
+                    </span>
+                  )}
                </div>
              </div>
            </div>
@@ -533,6 +637,7 @@ export default function ClientDetail() {
             {/* First Row - Communication Buttons */}
             <div className="flex gap-3 flex-wrap">
               <PhoneDialer 
+                phoneNumber={client?.phone}
                 trigger={
                   <Button 
                     variant="gradient-blue"
@@ -673,28 +778,13 @@ export default function ClientDetail() {
                           placeholder="Enter phone number"
                         />
                       ) : (
-                        <p className="font-medium">{client.phone || 'N/A'}</p>
+                        <p className="font-medium">{client.phone ? formatPhoneNumber(client.phone) : 'N/A'}</p>
                       )}
                     </div>
                   </div>
                 </div>
 
                 <div className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <MapPin className="w-4 h-4" />
-                     <div className="flex-1">
-                       <p className="text-sm text-muted-foreground">Address</p>
-                      {isEditing ? (
-                         <Input
-                           value={editableFields.location}
-                           onChange={(e) => setEditableFields({...editableFields, location: e.target.value})}
-                           placeholder="Enter address"
-                         />
-                      ) : (
-                       <p className="font-medium">{client.location || 'N/A'}</p>
-                      )}
-                    </div>
-                  </div>
 
                   <div className="flex items-center gap-3">
                     <div className="flex-1">
@@ -711,7 +801,7 @@ export default function ClientDetail() {
                           </SelectContent>
                         </Select>
                       ) : (
-                        <Badge variant={getStatusColor(client.status)}>{client.status}</Badge>
+                        <span className="text-sm font-medium">{client.status}</span>
                       )}
                     </div>
                   </div>
@@ -769,16 +859,45 @@ export default function ClientDetail() {
                   <div className="flex items-center gap-3">
                     <Home className="w-4 h-4" />
                     <div className="flex-1">
-                      <p className="text-sm text-muted-foreground">Business Address</p>
+                      <p className="text-sm text-muted-foreground">Company Address</p>
                       {isEditing ? (
-                        <Textarea
-                          value={editableFields.business_address}
-                          onChange={(e) => setEditableFields({...editableFields, business_address: e.target.value})}
-                          placeholder="Enter business address"
-                          rows={2}
-                        />
+                        <div className="space-y-2">
+                          <Textarea
+                            value={editableFields.business_address}
+                            onChange={(e) => setEditableFields({...editableFields, business_address: e.target.value})}
+                            placeholder="Enter street address"
+                            rows={2}
+                          />
+                          <div className="grid grid-cols-2 gap-2">
+                            <Input
+                              value={editableFields.business_city}
+                              onChange={(e) => setEditableFields({...editableFields, business_city: e.target.value})}
+                              placeholder="City"
+                            />
+                            <Input
+                              value={editableFields.business_state}
+                              onChange={(e) => setEditableFields({...editableFields, business_state: e.target.value})}
+                              placeholder="State"
+                            />
+                          </div>
+                          <Input
+                            value={editableFields.business_zip_code}
+                            onChange={(e) => setEditableFields({...editableFields, business_zip_code: e.target.value})}
+                            placeholder="ZIP Code"
+                          />
+                        </div>
                       ) : (
-                        <p className="font-medium">{client.business_address || 'N/A'}</p>
+                        <div className="space-y-1">
+                          {(client as any).business_address && <p className="font-medium">{(client as any).business_address}</p>}
+                          {((client as any).business_city || (client as any).business_state || (client as any).business_zip_code) && (
+                            <p className="font-medium">
+                              {[(client as any).business_city, (client as any).business_state, (client as any).business_zip_code].filter(Boolean).join(', ')}
+                            </p>
+                          )}
+                          {!(client as any).business_address && !(client as any).business_city && !(client as any).business_state && !(client as any).business_zip_code && (
+                            <p className="font-medium">N/A</p>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>
@@ -1152,12 +1271,13 @@ export default function ClientDetail() {
                            <SelectContent>
                              <SelectItem value="New Lead">New Lead</SelectItem>
                              <SelectItem value="Initial Contact">Initial Contact</SelectItem>
-                             <SelectItem value="Qualified">Qualified</SelectItem>
-                             <SelectItem value="Application">Application</SelectItem>
+                             <SelectItem value="Loan Application Signed">Loan Application Signed</SelectItem>
+                             <SelectItem value="Waiting for Documentation">Waiting for Documentation</SelectItem>
+                             <SelectItem value="Pre-Approved">Pre-Approved</SelectItem>
+                             <SelectItem value="Term Sheet Signed">Term Sheet Signed</SelectItem>
                              <SelectItem value="Loan Approved">Loan Approved</SelectItem>
-                             <SelectItem value="Documentation">Documentation</SelectItem>
                              <SelectItem value="Closing">Closing</SelectItem>
-                             <SelectItem value="Funded">Funded</SelectItem>
+                             <SelectItem value="Loan Funded">Loan Funded</SelectItem>
                            </SelectContent>
                         </Select>
                       ) : (
@@ -1367,6 +1487,13 @@ export default function ClientDetail() {
             </CardContent>
           </Card>
 
+          {/* Client Scheduling */}
+          <ClientScheduler 
+            clientId={client.contact_entity_id || client.id}
+            clientName={client.name}
+            clientType="client"
+          />
+
           {/* General Notes Section */}
           <Card>
             <CardHeader>
@@ -1374,19 +1501,17 @@ export default function ClientDetail() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="generalNotes">
-                  Notes
-                </Label>
+                <Label htmlFor="generalNotes">Add New Note</Label>
                 <Textarea
                   id="generalNotes"
-                  placeholder="Enter general notes about this client..."
+                  placeholder="Type your note here..."
                   value={generalNotes}
                   onChange={(e) => setGeneralNotes(e.target.value)}
                   rows={4}
                 />
-                <Button onClick={saveGeneralNotes}>
+                <Button onClick={saveGeneralNotes} disabled={!generalNotes.trim()}>
                   <Save className="w-4 h-4 mr-2" />
-                  Save General Notes
+                  Save Note
                 </Button>
               </div>
             </CardContent>
@@ -1395,30 +1520,12 @@ export default function ClientDetail() {
           {/* Call Notes Section */}
           <Card>
             <CardHeader>
-              <CardTitle>
-                Call Notes
-              </CardTitle>
+              <CardTitle>Call Notes</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Existing Call Notes */}
-              {callNotes && (
-                <div>
-                  <Label>Previous Call Notes</Label>
-                  <div className="mt-2 p-3 bg-muted rounded-lg">
-                    <pre className="whitespace-pre-wrap text-sm">
-                      {callNotes}
-                    </pre>
-                  </div>
-                </div>
-              )}
-
-              <Separator />
-
-              {/* Add New Call Note */}
+              {/* New Call Note Input */}
               <div className="space-y-2">
-                <Label htmlFor="newCallNote">
-                  Add New Call Note
-                </Label>
+                <Label htmlFor="newCallNote">Add New Call Note</Label>
                 <Textarea
                   id="newCallNote"
                   placeholder="Enter your call notes here..."
@@ -1431,10 +1538,40 @@ export default function ClientDetail() {
                   Save Call Note
                 </Button>
               </div>
+
+              {/* Call Notes History */}
+              <div className="space-y-2">
+                <Label>Call Notes History</Label>
+                <div className="max-h-[500px] overflow-y-auto space-y-2">
+                  {notesHistory.filter(n => n.note_type === 'call').length === 0 ? (
+                    <p className="text-sm text-muted-foreground italic py-4">No call notes yet...</p>
+                  ) : (
+                    notesHistory
+                      .filter(n => n.note_type === 'call')
+                      .map(note => (
+                        <div key={note.id} className="pb-2 border-b border-border last:border-0">
+                          <div className="flex items-baseline justify-between mb-1">
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(note.created_at).toLocaleString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric',
+                                hour: 'numeric',
+                                minute: '2-digit',
+                                hour12: true
+                              })}
+                            </span>
+                            <span className="text-xs text-muted-foreground">{note.user_name}</span>
+                          </div>
+                          <p className="text-sm text-foreground whitespace-pre-wrap">{note.content}</p>
+                        </div>
+                      ))
+                  )}
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>
-      </div>
 
       {/* Action Reminder Dialog */}
       {client && (
@@ -1446,7 +1583,7 @@ export default function ClientDetail() {
           onClose={() => setShowReminderDialog(false)}
         />
       )}
-    </Layout>
+    </div>
   )
 }
 

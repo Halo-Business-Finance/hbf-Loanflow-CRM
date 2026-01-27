@@ -1,5 +1,11 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+import { validateText, validateUUID } from "../_shared/validation.ts";
+import { createErrorResponse, createSuccessResponse } from "../_shared/error-handler.ts";
+import { checkRateLimit, RATE_LIMITS } from "../_shared/rate-limit.ts";
+import { SecureLogger } from "../_shared/secure-logger.ts";
+
+const logger = new SecureLogger('audit-log');
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -17,7 +23,7 @@ serve(async (req) => {
   }
 
   try {
-    const { action, table_name, record_id, old_values, new_values } = await req.json();
+    const requestBody = await req.json();
     
     // Get authorization header
     const authHeader = req.headers.get('Authorization');
@@ -31,6 +37,39 @@ serve(async (req) => {
     if (userError || !user) {
       throw new Error('Unauthorized');
     }
+    
+    // CRITICAL: Rate limiting for audit logging
+    const rateLimit = await checkRateLimit(supabase, user.id, RATE_LIMITS.AUDIT_LOG);
+    if (!rateLimit.allowed) {
+      throw new Error(rateLimit.error);
+    }
+    
+    // CRITICAL: Validate and sanitize input
+    const actionValidation = validateText(requestBody.action, 'Action', 100);
+    if (!actionValidation.valid) {
+      throw new Error(actionValidation.error);
+    }
+    
+    const tableNameValidation = validateText(requestBody.table_name, 'Table name', 100);
+    if (!tableNameValidation.valid) {
+      throw new Error(tableNameValidation.error);
+    }
+    
+    let recordIdValidation = { valid: true, sanitized: requestBody.record_id };
+    if (requestBody.record_id) {
+      recordIdValidation = validateUUID(requestBody.record_id, 'Record ID');
+      if (!recordIdValidation.valid) {
+        throw new Error(recordIdValidation.error);
+      }
+    }
+    
+    const { action, table_name, record_id, old_values, new_values } = {
+      action: actionValidation.sanitized,
+      table_name: tableNameValidation.sanitized,
+      record_id: recordIdValidation.sanitized,
+      old_values: requestBody.old_values,
+      new_values: requestBody.new_values
+    };
 
     // Get client IP and user agent - handle comma-separated IPs
     const rawIP = req.headers.get('x-forwarded-for') || 
@@ -40,7 +79,7 @@ serve(async (req) => {
     const clientIP = rawIP.includes(',') ? rawIP.split(',')[0].trim() : rawIP;
     const userAgent = req.headers.get('user-agent') || 'unknown';
 
-    console.log(`Audit log: ${action} by user ${user.id}`);
+    logger.logAction(action, { userId: user.id });
 
     // Insert audit log
     const { data, error } = await supabase
@@ -59,7 +98,7 @@ serve(async (req) => {
       .single();
 
     if (error) {
-      console.error('Database error:', error);
+      logger.error('Database error', error);
       throw error;
     }
 
@@ -71,13 +110,7 @@ serve(async (req) => {
     });
 
   } catch (error: any) {
-    console.error('Error in audit-log function:', error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { 
-        status: 500, 
-        headers: { 'Content-Type': 'application/json', ...corsHeaders } 
-      }
-    );
+    // Use secure error handler to prevent information leakage
+    return createErrorResponse(error, corsHeaders, 400);
   }
 });

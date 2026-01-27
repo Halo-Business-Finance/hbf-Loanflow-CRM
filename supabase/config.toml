@@ -1,52 +1,92 @@
 project_id = "gshxxsniwytjgcnthyfq"
 
 [functions.enhanced-auth]
-verify_jwt = false
+verify_jwt = true
 
 [functions.geo-security]
-verify_jwt = false
+verify_jwt = true
 
 [functions.production-geo-security]
-verify_jwt = false
+verify_jwt = true
 
 [functions.enhanced-geo-security]
-verify_jwt = false
+verify_jwt = true
 
 [functions.microsoft-auth]
-verify_jwt = false
+verify_jwt = true
 
 [functions.audit-log]
-verify_jwt = false
+verify_jwt = true
 
 [functions.ringcentral-auth]
-verify_jwt = false
+verify_jwt = true
 
 [functions.threat-detection]
-verify_jwt = false
+verify_jwt = true
 
 [functions.google-maps-config]
-verify_jwt = false
+verify_jwt = true
 
 [functions.security-monitor]
-verify_jwt = false
+verify_jwt = true
 
 [functions.blockchain-hash]
-verify_jwt = false
+verify_jwt = true
 
 [functions.encrypt-data]
-verify_jwt = false
+verify_jwt = true
 
 [functions.get-adobe-config]
-verify_jwt = false
+verify_jwt = true
 
 [functions.secure-external-api]
-verify_jwt = false
+verify_jwt = true
 
 [functions.send-email]
-verify_jwt = false
+verify_jwt = true
 
 [functions.session-security]
-verify_jwt = false
+verify_jwt = true
 
 [functions.webhook-security]
 verify_jwt = false
+
+# Explicitly configure critical admin functions
+[functions.admin-get-users]
+verify_jwt = true
+
+[functions.admin-reset-password]
+verify_jwt = true
+
+[functions.admin-create-user]
+verify_jwt = true
+
+[functions.admin-update-user]
+verify_jwt = true
+
+[functions.admin-delete-user]
+verify_jwt = true
+
+[functions.validate-form-data]
+verify_jwt = true
+
+[functions.secure-document-manager]
+verify_jwt = true
+
+[functions.secure-profile-access]
+verify_jwt = true
+
+[functions.persistent-ai-security]
+verify_jwt = true
+
+[functions.security-enhanced]
+verify_jwt = true
+
+[functions.generate-conditions]
+verify_jwt = true
+
+[functions.ai-decision-engine]
+verify_jwt = true
+
+[functions.scan-document]
+verify_jwt = true

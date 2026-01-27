@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -10,6 +10,9 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom"
 import { Lead } from "@/types/lead"
+import { formatPhoneNumber } from "@/lib/utils"
+import { useRoleBasedAccess } from "@/hooks/useRoleBasedAccess"
+import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription"
 
 // Use Lead type from centralized types but alias as LeadData for backwards compatibility
 type LeadData = Lead
@@ -65,15 +68,9 @@ const LeadCard = ({ lead, onStageChange, onViewDetails }: {
           </div>
           
           <div className="flex flex-col gap-2 items-end">
-            <Badge 
-              variant={
-                lead.priority === 'high' ? 'destructive' : 
-                lead.priority === 'medium' ? 'default' : 'secondary'
-              }
-              className="text-xs"
-            >
+            <span className="text-xs">
               {lead.priority}
-            </Badge>
+            </span>
             
             <div className="flex gap-1" onClick={handleActionClick}>
               <Button
@@ -97,10 +94,10 @@ const LeadCard = ({ lead, onStageChange, onViewDetails }: {
                   </DialogHeader>
                   <div className="space-y-4">
                     <div>
-                      <label className="text-sm font-medium text-foreground">Move to Stage:</label>
+                      <label className="text-sm font-medium text-foreground">Move to Loan Stage:</label>
                       <Select onValueChange={(value) => onStageChange(lead.id, value)}>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select new stage" />
+                          <SelectValue placeholder="Select new loan stage" />
                         </SelectTrigger>
                         <SelectContent>
                           {stageOrder.map(stage => (
@@ -122,7 +119,7 @@ const LeadCard = ({ lead, onStageChange, onViewDetails }: {
   );
 };
 
-const stageOrder = ["New Lead", "Initial Contact", "Qualified", "Application", "Loan Approved", "Closing", "Funded"];
+const stageOrder = ["New Lead", "Initial Contact", "Loan Application Signed", "Waiting for Documentation", "Pre-Approved", "Term Sheet Signed", "Loan Approved", "Closing", "Loan Funded"];
 
 export function InteractivePipeline() {
   const [leads, setLeads] = useState<LeadData[]>([]);
@@ -130,6 +127,7 @@ export function InteractivePipeline() {
   const [selectedLead, setSelectedLead] = useState<LeadData | null>(null);
   const { user } = useAuth();
   const { toast } = useToast();
+  const { hasRole } = useRoleBasedAccess();
 
   useEffect(() => {
     if (user) {
@@ -137,25 +135,86 @@ export function InteractivePipeline() {
     }
   }, [user]);
 
+  // Real-time subscription for leads
+  useRealtimeSubscription({
+    table: 'leads',
+    event: '*',
+    onChange: () => {
+      console.log('Leads changed, refreshing pipeline...');
+      fetchLeads();
+    }
+  });
+
+  // Real-time subscription for contact_entities to catch stage changes
+  useRealtimeSubscription({
+    table: 'contact_entities',
+    event: '*',
+    onChange: () => {
+      console.log('Contact entities changed, refreshing pipeline...');
+      fetchLeads();
+    }
+  });
+
   const fetchLeads = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      
+      // Managers and admins can see all leads, others see only their own
+      const isManagerOrAdmin = hasRole('manager') || hasRole('admin') || hasRole('super_admin');
+      
+      let query = supabase
         .from('leads')
         .select(`
           *,
-          contact_entity:contact_entities!contact_entity_id (*)
-        `)
-        .eq('user_id', user?.id);
+          contact_entity:contact_entities!leads_contact_entity_id_fkey(*)
+        `);
+      
+      // Only filter by user_id if not a manager/admin
+      if (!isManagerOrAdmin) {
+        query = query.eq('user_id', user?.id);
+      }
+      
+      // Try embedded join first; fallback to two-step fetch on error
+      const respAny = await (query as any);
+      let data = (respAny?.data as any[]) || null;
+      let error = respAny?.error as any;
+      if (error) {
+        console.warn('[Pipeline] Embedded join failed, falling back:', error);
+        const baseQuery = supabase.from('leads').select('*');
+        const baseResp = !isManagerOrAdmin
+          ? await baseQuery.eq('user_id', user?.id)
+          : await baseQuery;
+        const baseLeads = (baseResp.data as any[]) || [];
+        const baseError = baseResp.error as any;
+        if (baseError) throw baseError;
+        const ids = (baseLeads || []).map(l => l.contact_entity_id).filter(Boolean);
+        const contactsResp = ids.length
+          ? await supabase.from('contact_entities').select('*').in('id', ids as string[])
+          : ({ data: [], error: null } as any);
+        const contacts = (contactsResp.data as any[]) || [];
+        const contactsError = contactsResp.error as any;
+        if (contactsError) throw contactsError;
+        const map = new Map((contacts || []).map((c: any) => [c.id, c]));
+        data = (baseLeads || []).map((lead: any) => ({
+          ...lead,
+          contact_entity: map.get(lead.contact_entity_id) || null,
+        }));
+        error = null as any;
+      }
 
       if (error) throw error;
 
       // Transform leads data to merge contact entity fields
-      const transformedLeads = data?.map(lead => ({
-        ...lead,
-        ...lead.contact_entity
-      })) || []
+      const transformedLeads = data?.map(lead => {
+        const contactEntity = lead.contact_entity as any;
+        return {
+          ...lead,
+          ...(contactEntity || {}),
+          contact_entity_id: lead.contact_entity_id // Preserve the contact_entity_id
+        };
+      }) || []
 
+      console.log('Transformed leads for pipeline:', transformedLeads);
       setLeads(transformedLeads);
     } catch (error) {
       console.error('Error fetching leads:', error);
@@ -171,12 +230,25 @@ export function InteractivePipeline() {
 
   const updateLeadStage = async (leadId: string, newStage: string) => {
     try {
+      // Find the lead to get its contact_entity_id
+      const lead = leads.find(l => l.id === leadId);
+      if (!lead || !lead.contact_entity_id) {
+        throw new Error('Lead or contact entity not found');
+      }
+
+      // Update the stage in contact_entities table
       const { error } = await supabase
-        .from('leads')
+        .from('contact_entities')
         .update({ stage: newStage, updated_at: new Date().toISOString() })
-        .eq('id', leadId);
+        .eq('id', lead.contact_entity_id);
 
       if (error) throw error;
+
+      // Also update the lead's updated_at timestamp
+      await supabase
+        .from('leads')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', leadId);
 
       toast({
         title: "Success",
@@ -244,7 +316,7 @@ export function InteractivePipeline() {
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-lg text-foreground">{stage}</CardTitle>
                   <div className="flex items-center gap-2">
-                    <Badge variant="secondary">{stageGroups[stage]?.length || 0}</Badge>
+                    <span className="text-sm font-medium">{stageGroups[stage]?.length || 0}</span>
                     {index < stageOrder.length - 1 && (
                       <ArrowRight className="h-4 w-4 text-muted-foreground" />
                     )}
@@ -305,26 +377,20 @@ export function InteractivePipeline() {
               {selectedLead.phone && (
                 <div>
                   <label className="text-sm font-medium dark:text-white">Phone:</label>
-                  <p className="text-sm text-muted-foreground dark:text-white">{selectedLead.phone}</p>
+                  <p className="text-sm text-muted-foreground dark:text-white">{formatPhoneNumber(selectedLead.phone)}</p>
                 </div>
               )}
               
               <div>
-                <label className="text-sm font-medium dark:text-white">Current Stage:</label>
-                <Badge className="ml-2">{selectedLead.stage}</Badge>
+                <label className="text-sm font-medium dark:text-white">Current Loan Stage:</label>
+                <span className="ml-2 text-sm">{selectedLead.stage}</span>
               </div>
               
               <div>
                 <label className="text-sm font-medium dark:text-white">Priority:</label>
-                <Badge 
-                  className="ml-2"
-                  variant={
-                    selectedLead.priority === 'high' ? 'destructive' : 
-                    selectedLead.priority === 'medium' ? 'default' : 'secondary'
-                  }
-                >
+                <span className="ml-2 text-sm">
                   {selectedLead.priority}
-                </Badge>
+                </span>
               </div>
               
               {selectedLead.loan_amount && (

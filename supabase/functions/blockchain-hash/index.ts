@@ -1,5 +1,11 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { validateText, validateUUID } from "../_shared/validation.ts";
+import { createErrorResponse, createSuccessResponse } from "../_shared/error-handler.ts";
+import { checkRateLimit, RATE_LIMITS } from "../_shared/rate-limit.ts";
+import { SecureLogger } from "../_shared/secure-logger.ts";
+
+const logger = new SecureLogger('blockchain-hash');
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -25,19 +31,46 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
+    
+    // Get authorization and verify rate limit
+    const authHeader = req.headers.get('Authorization');
+    if (authHeader) {
+      const token = authHeader.replace('Bearer ', '');
+      const { data: { user } } = await supabase.auth.getUser(token);
+      
+      if (user) {
+        // CRITICAL: Rate limiting for blockchain operations
+        const rateLimit = await checkRateLimit(supabase, user.id, RATE_LIMITS.BLOCKCHAIN_HASH);
+        if (!rateLimit.allowed) {
+          throw new Error(rateLimit.error);
+        }
+      }
+    }
 
     // Get request body
-    const { recordType, recordId, data, metadata = {} }: BlockchainRequest = await req.json()
+    const requestBody: BlockchainRequest = await req.json();
 
-    if (!recordType || !recordId || !data) {
-      return new Response(
-        JSON.stringify({ error: 'Missing required fields: recordType, recordId, data' }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      )
+    if (!requestBody.recordType || !requestBody.recordId || !requestBody.data) {
+      throw new Error('Missing required fields: recordType, recordId, data');
     }
+    
+    // CRITICAL: Validate and sanitize input
+    const recordTypeValidation = validateText(requestBody.recordType, 'Record type', 50);
+    if (!recordTypeValidation.valid) {
+      throw new Error(recordTypeValidation.error);
+    }
+    
+    const recordIdValidation = validateUUID(requestBody.recordId, 'Record ID');
+    if (!recordIdValidation.valid) {
+      throw new Error(recordIdValidation.error);
+    }
+    
+    const { recordType, recordId, data, metadata = {} } = {
+      recordType: recordTypeValidation.sanitized,
+      recordId: recordIdValidation.sanitized,
+      data: requestBody.data,
+      metadata: requestBody.metadata || {}
+    };
 
     // Generate cryptographic hash of the data
     const encoder = new TextEncoder()
@@ -62,7 +95,7 @@ serve(async (req) => {
       })
 
     if (createError) {
-      console.error('Error creating blockchain record:', createError)
+      logger.error('Error creating blockchain record', createError)
       return new Response(
         JSON.stringify({ error: 'Failed to create blockchain record' }),
         { 
@@ -92,7 +125,7 @@ serve(async (req) => {
       .eq('id', blockchainRecord)
 
     if (updateError) {
-      console.error('Error updating blockchain record:', updateError)
+      logger.error('Error updating blockchain record', updateError)
       return new Response(
         JSON.stringify({ error: 'Failed to update blockchain record' }),
         { 
@@ -133,17 +166,8 @@ serve(async (req) => {
       }
     )
 
-  } catch (error) {
-    console.error('Blockchain hash function error:', error)
-    return new Response(
-      JSON.stringify({ 
-        error: 'Internal server error',
-        message: error.message 
-      }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
-    )
+  } catch (error: unknown) {
+    // Use secure error handler to prevent information leakage
+    return createErrorResponse(error, corsHeaders, 400);
   }
 })

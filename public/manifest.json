@@ -1,0 +1,26 @@
+{
+  "name": "LoanFlow CRM",
+  "short_name": "LoanFlow",
+  "description": "Enterprise-grade SBA and Commercial Loan CRM for Banks and Lenders",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0f172a",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "any",
+      "type": "image/x-icon"
+    }
+  ],
+  "categories": [
+    "business",
+    "finance",
+    "productivity"
+  ],
+  "scope": "/",
+  "dir": "ltr",
+  "lang": "en-US",
+  "prefer_related_applications": false
+}

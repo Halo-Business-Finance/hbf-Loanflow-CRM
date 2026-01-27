@@ -18,18 +18,43 @@ export default {
 			}
 		},
 		extend: {
+			fontFamily: {
+				sans: [
+					'ui-sans-serif',
+					'system-ui',
+					'-apple-system',
+					'BlinkMacSystemFont',
+					'"Segoe UI"',
+					'Roboto',
+					'"Helvetica Neue"',
+					'Arial',
+					'"Noto Sans"',
+					'sans-serif',
+					'"Apple Color Emoji"',
+					'"Segoe UI Emoji"',
+					'"Segoe UI Symbol"',
+					'"Noto Color Emoji"'
+				],
+			},
 			backgroundImage: {
 				'gradient-primary': 'var(--gradient-primary)',
 				'gradient-card': 'var(--gradient-card)',
+				'gradient-navy': 'var(--gradient-navy)',
+				'glass-pattern': 'var(--widget-pattern)',
 			},
 			boxShadow: {
 				'soft': 'var(--shadow-soft)',
 				'medium': 'var(--shadow-medium)',
 				'large': 'var(--shadow-large)',
+				'glass': 'var(--glass-shadow)',
+				'widget': 'var(--widget-glow)',
 			},
 			colors: {
 				border: 'hsl(var(--border))',
 				input: 'hsl(var(--input))',
+				'input-border': 'hsl(var(--input-border))',
+				'input-border-hover': 'hsl(var(--input-border-hover))',
+				'input-border-focus': 'hsl(var(--input-border-focus))',
 				ring: 'hsl(var(--ring))',
 				background: 'hsl(var(--background))',
 				foreground: 'hsl(var(--foreground))',
@@ -79,7 +104,23 @@ export default {
 				navy: {
 					DEFAULT: 'hsl(var(--navy))',
 					foreground: 'hsl(var(--navy-foreground))',
+					light: 'hsl(var(--navy-light))',
+					dark: 'hsl(var(--navy-dark))',
 					600: 'hsl(220 80% 45%)'
+				},
+				'royal-blue': {
+					DEFAULT: 'hsl(var(--royal-blue))'
+				},
+				'field-accent': {
+					DEFAULT: 'hsl(var(--field-accent))'
+				},
+				success: {
+					DEFAULT: 'hsl(var(--success))',
+					foreground: 'hsl(var(--success-foreground))'
+				},
+				info: {
+					DEFAULT: 'hsl(var(--info))',
+					foreground: 'hsl(var(--info-foreground))'
 				}
 			},
 			borderRadius: {

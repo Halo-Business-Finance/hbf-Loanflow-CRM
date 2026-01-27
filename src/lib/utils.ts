@@ -61,3 +61,26 @@ export function formatClickablePhone(phoneNumber: string): { formatted: string; 
   const telLink = createTelLink(phoneNumber)
   return { formatted, telLink }
 }
+
+// Format number with commas for display in inputs
+export function formatNumberWithCommas(value: string | number): string {
+  if (value === null || value === undefined || value === '') {
+    return ''
+  }
+  
+  const numStr = typeof value === 'number' ? value.toString() : value
+  const cleanedValue = numStr.replace(/[^\d.]/g, '')
+  
+  if (!cleanedValue) return ''
+  
+  const parts = cleanedValue.split('.')
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+  
+  return parts.join('.')
+}
+
+// Parse formatted number back to raw string
+export function parseNumberFromFormatted(value: string): string {
+  if (!value) return ''
+  return value.replace(/,/g, '')
+}

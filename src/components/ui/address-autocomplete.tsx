@@ -46,10 +46,14 @@ export function AddressAutocomplete({
           })
 
           autocompleteRef.current.addListener('place_changed', () => {
-            const place = autocompleteRef.current?.getPlace()
-            if (place && place.formatted_address) {
-              onChange(place.formatted_address)
-              onPlaceSelected?.(place)
+            try {
+              const place = autocompleteRef.current?.getPlace()
+              if (place && place.formatted_address) {
+                onChange(place.formatted_address)
+                onPlaceSelected?.(place)
+              }
+            } catch (error) {
+              console.error('Error processing place selection:', error)
             }
           })
         }

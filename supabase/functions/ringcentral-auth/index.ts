@@ -1,15 +1,14 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { getSecurityHeaders, handleSecureOptions, validatePhoneNumber, sanitizeString } from "../_shared/security-headers.ts";
+import { SecureLogger } from "../_shared/secure-logger.ts";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+const logger = new SecureLogger('ringcentral-auth');
 
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
+    return handleSecureOptions()
   }
 
   try {
@@ -31,10 +30,19 @@ serve(async (req) => {
 
     const { action, phoneNumber } = await req.json()
 
+    // Validate inputs
+    if (action && !['call', 'status'].includes(action)) {
+      throw new Error('Invalid action parameter')
+    }
+    
+    if (phoneNumber && !validatePhoneNumber(phoneNumber)) {
+      throw new Error('Invalid phone number format')
+    }
+
     // Get user's RingCentral account
     const { data: rcAccount, error: rcError } = await supabaseClient
       .from('ringcentral_accounts')
-      .select('*')
+      .select('client_id, client_secret, server_url, username, extension, password')
       .eq('user_id', user.id)
       .eq('is_active', true)
       .single()
@@ -43,7 +51,12 @@ serve(async (req) => {
       throw new Error('RingCentral account not configured')
     }
 
-    // Authenticate with RingCentral
+    // Validate required fields
+    if (!rcAccount.client_id || !rcAccount.client_secret || !rcAccount.username || !rcAccount.password) {
+      throw new Error('RingCentral account incomplete - missing required credentials')
+    }
+
+    // Authenticate with RingCentral using proper password field
     const authResponse = await fetch(`${rcAccount.server_url}/restapi/oauth/token`, {
       method: 'POST',
       headers: {
@@ -53,23 +66,26 @@ serve(async (req) => {
       body: new URLSearchParams({
         grant_type: 'password',
         username: rcAccount.username,
-        password: rcAccount.client_secret, // This should be the actual password
+        password: rcAccount.password, // Use the actual password field, not client_secret
         extension: rcAccount.extension || ''
       })
     })
 
     if (!authResponse.ok) {
       const error = await authResponse.text()
-      console.error('RingCentral auth error:', error)
+      logger.error('RingCentral auth error', new Error(error))
       throw new Error('Failed to authenticate with RingCentral')
     }
 
     const authData = await authResponse.json()
-    console.log('RingCentral authenticated successfully')
+    logger.info('RingCentral authenticated successfully')
 
     let result = {}
 
     if (action === 'call' && phoneNumber) {
+      // Sanitize phone number
+      const sanitizedPhoneNumber = sanitizeString(phoneNumber, 20);
+      
       // Make a RingOut call
       const callResponse = await fetch(`${rcAccount.server_url}/restapi/v1.0/account/~/extension/~/ring-out`, {
         method: 'POST',
@@ -79,19 +95,19 @@ serve(async (req) => {
         },
         body: JSON.stringify({
           from: { phoneNumber: rcAccount.username },
-          to: { phoneNumber: phoneNumber },
+          to: { phoneNumber: sanitizedPhoneNumber },
           playPrompt: false
         })
       })
 
       if (!callResponse.ok) {
         const error = await callResponse.text()
-        console.error('RingCentral call error:', error)
+        logger.error('RingCentral call error', new Error(error))
         throw new Error('Failed to initiate call')
       }
 
       result = await callResponse.json()
-      console.log('Call initiated:', result)
+      logger.info('Call initiated')
 
     } else if (action === 'status') {
       // Get extension info
@@ -106,18 +122,20 @@ serve(async (req) => {
       }
 
       result = await extensionResponse.json()
-      console.log('Extension status:', result)
+      logger.info('Extension status retrieved')
     }
 
     return new Response(JSON.stringify(result), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: getSecurityHeaders({ 'Content-Type': 'application/json' }),
     })
 
   } catch (error) {
-    console.error('Error in ringcentral-auth function:', error)
-    return new Response(JSON.stringify({ error: error.message }), {
+    logger.error('Error in ringcentral-auth function', error)
+    return new Response(JSON.stringify({
+      error: error instanceof Error ? error.message : 'Internal server error' 
+    }), {
       status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: getSecurityHeaders({ 'Content-Type': 'application/json' }),
     })
   }
 })

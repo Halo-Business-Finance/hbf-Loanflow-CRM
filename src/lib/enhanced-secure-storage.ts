@@ -1,6 +1,7 @@
 /**
  * Enhanced secure storage that prioritizes server-side sessions over localStorage
  * for sensitive data with automatic cleanup
+ * NOW WITH PROPER AES-GCM ENCRYPTION (replaces weak XOR cipher)
  */
 
 import { supabase } from '@/integrations/supabase/client';
@@ -47,34 +48,107 @@ class EnhancedSecureStorage {
     return this.sessionKey;
   }
 
+  /**
+   * Encrypt using AES-GCM (replaces weak XOR cipher)
+   */
   private async encrypt(text: string): Promise<string> {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(text);
-    const key = this.getEncryptionKey();
-    const keyBytes = encoder.encode(key);
-    const encrypted = new Uint8Array(data.length);
-    
-    for (let i = 0; i < data.length; i++) {
-      encrypted[i] = data[i] ^ keyBytes[i % keyBytes.length];
+    try {
+      const encoder = new TextEncoder();
+      const data = encoder.encode(text);
+      
+      // Get encryption key and convert to CryptoKey
+      const keyMaterial = await crypto.subtle.importKey(
+        'raw',
+        encoder.encode(this.getEncryptionKey()),
+        { name: 'PBKDF2' },
+        false,
+        ['deriveBits', 'deriveKey']
+      );
+      
+      // Derive a proper AES key using PBKDF2
+      const aesKey = await crypto.subtle.deriveKey(
+        {
+          name: 'PBKDF2',
+          salt: encoder.encode('lovable-crm-salt-v1'),
+          iterations: 100000,
+          hash: 'SHA-256'
+        },
+        keyMaterial,
+        { name: 'AES-GCM', length: 256 },
+        false,
+        ['encrypt']
+      );
+      
+      // Generate random IV (12 bytes for GCM)
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      
+      // Encrypt with AES-GCM
+      const encryptedData = await crypto.subtle.encrypt(
+        { name: 'AES-GCM', iv },
+        aesKey,
+        data
+      );
+      
+      // Combine IV + encrypted data
+      const combined = new Uint8Array(iv.length + encryptedData.byteLength);
+      combined.set(iv, 0);
+      combined.set(new Uint8Array(encryptedData), iv.length);
+      
+      // Return as base64
+      return btoa(String.fromCharCode(...combined));
+    } catch (error) {
+      console.error('Encryption failed');
+      throw error;
     }
-    
-    return btoa(String.fromCharCode(...encrypted));
   }
 
+  /**
+   * Decrypt using AES-GCM
+   */
   private async decrypt(encryptedText: string): Promise<string> {
     try {
-      const encrypted = new Uint8Array(
+      const encoder = new TextEncoder();
+      
+      // Decode base64
+      const combined = new Uint8Array(
         atob(encryptedText).split('').map(char => char.charCodeAt(0))
       );
-      const key = this.getEncryptionKey();
-      const keyBytes = new TextEncoder().encode(key);
-      const decrypted = new Uint8Array(encrypted.length);
       
-      for (let i = 0; i < encrypted.length; i++) {
-        decrypted[i] = encrypted[i] ^ keyBytes[i % keyBytes.length];
-      }
+      // Extract IV (first 12 bytes) and encrypted data
+      const iv = combined.slice(0, 12);
+      const encryptedData = combined.slice(12);
       
-      return new TextDecoder().decode(decrypted);
+      // Get encryption key and convert to CryptoKey
+      const keyMaterial = await crypto.subtle.importKey(
+        'raw',
+        encoder.encode(this.getEncryptionKey()),
+        { name: 'PBKDF2' },
+        false,
+        ['deriveBits', 'deriveKey']
+      );
+      
+      // Derive the same AES key
+      const aesKey = await crypto.subtle.deriveKey(
+        {
+          name: 'PBKDF2',
+          salt: encoder.encode('lovable-crm-salt-v1'),
+          iterations: 100000,
+          hash: 'SHA-256'
+        },
+        keyMaterial,
+        { name: 'AES-GCM', length: 256 },
+        false,
+        ['decrypt']
+      );
+      
+      // Decrypt with AES-GCM
+      const decryptedData = await crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv },
+        aesKey,
+        encryptedData
+      );
+      
+      return new TextDecoder().decode(decryptedData);
     } catch (error) {
       console.error('Decryption failed');
       return '';

@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { 
   Brain, 
@@ -44,10 +44,10 @@ export function AdminAITools() {
       <div className="flex items-center gap-3">
         <Cpu className="h-6 w-6 text-white" />
         <div>
-          <h2 className="text-2xl font-bold text-foreground underline">AI & Automation Tools</h2>
+          <h2 className="text-2xl font-thin text-foreground">AI & Automation Tools</h2>
           <p className="text-muted-foreground">Advanced tools to boost loan origination efficiency</p>
         </div>
-        <Badge variant="default" className="ml-auto">Admin Only</Badge>
+        <span className="ml-auto text-sm font-medium">Admin Only</span>
       </div>
 
       <Tabs defaultValue="ai-assistant" className="space-y-6">

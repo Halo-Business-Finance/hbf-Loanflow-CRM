@@ -1,0 +1,88 @@
+name: Edge Function Security Check
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'supabase/functions/**'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'supabase/functions/**'
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Check for console.log in edge functions
+        run: |
+          echo "Scanning edge functions for console.log statements..."
+          
+          # Find all console.log, console.error, console.warn in edge functions
+          VIOLATIONS=$(grep -rn "console\.\(log\|error\|warn\|info\|debug\)" supabase/functions/ --include="*.ts" || true)
+          
+          if [ -n "$VIOLATIONS" ]; then
+            echo "❌ SECURITY VIOLATION: Found console statements in edge functions"
+            echo "These must be replaced with SecureLogger to prevent sensitive data exposure:"
+            echo ""
+            echo "$VIOLATIONS"
+            echo ""
+            echo "Example fix:"
+            echo "  import { SecureLogger } from '../_shared/secure-logger.ts'"
+            echo "  const logger = new SecureLogger('function-name')"
+            echo "  logger.info('message', { context })"
+            exit 1
+          else
+            echo "✅ No console statements found in edge functions"
+          fi
+
+      - name: Check for SecureLogger usage
+        run: |
+          echo "Verifying SecureLogger is imported in edge functions..."
+          
+          # Find all edge function index.ts files
+          EDGE_FUNCTIONS=$(find supabase/functions -name "index.ts" -not -path "*/node_modules/*")
+          
+          for func in $EDGE_FUNCTIONS; do
+            # Skip shared utilities
+            if [[ $func == *"_shared"* ]]; then
+              continue
+            fi
+            
+            # Check if SecureLogger is imported
+            if ! grep -q "SecureLogger" "$func"; then
+              echo "⚠️  WARNING: $func does not import SecureLogger"
+            else
+              echo "✅ $func uses SecureLogger"
+            fi
+          done
+
+      - name: Check for sensitive data patterns
+        run: |
+          echo "Scanning for potential sensitive data exposure patterns..."
+          
+          # Check for common sensitive data patterns
+          SENSITIVE_PATTERNS=$(grep -rn -E "(password|token|secret|key|api_key|apiKey).*=" supabase/functions/ --include="*.ts" | grep -v "SecureLogger" || true)
+          
+          if [ -n "$SENSITIVE_PATTERNS" ]; then
+            echo "⚠️  WARNING: Found potential sensitive data handling:"
+            echo "$SENSITIVE_PATTERNS"
+            echo ""
+            echo "Ensure these are properly sanitized before logging"
+          fi
+
+      - name: Summary
+        if: always()
+        run: |
+          echo ""
+          echo "==================================="
+          echo "Edge Function Security Scan Complete"
+          echo "==================================="
+          echo ""
+          echo "Remember:"
+          echo "1. Always use SecureLogger instead of console methods"
+          echo "2. Never log sensitive data (passwords, tokens, keys)"
+          echo "3. Use logger.sanitize() for user input before logging"
+          echo ""

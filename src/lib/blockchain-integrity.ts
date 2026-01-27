@@ -198,31 +198,21 @@ export class BlockchainIntegrity {
     recordId?: string
   ): Promise<any[]> {
     try {
-      let query = supabase
-        .from('immutable_audit_trail')
-        .select(`
-          *,
-          blockchain_records!blockchain_record_id (
-            blockchain_hash,
-            transaction_hash,
-            block_number,
-            verification_status
-          )
-        `)
-        .order('created_at', { ascending: false })
+      // Use secure function instead of direct table access
+      const { data, error } = await supabase.rpc(
+        'get_verified_blockchain_records_safe',
+        {
+          p_record_type: recordType,
+          p_record_id: recordId
+        }
+      );
 
-      if (recordType) {
-        query = query.eq('table_name', recordType)
-      }
-      
-      if (recordId) {
-        query = query.eq('record_id', recordId)
+      if (error) {
+        console.error('Error fetching secure audit trail:', error);
+        return [];
       }
 
-      const { data: auditTrail } = await query
-
-      return auditTrail || []
-
+      return data || [];
     } catch (error) {
       console.error('Failed to get audit trail:', error)
       return []

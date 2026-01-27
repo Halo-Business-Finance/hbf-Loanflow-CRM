@@ -6,6 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Loader2, Mail, Lock, User, Shield } from 'lucide-react'
 import { useAuth } from './AuthProvider'
 import { supabase } from '@/integrations/supabase/client'
+import { toast } from 'sonner'
+import { sanitizeError, logSecureError } from '@/lib/error-sanitizer'
 
 interface SignUpFormProps {
   onToggleMode: () => void
@@ -27,6 +29,8 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
     setIsLoading(true)
     try {
       await signUp(email, password, firstName, lastName)
+      // Switch to login mode after successful signup
+      onToggleMode()
     } catch (error) {
       // Error handling is done in the AuthProvider
     } finally {
@@ -36,18 +40,44 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
 
   const handleMicrosoftSignUp = async () => {
     setIsMicrosoftLoading(true)
+    
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
+      const redirectUrl = `${window.location.origin}/`
+      
+      const oauthResponse = await supabase.auth.signInWithOAuth({
         provider: 'azure',
         options: {
-          scopes: 'email openid profile',
-          redirectTo: `${window.location.origin}/`
+          scopes: 'openid profile email User.Read',
+          redirectTo: redirectUrl,
+          queryParams: {
+            prompt: 'consent',
+            access_type: 'offline',
+            response_mode: 'query'
+          }
         }
       })
-      if (error) throw error
-    } catch (error) {
-      console.error('Microsoft sign up error:', error)
-    } finally {
+      
+      if (oauthResponse.error) {
+        logSecureError(oauthResponse.error, 'Microsoft sign-up', supabase)
+        toast.error(sanitizeError(oauthResponse.error))
+        setIsMicrosoftLoading(false)
+        return
+      }
+      
+      if (oauthResponse.data?.url) {
+        // Notify user of redirect
+        toast.success('Redirecting to Microsoft...')
+        
+        // Perform redirect - state is managed server-side via OAuth flow
+        window.location.href = oauthResponse.data.url
+      } else {
+        toast.error('Microsoft sign-up setup failed: No redirect URL received')
+        setIsMicrosoftLoading(false)
+      }
+      
+    } catch (error: any) {
+      logSecureError(error, 'Microsoft sign-up', supabase)
+      toast.error(sanitizeError(error))
       setIsMicrosoftLoading(false)
     }
   }
@@ -66,22 +96,31 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {/* Microsoft 365 Sign Up - Primary Option */}
+        {/* Microsoft 365 Sign Up - Testing Configuration */}
         <div className="space-y-4">
           <Button
             type="button"
             onClick={handleMicrosoftSignUp}
             disabled={isMicrosoftLoading || isLoading}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+            className="w-full bg-[#0078d4] hover:bg-[#106ebe] text-white border-0"
+            size="lg"
           >
-            {isMicrosoftLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            <svg className="mr-2 h-4 w-4" viewBox="0 0 23 23">
-              <path fill="#ffffff" d="M1 1h10v10H1z"/>
-              <path fill="#ffffff" d="M12 1h10v10H12z"/>
-              <path fill="#ffffff" d="M1 12h10v10H1z"/>
-              <path fill="#ffffff" d="M12 12h10v10H12z"/>
-            </svg>
-            Sign up with Microsoft 365
+            {isMicrosoftLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Setting up Microsoft account...
+              </>
+            ) : (
+              <>
+                <svg className="mr-2 h-5 w-5" viewBox="0 0 23 23">
+                  <path fill="currentColor" d="M1 1h10v10H1z"/>
+                  <path fill="currentColor" d="M12 1h10v10H12z"/>
+                  <path fill="currentColor" d="M1 12h10v10H1z"/>
+                  <path fill="currentColor" d="M12 12h10v10H12z"/>
+                </svg>
+                Create account with Microsoft 365
+              </>
+            )}
           </Button>
         </div>
 
@@ -99,7 +138,6 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
           </div>
         </div>
 
-        {/* Email/Password Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -164,10 +202,11 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
                 className="pl-10"
                 disabled={isLoading}
                 required
+                minLength={6}
               />
             </div>
           </div>
-          <Button type="submit" variant="outline" className="w-full" disabled={isLoading}>
+          <Button type="submit" className="w-full" disabled={isLoading || isMicrosoftLoading}>
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Create Account with Email
           </Button>
@@ -178,6 +217,7 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
             variant="link"
             onClick={onToggleMode}
             className="text-sm text-muted-foreground"
+            disabled={isLoading || isMicrosoftLoading}
           >
             Already have an account? Sign in
           </Button>

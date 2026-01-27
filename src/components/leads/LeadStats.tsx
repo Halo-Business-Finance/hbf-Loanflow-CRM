@@ -151,7 +151,7 @@ export function LeadStats({ leads }: LeadStatsProps) {
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={stageData}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="stage" />
+                <XAxis dataKey="stage" label={{ value: 'Loan Stage', position: 'insideBottom', offset: -5 }} />
                 <YAxis />
                 <Tooltip />
                 <Bar dataKey="count" fill="hsl(var(--primary))" />

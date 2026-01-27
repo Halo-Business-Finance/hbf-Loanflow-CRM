@@ -3,6 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { IBMPageHeader } from '@/components/ui/IBMPageHeader';
+import { FundingQueueWidget } from '@/components/widgets/FundingQueueWidget';
+import { ClosingCalendarWidget } from '@/components/widgets/ClosingCalendarWidget';
 import { 
   FileCheck, 
   Calendar, 
@@ -120,26 +123,19 @@ export const CloserDashboard = () => {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-card/60 to-card/30 backdrop-blur-sm rounded-xl p-6 border border-border/20">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-gradient-primary flex items-center justify-center">
-            <FileCheck className="w-5 h-5 text-primary-foreground" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Closer Dashboard</h1>
-            <p className="text-sm text-muted-foreground">Manage loan closings and finalizations</p>
-          </div>
-        </div>
-      </div>
+    <div className="min-h-screen bg-background">
+      <IBMPageHeader
+        title="Closer Dashboard"
+        subtitle="Manage loan closings and finalizations"
+      />
 
+      <div className="p-8 space-y-6">
       {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Scheduled Closings</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
+            
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatNumber(metrics.scheduledClosings)}</div>
@@ -150,7 +146,7 @@ export const CloserDashboard = () => {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Completed Today</CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-600" />
+            
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">{formatNumber(metrics.completedToday)}</div>
@@ -161,7 +157,7 @@ export const CloserDashboard = () => {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Avg. Closing Time</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
+            
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{metrics.avgClosingTime} days</div>
@@ -172,7 +168,7 @@ export const CloserDashboard = () => {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Documents Ready</CardTitle>
-            <FileCheck className="h-4 w-4 text-muted-foreground" />
+            
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatNumber(metrics.documentsReady)}</div>
@@ -183,13 +179,19 @@ export const CloserDashboard = () => {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Value</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatCurrency(metrics.totalClosingValue)}</div>
             <p className="text-xs text-muted-foreground">Closing pipeline</p>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Role-Specific Widgets */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <FundingQueueWidget />
+        <ClosingCalendarWidget />
       </div>
 
       {/* Main Content */}
@@ -305,6 +307,7 @@ export const CloserDashboard = () => {
           </Card>
         </TabsContent>
       </Tabs>
+      </div>
     </div>
   );
 };

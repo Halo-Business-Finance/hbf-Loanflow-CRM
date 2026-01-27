@@ -1,4 +1,6 @@
+// Security manager - server-side encryption should be used for sensitive data
 import { supabase } from "@/integrations/supabase/client";
+import { logger } from '@/lib/logger';
 
 export interface SecurityConfig {
   enableMFA: boolean;
@@ -44,7 +46,7 @@ export class SecurityManager {
       if (error) throw error;
       return data.validation_result;
     } catch (error: any) {
-      console.error('Password validation error:', error);
+      logger.error('Password validation error:', error);
       return {
         valid: false,
         errors: ['Password validation failed. Please try again.']
@@ -66,7 +68,7 @@ export class SecurityManager {
       if (error) throw error;
       return data.rate_limit_result;
     } catch (error: any) {
-      console.error('Rate limit check error:', error);
+      logger.error('Rate limit check error:', error);
       return {
         allowed: false,
         attempts_remaining: 0,
@@ -88,7 +90,7 @@ export class SecurityManager {
       if (error) throw error;
       return data.event_id;
     } catch (error: any) {
-      console.error('Security event logging error:', error);
+      logger.error('Security event logging error:', error);
       return null;
     }
   }
@@ -122,7 +124,7 @@ export class SecurityManager {
         security: data.security
       };
     } catch (error: any) {
-      console.error('Session validation error:', error);
+      logger.error('Session validation error:', error);
       return { valid: false };
     }
   }
@@ -300,112 +302,26 @@ export class SecurityManager {
     );
   }
 
-  // Enhanced encryption utilities with key derivation
-  static async encryptSensitiveData(data: string, key?: string): Promise<string> {
-    try {
-      const encoder = new TextEncoder();
-      const dataBuffer = encoder.encode(data);
-      
-      // Use PBKDF2 for proper key derivation
-      const salt = crypto.getRandomValues(new Uint8Array(16));
-      const keyMaterial = await crypto.subtle.importKey(
-        'raw',
-        encoder.encode(key || await this.generateMasterKey()),
-        { name: 'PBKDF2' },
-        false,
-        ['deriveKey']
-      );
-
-      const derivedKey = await crypto.subtle.deriveKey(
-        {
-          name: 'PBKDF2',
-          salt,
-          iterations: 100000,
-          hash: 'SHA-256'
-        },
-        keyMaterial,
-        { name: 'AES-GCM', length: 256 },
-        false,
-        ['encrypt', 'decrypt']
-      );
-
-      const iv = crypto.getRandomValues(new Uint8Array(12));
-      const encryptedData = await crypto.subtle.encrypt(
-        { name: 'AES-GCM', iv },
-        derivedKey,
-        dataBuffer
-      );
-
-      // Combine salt, IV and encrypted data
-      const combined = new Uint8Array(salt.length + iv.length + encryptedData.byteLength);
-      combined.set(salt);
-      combined.set(iv, salt.length);
-      combined.set(new Uint8Array(encryptedData), salt.length + iv.length);
-
-      return btoa(String.fromCharCode(...combined));
-    } catch (error) {
-      console.error('Enhanced encryption error:', error);
-      throw new Error('Encryption failed');
-    }
+  /**
+   * Generate secure token for various purposes
+   * @param length - Token length in bytes
+   */
+  static generateSecureToken(length: number = 32): string {
+    const array = new Uint8Array(length);
+    crypto.getRandomValues(array);
+    return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
   }
 
-  // Decrypt with enhanced security
-  static async decryptSensitiveData(encryptedData: string, key?: string): Promise<string> {
-    try {
-      const combined = new Uint8Array(
-        atob(encryptedData).split('').map(char => char.charCodeAt(0))
-      );
-      
-      const salt = combined.slice(0, 16);
-      const iv = combined.slice(16, 28);
-      const encrypted = combined.slice(28);
-      
-      const encoder = new TextEncoder();
-      const keyMaterial = await crypto.subtle.importKey(
-        'raw',
-        encoder.encode(key || await this.generateMasterKey()),
-        { name: 'PBKDF2' },
-        false,
-        ['deriveKey']
-      );
-
-      const derivedKey = await crypto.subtle.deriveKey(
-        {
-          name: 'PBKDF2',
-          salt,
-          iterations: 100000,
-          hash: 'SHA-256'
-        },
-        keyMaterial,
-        { name: 'AES-GCM', length: 256 },
-        false,
-        ['encrypt', 'decrypt']
-      );
-      
-      const decrypted = await crypto.subtle.decrypt(
-        { name: 'AES-GCM', iv },
-        derivedKey,
-        encrypted
-      );
-      
-      return new TextDecoder().decode(decrypted);
-    } catch (error) {
-      console.error('Decryption error:', error);
-      throw new Error('Decryption failed');
+  /**
+   * Constant-time string comparison to prevent timing attacks
+   */
+  static secureCompare(a: string, b: string): boolean {
+    if (a.length !== b.length) return false;
+    let result = 0;
+    for (let i = 0; i < a.length; i++) {
+      result |= a.charCodeAt(i) ^ b.charCodeAt(i);
     }
-  }
-
-  // Generate or retrieve master encryption key
-  private static async generateMasterKey(): Promise<string> {
-    const stored = localStorage.getItem('_master_security_key');
-    if (stored) return stored;
-    
-    const key = Array.from(crypto.getRandomValues(new Uint8Array(64)))
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('');
-    
-    localStorage.setItem('_master_security_key', key);
-    return key;
+    return result === 0;
   }
 
   // Audit logging for frontend actions
@@ -426,7 +342,7 @@ export class SecurityManager {
         device_fingerprint: this.generateDeviceFingerprint()
       });
     } catch (error) {
-      console.error('User action logging error:', error);
+      logger.error('User action logging error:', error);
     }
   }
 
@@ -520,24 +436,5 @@ export class SecurityManager {
     }
 
     return { score, checks };
-  }
-
-  // Generate secure token (alias for generateCSRFToken)
-  static generateSecureToken(length: number = 32): string {
-    return Array.from(crypto.getRandomValues(new Uint8Array(length)))
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('');
-  }
-
-  // Secure constant-time string comparison
-  static secureCompare(a: string, b: string): boolean {
-    if (a.length !== b.length) return false;
-    
-    let result = 0;
-    for (let i = 0; i < a.length; i++) {
-      result |= a.charCodeAt(i) ^ b.charCodeAt(i);
-    }
-    
-    return result === 0;
   }
 }

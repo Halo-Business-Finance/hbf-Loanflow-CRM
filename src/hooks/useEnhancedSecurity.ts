@@ -4,10 +4,12 @@
 
 import { useEffect, useCallback } from 'react';
 import { enhancedSecureStorage } from '@/lib/enhanced-secure-storage';
-import { errorSanitizer, handleSanitizedError } from '@/lib/error-sanitizer';
+import { sanitizeError } from '@/lib/error-sanitizer';
 import { applyClientSecurityHeaders } from '@/lib/security-headers';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { logger } from '@/lib/logger';
 
 export const useEnhancedSecurity = () => {
   const { user } = useAuth();
@@ -41,7 +43,8 @@ export const useEnhancedSecurity = () => {
         ttl: serverSide ? 480 : 60 // 8 hours server, 1 hour client
       });
     } catch (error) {
-      handleSanitizedError(error, 'secure_storage_set', (msg) => toast.error(msg));
+      const userMessage = sanitizeError(error);
+      toast.error(userMessage);
       return false;
     }
   }, []);
@@ -53,7 +56,8 @@ export const useEnhancedSecurity = () => {
     try {
       return await enhancedSecureStorage.getItem(key, serverSide);
     } catch (error) {
-      handleSanitizedError(error, 'secure_storage_get');
+      const userMessage = sanitizeError(error);
+      toast.error(userMessage);
       return null;
     }
   }, []);
@@ -62,13 +66,22 @@ export const useEnhancedSecurity = () => {
     try {
       await enhancedSecureStorage.removeItem(key);
     } catch (error) {
-      handleSanitizedError(error, 'secure_storage_remove');
+      const userMessage = sanitizeError(error);
+      toast.error(userMessage);
     }
   }, []);
 
   // Enhanced error handling
   const handleError = useCallback((error: any, context?: string) => {
-    return handleSanitizedError(error, context, (msg) => toast.error(msg));
+    const userMessage = sanitizeError(error);
+    toast.error(userMessage);
+    
+    // Log in development only
+    if (import.meta.env.DEV) {
+      console.error(`[${context || 'Error'}]`, error);
+    }
+    
+    return userMessage;
   }, []);
 
   // Security validation
@@ -117,7 +130,7 @@ export const useEnhancedSecurity = () => {
     }
   }, []);
 
-  // Monitor suspicious activity
+  // Monitor suspicious activity - ALL events sent to server immediately
   const logSecurityEvent = useCallback(async (
     eventType: string,
     severity: 'low' | 'medium' | 'high' | 'critical' = 'medium',
@@ -126,33 +139,23 @@ export const useEnhancedSecurity = () => {
     try {
       if (!user) return;
 
-      // Only log in production or for high/critical events
-      if (!import.meta.env.PROD && severity !== 'high' && severity !== 'critical') {
-        return;
-      }
-
-      // Log to local storage for batching (privacy-preserving)
-      const events = JSON.parse(localStorage.getItem('_security_events') || '[]');
-      events.push({
-        type: eventType,
+      // Send ALL security events to server immediately - no localStorage batching
+      await supabase.from('security_events').insert({
+        event_type: eventType,
         severity,
-        timestamp: Date.now(),
-        details: severity === 'high' || severity === 'critical' ? details : undefined
+        user_id: user.id,
+        details: {
+          ...details,
+          timestamp: new Date().toISOString()
+        }
       });
 
-      // Keep only last 50 events
-      if (events.length > 50) {
-        events.splice(0, events.length - 50);
-      }
-
-      localStorage.setItem('_security_events', JSON.stringify(events));
-
-      // For critical events, immediately notify
+      // Notify for critical events
       if (severity === 'critical') {
         toast.error('Security alert detected. Please review your account.');
       }
     } catch (error) {
-      console.error('Failed to log security event');
+      logger.error('Failed to log security event');
     }
   }, [user]);
 
@@ -162,7 +165,6 @@ export const useEnhancedSecurity = () => {
     removeSecureItem,
     handleError,
     validateInput,
-    logSecurityEvent,
-    errorSanitizer
+    logSecurityEvent
   };
 };

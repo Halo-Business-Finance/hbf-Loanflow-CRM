@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { Check, Edit, Trash2, Mail, Phone, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
+
 import {
   Select,
   SelectContent,
@@ -70,12 +70,15 @@ export function BulkActions({ selectedItems, onClearSelection, onBulkUpdate, typ
   const getStageOptions = () => {
     if (type === 'leads') {
       return [
+        { value: 'New Lead', label: 'New Lead' },
         { value: 'Initial Contact', label: 'Initial Contact' },
-        { value: 'Qualified', label: 'Qualified' },
-        { value: 'Proposal', label: 'Proposal' },
-        { value: 'Negotiation', label: 'Negotiation' },
-        { value: 'Closed Won', label: 'Closed Won' },
-        { value: 'Closed Lost', label: 'Closed Lost' },
+        { value: 'Loan Application Signed', label: 'Loan Application Signed' },
+        { value: 'Waiting for Documentation', label: 'Waiting for Documentation' },
+        { value: 'Pre-Approved', label: 'Pre-Approved' },
+        { value: 'Term Sheet Signed', label: 'Term Sheet Signed' },
+        { value: 'Loan Approved', label: 'Loan Approved' },
+        { value: 'Closing', label: 'Closing' },
+        { value: 'Loan Funded', label: 'Loan Funded' },
       ]
     } else {
       return [
@@ -97,9 +100,9 @@ export function BulkActions({ selectedItems, onClearSelection, onBulkUpdate, typ
       <div className="fixed bottom-20 md:bottom-6 left-1/2 transform -translate-x-1/2 z-40 bg-background border rounded-lg shadow-lg p-4 animate-slide-in-right">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <Badge variant="secondary" className="font-medium">
+            <span className="font-medium">
               {selectedItems.length} selected
-            </Badge>
+            </span>
             <Button
               variant="ghost"
               size="sm"
@@ -111,10 +114,10 @@ export function BulkActions({ selectedItems, onClearSelection, onBulkUpdate, typ
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Update Stage/Status */}
+            {/* Update Loan Stage/Status */}
             <Select onValueChange={(value) => handleAction(type === 'leads' ? 'stage' : 'status', value)}>
               <SelectTrigger className="w-40">
-                <SelectValue placeholder={`Update ${type === 'leads' ? 'Stage' : 'Status'}`} />
+                <SelectValue placeholder={`Update ${type === 'leads' ? 'Loan Stage' : 'Status'}`} />
               </SelectTrigger>
               <SelectContent>
                 {getStageOptions().map(option => (
@@ -145,6 +148,7 @@ export function BulkActions({ selectedItems, onClearSelection, onBulkUpdate, typ
               size="sm"
               onClick={() => handleAction('email')}
               disabled={loading}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
             >
               <Mail className="h-4 w-4 mr-1" />
               Email
@@ -155,6 +159,7 @@ export function BulkActions({ selectedItems, onClearSelection, onBulkUpdate, typ
               size="sm"
               onClick={() => handleAction('call')}
               disabled={loading}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
             >
               <Phone className="h-4 w-4 mr-1" />
               Call

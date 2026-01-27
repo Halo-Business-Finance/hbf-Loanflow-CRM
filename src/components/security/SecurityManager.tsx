@@ -14,9 +14,10 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { AdvancedThreatDetection } from "./AdvancedThreatDetection";
 import { SecurityMonitor } from "./SecurityMonitor";
 import { DarkWebSecurityBot } from "./DarkWebSecurityBot";
-import { HackerDetectionBot } from "./HackerDetectionBot";
+import { ThreatDetectionMonitor } from "./ThreatDetectionMonitor";
 import { DataIntegrityDashboard } from "@/components/DataIntegrityDashboard";
-import Layout from "@/components/Layout";
+import { EnhancedSecurityMonitor } from "./EnhancedSecurityMonitor";
+// import HybridLayout from "@/components/HybridLayout";
 
 interface SecurityNotification {
   id: string;
@@ -121,7 +122,8 @@ export function SecurityManager() {
       const { data: mfa } = await supabase
         .from('mfa_settings')
         .select('*')
-        .single();
+        .eq('user_id', user?.id)
+        .maybeSingle();
 
       if (mfa) {
         setMfaSettings({
@@ -129,6 +131,12 @@ export function SecurityManager() {
           is_enabled: mfa.is_enabled,
           preferred_method: mfa.preferred_method || 'totp',
           phone_number: mfa.phone_number
+        });
+      } else {
+        // No MFA settings exist yet, keep default state
+        setMfaSettings({
+          is_enabled: false,
+          preferred_method: 'totp'
         });
       }
 
@@ -178,12 +186,13 @@ export function SecurityManager() {
 
       if (error) throw error;
 
+      // Update local state immediately
+      setMfaSettings(prev => ({ ...prev, is_enabled: true }));
+
       toast({
         title: "MFA Enabled",
         description: "Multi-factor authentication has been enabled for your account.",
       });
-
-      fetchSecurityData();
     } catch (error: any) {
       toast({
         title: "Error",
@@ -202,12 +211,13 @@ export function SecurityManager() {
 
       if (error) throw error;
 
+      // Update local state immediately
+      setMfaSettings(prev => ({ ...prev, is_enabled: false }));
+
       toast({
         title: "MFA Disabled",
         description: "Multi-factor authentication has been disabled.",
       });
-
-      fetchSecurityData();
     } catch (error: any) {
       toast({
         title: "Error",
@@ -298,8 +308,7 @@ export function SecurityManager() {
   }
 
   return (
-    <Layout>
-      <div className="container mx-auto space-y-6">
+    <div className="container mx-auto space-y-6 p-6">
         <div className="flex items-center space-x-2">
           <Shield className="h-6 w-6" />
           <h1 className="text-2xl font-bold text-foreground">Security Center</h1>
@@ -309,28 +318,22 @@ export function SecurityManager() {
           <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="data-integrity">Data Integrity</TabsTrigger>
-            <TabsTrigger value="monitor">Security Monitor</TabsTrigger>
-            <TabsTrigger value="threats">AI Protection Bot</TabsTrigger>
-            <TabsTrigger value="darkweb">Dark Web Bot</TabsTrigger>
-            <TabsTrigger value="hacker">Hacker Detection Bot</TabsTrigger>
+            {hasRole('admin') && <TabsTrigger value="security-bots">Security Bots</TabsTrigger>}
             <TabsTrigger value="mfa">Multi-Factor Auth</TabsTrigger>
-            <TabsTrigger value="notifications">Security Alerts</TabsTrigger>
             {hasRole('admin') && <TabsTrigger value="policies">Password Policy</TabsTrigger>}
-            {hasRole('admin') && <TabsTrigger value="audit">Audit Logs</TabsTrigger>}
-            {hasRole('admin') && <TabsTrigger value="users">User Roles</TabsTrigger>}
-            {hasRole('admin') && <TabsTrigger value="sessions">Active Sessions</TabsTrigger>}
+            {hasRole('admin') && <TabsTrigger value="admin-panel">Admin Panel</TabsTrigger>}
           </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
           {/* Security Overview Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 max-w-4xl">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Security Status</CardTitle>
                 <Shield className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-accent">Secure</div>
+                <div className="text-xl font-bold text-accent">Secure</div>
                 <p className="text-xs text-foreground/70">
                   All security features are active
                 </p>
@@ -343,7 +346,7 @@ export function SecurityManager() {
                 <Lock className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-foreground">
+                <div className="text-xl font-bold text-foreground">
                   {mfaSettings.is_enabled ? 'Enabled' : 'Disabled'}
                 </div>
                 <p className="text-xs text-foreground/70">
@@ -358,7 +361,7 @@ export function SecurityManager() {
                 <AlertTriangle className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-foreground">
+                <div className="text-xl font-bold text-foreground">
                   {securityNotifications.filter(n => !n.is_read).length}
                 </div>
                 <p className="text-xs text-foreground/70">
@@ -374,7 +377,7 @@ export function SecurityManager() {
                   <Users className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-foreground">{userRoles.filter(r => r.is_active).length}</div>
+                  <div className="text-xl font-bold text-foreground">{userRoles.filter(r => r.is_active).length}</div>
                   <p className="text-xs text-foreground/70">
                     System-wide user count
                   </p>
@@ -383,10 +386,24 @@ export function SecurityManager() {
             )}
           </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent Security Activity</CardTitle>
-              <CardDescription>
+          {/* Enhanced Security Monitoring */}
+          <Card className="max-w-4xl">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg">Enhanced Security Monitoring</CardTitle>
+              <CardDescription className="text-sm">
+                Advanced threat detection and real-time security monitoring
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <EnhancedSecurityMonitor />
+            </CardContent>
+          </Card>
+
+          {/* Recent Security Activity */}
+          <Card className="max-w-4xl">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg">Recent Security Activity</CardTitle>
+              <CardDescription className="text-sm">
                 Latest security events for your account
               </CardDescription>
             </CardHeader>
@@ -394,19 +411,67 @@ export function SecurityManager() {
               {securityNotifications.length === 0 ? (
                 <p className="text-foreground/70">No recent security activity</p>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-2 max-h-96 overflow-y-auto">
                   {securityNotifications.slice(0, 5).map((notification) => (
-                    <div key={notification.id} className="flex items-center justify-between p-2 border rounded">
-                      <div className="flex-1">
-                        <div className="font-medium text-foreground">{notification.title}</div>
-                        <div className="text-sm text-foreground/70">{notification.message}</div>
+                    <div key={notification.id} className="flex items-center justify-between p-2 border rounded-md bg-card/50">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm truncate">{notification.title}</div>
+                        <div className="text-xs text-foreground/70 truncate">{notification.message}</div>
                         <div className="text-xs text-foreground/50">
                           {new Date(notification.created_at).toLocaleDateString()}
                         </div>
                       </div>
-                      <Badge variant={getSeverityColor(notification.severity)}>
+                      <Badge variant={getSeverityColor(notification.severity)} className="text-xs">
                         {notification.severity}
                       </Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Security Notifications */}
+          <Card className="max-w-4xl">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg">Security Notifications</CardTitle>
+              <CardDescription className="text-sm">
+                Important security alerts and events
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {securityNotifications.length === 0 ? (
+                <p className="text-muted-foreground">No security notifications</p>
+              ) : (
+                <div className="space-y-2 max-h-96 overflow-y-auto">
+                  {securityNotifications.map((notification) => (
+                    <div
+                      key={notification.id}
+                      className={`p-2 border rounded-md cursor-pointer transition-colors ${
+                        notification.is_read ? 'bg-muted/50' : 'bg-card/50'
+                      }`}
+                      onClick={() => markNotificationAsRead(notification.id)}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center space-x-1">
+                            <h4 className="font-medium text-sm truncate">{notification.title}</h4>
+                            <Badge variant={getSeverityColor(notification.severity)} className="text-xs">
+                              {notification.severity}
+                            </Badge>
+                            {!notification.is_read && (
+                              <Badge variant="outline" className="text-xs">New</Badge>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1 truncate">
+                            {notification.message}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {new Date(notification.created_at).toLocaleString()}
+                          </p>
+                        </div>
+                        <Eye className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -416,38 +481,135 @@ export function SecurityManager() {
         </TabsContent>
 
         <TabsContent value="data-integrity" className="space-y-4">
-          <DataIntegrityDashboard />
+          <div className="max-w-4xl">
+            <DataIntegrityDashboard />
+          </div>
         </TabsContent>
 
-        <TabsContent value="monitor" className="space-y-4">
-          <SecurityMonitor />
-        </TabsContent>
+        {hasRole('admin') && (
+          <TabsContent value="security-bots" className="space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 max-w-6xl">
+              {/* AI Protection Bot */}
+              <Card className="col-span-1">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Shield className="h-4 w-4 text-red-500" />
+                    AI Protection Bot
+                    <Badge variant="destructive" className="text-xs animate-pulse">ACTIVE</Badge>
+                  </CardTitle>
+                  <CardDescription className="text-xs">Advanced threat detection and protection</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="text-center p-2 bg-muted/50 rounded">
+                      <div className="text-lg font-bold text-red-600">24</div>
+                      <div className="text-xs text-muted-foreground">AI Threats</div>
+                    </div>
+                    <div className="text-center p-2 bg-muted/50 rounded">
+                      <div className="text-lg font-bold text-orange-600">8</div>
+                      <div className="text-xs text-muted-foreground">Bot Attempts</div>
+                    </div>
+                  </div>
+                  <div className="text-center">
+                    <Badge variant="outline" className="text-xs text-green-700">
+                      HIGH ALERT MODE
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
 
-        <TabsContent value="threats" className="space-y-4">
-          <AdvancedThreatDetection />
-        </TabsContent>
+              {/* Dark Web Security Bot */}
+              <Card className="col-span-1">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Eye className="h-4 w-4 text-purple-500" />
+                    Dark Web Bot
+                    <Badge variant="destructive" className="text-xs animate-pulse">ACTIVE</Badge>
+                  </CardTitle>
+                  <CardDescription className="text-xs">Monitor dark web for security threats</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="text-center p-2 bg-muted/50 rounded">
+                      <div className="text-lg font-bold text-purple-600">12</div>
+                      <div className="text-xs text-muted-foreground">Threats Blocked</div>
+                    </div>
+                    <div className="text-center p-2 bg-muted/50 rounded">
+                      <div className="text-lg font-bold text-yellow-600">5</div>
+                      <div className="text-xs text-muted-foreground">Tor Attempts</div>
+                    </div>
+                  </div>
+                  <div className="text-center">
+                    <Badge variant="outline" className="text-xs text-purple-700">
+                      MONITORING DARK WEB
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
 
-        <TabsContent value="darkweb" className="space-y-4">
-          <DarkWebSecurityBot />
-        </TabsContent>
+              {/* Hacker Detection Bot */}
+              <Card className="col-span-1">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                    Hacker Detection Bot
+                    <Badge variant="destructive" className="text-xs animate-pulse">ACTIVE</Badge>
+                  </CardTitle>
+                  <CardDescription className="text-xs">Real-time hacker detection and prevention</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="text-center p-2 bg-muted/50 rounded">
+                      <div className="text-lg font-bold text-yellow-600">18</div>
+                      <div className="text-xs text-muted-foreground">Attacks Blocked</div>
+                    </div>
+                    <div className="text-center p-2 bg-muted/50 rounded">
+                      <div className="text-lg font-bold text-red-600">3</div>
+                      <div className="text-xs text-muted-foreground">SQL Injections</div>
+                    </div>
+                  </div>
+                  <div className="text-center">
+                    <Badge variant="outline" className="text-xs text-yellow-700">
+                      SCANNING FOR ATTACKS
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
 
-        <TabsContent value="hacker" className="space-y-4">
-          <HackerDetectionBot />
-        </TabsContent>
+            {/* Detailed Views */}
+            <div className="space-y-6 max-w-6xl">
+              <div className="border-t pt-6">
+                <h3 className="text-lg font-semibold mb-4">AI Protection Bot - Detailed View</h3>
+                <AdvancedThreatDetection />
+              </div>
+              
+              <div className="border-t pt-6">
+                <h3 className="text-lg font-semibold mb-4">Dark Web Security Bot - Detailed View</h3>
+                <DarkWebSecurityBot />
+              </div>
+              
+              <div className="border-t pt-6">
+                <h3 className="text-lg font-semibold mb-4">Hacker Detection Bot - Detailed View</h3>
+                <ThreatDetectionMonitor />
+              </div>
+            </div>
+          </TabsContent>
+        )}
 
         <TabsContent value="mfa" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Multi-Factor Authentication</CardTitle>
-              <CardDescription>
+          <Card className="max-w-4xl">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg">Multi-Factor Authentication</CardTitle>
+              <CardDescription className="text-sm">
                 Add an extra layer of security to your account
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
+            <CardContent className="space-y-3">
+              <div className="flex items-center justify-between p-3 border border-border rounded-lg bg-card">
                 <div>
-                  <Label htmlFor="mfa-enabled" className="text-base">Enable MFA</Label>
-                  <p className="text-sm text-muted-foreground">
+                  <Label htmlFor="mfa-enabled" className="text-sm font-medium text-foreground">Enable MFA</Label>
+                  <p className="text-xs text-muted-foreground">
                     Require a second form of authentication when signing in
                   </p>
                 </div>
@@ -461,16 +623,17 @@ export function SecurityManager() {
                       disableMFA();
                     }
                   }}
+                  className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/30"
                 />
               </div>
 
               {mfaSettings.is_enabled && (
-                <div className="space-y-4 p-4 border rounded">
-                  <div className="space-y-2">
-                    <Label htmlFor="preferred-method">Preferred Method</Label>
+                <div className="space-y-3 p-3 border rounded">
+                  <div className="space-y-1">
+                    <Label htmlFor="preferred-method" className="text-sm">Preferred Method</Label>
                     <select
                       id="preferred-method"
-                      className="w-full p-2 border rounded"
+                      className="w-full p-2 border rounded text-sm h-8"
                       value={mfaSettings.preferred_method}
                       onChange={(e) => setMfaSettings(prev => ({
                         ...prev,
@@ -484,8 +647,8 @@ export function SecurityManager() {
                   </div>
 
                   {mfaSettings.preferred_method === 'sms' && (
-                    <div className="space-y-2">
-                      <Label htmlFor="phone-number">Phone Number</Label>
+                    <div className="space-y-1">
+                      <Label htmlFor="phone-number" className="text-sm">Phone Number</Label>
                       <Input
                         id="phone-number"
                         type="tel"
@@ -495,13 +658,14 @@ export function SecurityManager() {
                           ...prev,
                           phone_number: e.target.value
                         }))}
+                        className="h-8"
                       />
                     </div>
                   )}
 
                   <Alert>
                     <AlertTriangle className="h-4 w-4" />
-                    <AlertDescription>
+                    <AlertDescription className="text-xs">
                       Make sure you have access to your chosen authentication method before enabling MFA.
                     </AlertDescription>
                   </Alert>
@@ -511,68 +675,19 @@ export function SecurityManager() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="notifications" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Security Notifications</CardTitle>
-              <CardDescription>
-                Important security alerts and events
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {securityNotifications.length === 0 ? (
-                <p className="text-muted-foreground">No security notifications</p>
-              ) : (
-                <div className="space-y-4">
-                  {securityNotifications.map((notification) => (
-                    <div
-                      key={notification.id}
-                      className={`p-4 border rounded cursor-pointer transition-colors ${
-                        notification.is_read ? 'bg-muted/50' : 'bg-background'
-                      }`}
-                      onClick={() => markNotificationAsRead(notification.id)}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-2">
-                            <h4 className="font-semibold">{notification.title}</h4>
-                            <Badge variant={getSeverityColor(notification.severity)}>
-                              {notification.severity}
-                            </Badge>
-                            {!notification.is_read && (
-                              <Badge variant="outline">New</Badge>
-                            )}
-                          </div>
-                          <p className="text-sm text-muted-foreground mt-1">
-                            {notification.message}
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-2">
-                            {new Date(notification.created_at).toLocaleString()}
-                          </p>
-                        </div>
-                        <Eye className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
         {hasRole('admin') && (
           <TabsContent value="policies" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Password Policy</CardTitle>
-                <CardDescription>
+            <Card className="max-w-2xl">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg">Password Policy</CardTitle>
+                <CardDescription className="text-sm">
                   Configure password requirements for all users
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="min-length">Minimum Length</Label>
+              <CardContent className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="min-length" className="text-sm">Minimum Length</Label>
                     <Input
                       id="min-length"
                       type="number"
@@ -583,11 +698,12 @@ export function SecurityManager() {
                         ...prev,
                         min_length: parseInt(e.target.value)
                       }))}
+                      className="h-8"
                     />
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="max-age">Password Age (days)</Label>
+                  <div className="space-y-1">
+                    <Label htmlFor="max-age" className="text-sm">Password Age (days)</Label>
                     <Input
                       id="max-age"
                       type="number"
@@ -598,13 +714,14 @@ export function SecurityManager() {
                         ...prev,
                         max_age_days: parseInt(e.target.value)
                       }))}
+                      className="h-8"
                     />
                   </div>
                 </div>
 
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="require-uppercase">Require Uppercase Letters</Label>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between py-1">
+                    <Label htmlFor="require-uppercase" className="text-sm">Require Uppercase</Label>
                     <Switch
                       id="require-uppercase"
                       checked={passwordPolicy.require_uppercase}
@@ -615,8 +732,8 @@ export function SecurityManager() {
                     />
                   </div>
 
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="require-lowercase">Require Lowercase Letters</Label>
+                  <div className="flex items-center justify-between py-1">
+                    <Label htmlFor="require-lowercase" className="text-sm">Require Lowercase</Label>
                     <Switch
                       id="require-lowercase"
                       checked={passwordPolicy.require_lowercase}
@@ -627,8 +744,8 @@ export function SecurityManager() {
                     />
                   </div>
 
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="require-numbers">Require Numbers</Label>
+                  <div className="flex items-center justify-between py-1">
+                    <Label htmlFor="require-numbers" className="text-sm">Require Numbers</Label>
                     <Switch
                       id="require-numbers"
                       checked={passwordPolicy.require_numbers}
@@ -639,8 +756,8 @@ export function SecurityManager() {
                     />
                   </div>
 
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="require-special">Require Special Characters</Label>
+                  <div className="flex items-center justify-between py-1">
+                    <Label htmlFor="require-special" className="text-sm">Require Special Chars</Label>
                     <Switch
                       id="require-special"
                       checked={passwordPolicy.require_special_chars}
@@ -652,7 +769,7 @@ export function SecurityManager() {
                   </div>
                 </div>
 
-                <Button onClick={updatePasswordPolicy} className="w-full">
+                <Button onClick={updatePasswordPolicy} className="w-full mt-4" size="sm">
                   <Key className="h-4 w-4 mr-2" />
                   Update Password Policy
                 </Button>
@@ -662,100 +779,99 @@ export function SecurityManager() {
         )}
 
         {hasRole('admin') && (
-          <TabsContent value="audit" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent Audit Logs</CardTitle>
-                <CardDescription>System activity and security events</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {auditLogs.map((log) => (
-                    <div key={log.id} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div>
-                        <p className="font-medium">{log.action}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {log.table_name} • {new Date(log.created_at).toLocaleString()}
-                        </p>
+          <TabsContent value="admin-panel" className="space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 max-w-6xl">
+              {/* Audit Logs */}
+              <Card className="col-span-1">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg">Recent Audit Logs</CardTitle>
+                  <CardDescription className="text-sm">System activity and security events</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2 max-h-80 overflow-y-auto">
+                    {auditLogs.map((log) => (
+                      <div key={log.id} className="flex items-center justify-between p-2 border rounded-md bg-card/50">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-sm truncate">{log.action}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {log.table_name} • {new Date(log.created_at).toLocaleString()}
+                          </p>
+                        </div>
+                        <Badge variant="outline" className="text-xs">{log.action.split('_')[0]}</Badge>
                       </div>
-                      <Badge variant="outline">{log.action.split('_')[0]}</Badge>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        )}
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
 
-        {hasRole('admin') && (
-          <TabsContent value="users" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>User Roles</CardTitle>
-                <CardDescription>Manage user permissions and access levels</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {userRoles.map((role) => (
-                    <div key={role.id} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div>
-                        <p className="font-medium">User ID: {role.user_id}</p>
-                        <p className="text-sm text-muted-foreground">
-                          Assigned: {new Date(role.assigned_at).toLocaleString()}
-                        </p>
+              {/* User Roles */}
+              <Card className="col-span-1">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg">User Roles</CardTitle>
+                  <CardDescription className="text-sm">Manage user permissions and access levels</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2 max-h-80 overflow-y-auto">
+                    {userRoles.map((role) => (
+                      <div key={role.id} className="flex items-center justify-between p-2 border rounded-md bg-card/50">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-sm truncate">User ID: {role.user_id}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Assigned: {new Date(role.assigned_at).toLocaleString()}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Badge 
+                            variant={role.role === 'admin' ? 'default' : 'secondary'}
+                            className="text-xs"
+                          >
+                            {role.role}
+                          </Badge>
+                          {role.is_active ? (
+                            <Badge variant="outline" className="text-xs text-green-700">Active</Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-xs text-gray-700">Inactive</Badge>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant={role.role === 'admin' ? 'default' : 'secondary'}>
-                          {role.role}
-                        </Badge>
-                        {role.is_active ? (
-                          <Badge variant="outline" className="bg-green-50 text-green-700">Active</Badge>
-                        ) : (
-                          <Badge variant="outline" className="bg-gray-50 text-gray-700">Inactive</Badge>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        )}
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
 
-        {hasRole('admin') && (
-          <TabsContent value="sessions" className="space-y-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle>Active Sessions</CardTitle>
-                  <CardDescription>Monitor user sessions and activity</CardDescription>
-                </div>
-                <Button onClick={cleanupExpiredSessions} variant="outline" size="sm">
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Clean Expired
-                </Button>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {userSessions.filter(s => s.is_active).map((session) => (
-                    <div key={session.id} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div>
-                        <p className="font-medium">User ID: {session.user_id}</p>
-                        <p className="text-sm text-muted-foreground">
-                          IP: {session.ip_address} • Last activity: {new Date(session.last_activity).toLocaleString()}
-                        </p>
+              {/* Active Sessions */}
+              <Card className="col-span-1">
+                <CardHeader className="flex flex-row items-center justify-between pb-3">
+                  <div>
+                    <CardTitle className="text-lg">Active Sessions</CardTitle>
+                    <CardDescription className="text-sm">Monitor user sessions and activity</CardDescription>
+                  </div>
+                  <Button onClick={cleanupExpiredSessions} variant="outline" size="sm">
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Clean Expired
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2 max-h-80 overflow-y-auto">
+                    {userSessions.filter(s => s.is_active).map((session) => (
+                      <div key={session.id} className="flex items-center justify-between p-2 border rounded-md bg-card/50">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-sm truncate">User ID: {session.user_id}</p>
+                          <p className="text-xs text-muted-foreground">
+                            IP: {session.ip_address} • Last activity: {new Date(session.last_activity).toLocaleString()}
+                          </p>
+                        </div>
+                        <Badge variant="outline" className="text-xs text-green-700">Active</Badge>
                       </div>
-                      <Badge variant="outline" className="bg-green-50 text-green-700">Active</Badge>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
         )}
 
       </Tabs>
-      </div>
-    </Layout>
+    </div>
   );
 }

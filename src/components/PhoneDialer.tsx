@@ -6,21 +6,7 @@ import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import { supabase } from "@/integrations/supabase/client"
 import { Phone, PhoneCall } from "lucide-react"
-
-// Phone number formatting function
-const formatPhoneNumber = (value: string) => {
-  // Remove all non-digits
-  const phoneNumber = value.replace(/\D/g, '')
-  
-  // Format based on length
-  if (phoneNumber.length < 4) {
-    return phoneNumber
-  } else if (phoneNumber.length < 7) {
-    return `(${phoneNumber.slice(0, 3)}) ${phoneNumber.slice(3)}`
-  } else {
-    return `(${phoneNumber.slice(0, 3)}) ${phoneNumber.slice(3, 6)}-${phoneNumber.slice(6, 10)}`
-  }
-}
+import { formatPhoneNumber } from "@/lib/utils"
 
 interface PhoneDialerProps {
   trigger?: React.ReactNode
@@ -29,7 +15,9 @@ interface PhoneDialerProps {
 
 export function PhoneDialer({ trigger, phoneNumber: initialPhoneNumber }: PhoneDialerProps) {
   const [isOpen, setIsOpen] = useState(false)
-  const [phoneNumber, setPhoneNumber] = useState(initialPhoneNumber || "")
+  // Strip and reformat initial phone number to ensure consistent display
+  const cleanInitialPhone = initialPhoneNumber ? formatPhoneNumber(initialPhoneNumber) : ""
+  const [phoneNumber, setPhoneNumber] = useState(cleanInitialPhone)
   const [loading, setLoading] = useState(false)
   const { toast } = useToast()
 
@@ -90,7 +78,8 @@ export function PhoneDialer({ trigger, phoneNumber: initialPhoneNumber }: PhoneD
   const handleOpenChange = (open: boolean) => {
     setIsOpen(open)
     if (open && initialPhoneNumber) {
-      setPhoneNumber(initialPhoneNumber)
+      // Strip and reformat to ensure consistent display
+      setPhoneNumber(formatPhoneNumber(initialPhoneNumber))
     } else if (!open && !initialPhoneNumber) {
       setPhoneNumber("")
     }

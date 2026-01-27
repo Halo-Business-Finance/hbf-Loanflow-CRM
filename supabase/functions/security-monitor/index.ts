@@ -1,5 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { SecureLogger } from '../_shared/secure-logger.ts'
+
+const logger = new SecureLogger('security-monitor')
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -38,7 +41,7 @@ serve(async (req) => {
     const url = new URL(req.url);
     const action = url.searchParams.get('action') || 'monitor';
     
-    console.log('Security monitor action:', action);
+    logger.logAction(action);
 
     // Default monitoring configuration
     const config: MonitoringConfig = {
@@ -89,7 +92,7 @@ serve(async (req) => {
             return acc;
           }, {} as Record<string, number>);
 
-          const suspiciousIPs = Object.entries(ipGroups).filter(([ip, count]) => count >= 5);
+          const suspiciousIPs = Object.entries(ipGroups).filter(([ip, count]) => (count as number) >= 5);
 
           alerts.push({
             type: 'auth_failure',
@@ -171,7 +174,7 @@ serve(async (req) => {
               });
           }
 
-          console.log(`Generated ${alerts.length} security alerts`);
+          logger.info('Generated security alerts', { alertCount: alerts.length });
         }
 
         return new Response(
@@ -256,11 +259,12 @@ serve(async (req) => {
     }
 
   } catch (error) {
-    console.error('Security monitor error:', error);
+    logger.error('Security monitor error', error);
+    const message = error instanceof Error ? error.message : 'Unknown error'
     return new Response(
       JSON.stringify({ 
-        error: 'Security monitoring failed',
-        message: error.message 
+        error: 'Security monitoring failed', 
+        message 
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -278,8 +282,8 @@ function getTopCountries(geoBlocks: any[]): Array<{country: string, count: numbe
   }, {} as Record<string, number>);
 
   return Object.entries(counts)
-    .map(([country, count]) => ({ country, count }))
-    .sort((a, b) => b.count - a.count)
+    .map(([country, count]) => ({ country, count: count as number }))
+    .sort((a, b) => (b.count as number) - (a.count as number))
     .slice(0, 5);
 }
 
@@ -297,8 +301,8 @@ function getTopIPs(failedLogins: any[]): Array<{ip: string, attempts: number, em
   return Object.entries(ipStats)
     .map(([ip, stats]) => ({ 
       ip, 
-      attempts: stats.attempts, 
-      emails: stats.emails.size 
+      attempts: (stats as any).attempts, 
+      emails: (stats as any).emails.size 
     }))
     .sort((a, b) => b.attempts - a.attempts)
     .slice(0, 5);

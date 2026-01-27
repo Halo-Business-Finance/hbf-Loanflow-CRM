@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+
 import { Download, ExternalLink, FileText, X, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -14,7 +14,9 @@ declare global {
       View: new (config: { clientId: string; divId: string }) => {
         previewFile: (
           fileConfig: {
-            content: { location: { url: string } };
+            content:
+              | { location: { url: string } }
+              | { promise: Promise<ArrayBuffer> };
             metaData: { fileName: string };
           },
           viewerConfig: {
@@ -64,8 +66,29 @@ export function DocumentViewer({ document, isOpen, onClose }: DocumentViewerProp
     try {
       setLoading(true);
       console.log('Getting document URL for:', filePath);
-      
-      // Try downloading the file and creating a blob URL to avoid CORS issues
+
+      const isPdfPath = filePath.toLowerCase().endsWith('.pdf');
+
+      // For PDFs intended for Adobe viewer, prefer a signed URL first
+      if (isPdfPath) {
+        try {
+          console.log('Attempting signed URL first for PDF...');
+          const { data: signed, error: signedError } = await supabase.storage
+            .from('lead-documents')
+            .createSignedUrl(filePath, 3600);
+
+          if (!signedError && signed?.signedUrl) {
+            console.log('Using signed URL for Adobe viewer');
+            setDocumentUrl(signed.signedUrl);
+            return signed.signedUrl;
+          }
+          console.warn('Signed URL failed, falling back to download for PDF');
+        } catch (e) {
+          console.warn('Signed URL attempt threw, trying download for PDF');
+        }
+      }
+
+      // Download and create a blob URL (works well for images/others)
       try {
         const { data: fileData, error: downloadError } = await supabase.storage
           .from('lead-documents')
@@ -78,14 +101,23 @@ export function DocumentViewer({ document, isOpen, onClose }: DocumentViewerProp
           return blobUrl;
         }
       } catch (e) {
-        console.log('Download method failed, trying public URL');
+        console.log('Download method failed, trying signed URL');
       }
       
-      // Fallback to public URL
-      const publicUrl = `https://gshxxsniwytjgcnthyfq.supabase.co/storage/v1/object/public/lead-documents/${filePath}`;
-      console.log('Trying public URL:', publicUrl);
+      // Try signed URL (for non-PDF or download fallback)
+      const { data: signed, error: signedError } = await supabase.storage
+        .from('lead-documents')
+        .createSignedUrl(filePath, 3600); // 1 hour expiry
+
+      if (!signedError && signed?.signedUrl) {
+        console.log('Successfully got signed URL');
+        setDocumentUrl(signed.signedUrl);
+        return signed.signedUrl;
+      }
       
-      // Test if the public URL works
+      // Final fallback to public URL (may be disabled)
+      const publicUrl = `https://gshxxsniwytjgcnthyfq.supabase.co/storage/v1/object/public/lead-documents/${filePath}`;
+      console.log('Trying public URL as fallback:', publicUrl);
       try {
         const response = await fetch(publicUrl, { method: 'HEAD' });
         if (response.ok) {
@@ -94,22 +126,10 @@ export function DocumentViewer({ document, isOpen, onClose }: DocumentViewerProp
           return publicUrl;
         }
       } catch (e) {
-        console.log('Public URL failed, trying signed URL');
+        console.log('Public URL failed as expected for private bucket');
       }
-      
-      // Final fallback to signed URL
-      const { data, error } = await supabase.storage
-        .from('lead-documents')
-        .createSignedUrl(filePath, 3600); // 1 hour expiry
 
-      if (error) {
-        console.error('Supabase storage error:', error);
-        throw error;
-      }
-      
-      console.log('Successfully got signed URL');
-      setDocumentUrl(data.signedUrl);
-      return data.signedUrl;
+      return null;
     } catch (error) {
       console.error('Error getting document URL:', error);
       toast({
@@ -126,13 +146,23 @@ export function DocumentViewer({ document, isOpen, onClose }: DocumentViewerProp
   // Get Adobe configuration
   const getAdobeConfig = async () => {
     try {
+      console.log('🔍 Fetching Adobe configuration from edge function...');
       const { data, error } = await supabase.functions.invoke('get-adobe-config');
-      if (error) throw error;
-      console.log('Adobe config retrieved:', data);
+      
+      if (error) {
+        console.error('❌ Error from get-adobe-config edge function:', error);
+        throw error;
+      }
+      
+      console.log('✅ Adobe config retrieved successfully:', data);
+      console.log('📋 Client ID:', data?.clientId);
+      console.log('🎯 Is Demo:', data?.isDemo);
+      console.log('🔑 Has API Key:', data?.hasApiKey);
+      
       setAdobeConfig(data);
       return data;
     } catch (error) {
-      console.error('Error getting Adobe config:', error);
+      console.error('❌ Failed to get Adobe config, using demo fallback:', error);
       // Fallback to demo config
       const fallbackConfig = { clientId: 'dc-pdf-embed-demo', isDemo: true };
       setAdobeConfig(fallbackConfig);
@@ -144,54 +174,79 @@ export function DocumentViewer({ document, isOpen, onClose }: DocumentViewerProp
   const loadAdobeSDK = () => {
     return new Promise<void>((resolve, reject) => {
       if (window.AdobeDC) {
-        console.log('Adobe SDK already loaded');
+        console.log('✅ Adobe SDK already loaded');
         resolve();
         return;
       }
 
-      console.log('Loading Adobe PDF SDK...');
+      console.log('📦 Loading Adobe PDF SDK...');
+      
+      // Check if script already exists
+      const existingScript = window.document.querySelector('script[src*="acrobatservices.adobe.com"]');
+      if (existingScript) {
+        console.log('🔄 Adobe script tag already exists, waiting for load...');
+        const checkExisting = setInterval(() => {
+          if (window.AdobeDC) {
+            console.log('✅ Existing Adobe SDK ready');
+            clearInterval(checkExisting);
+            resolve();
+          }
+        }, 100);
+        setTimeout(() => {
+          clearInterval(checkExisting);
+          reject(new Error('Existing Adobe SDK timeout'));
+        }, 10000);
+        return;
+      }
+
       const script = window.document.createElement('script');
       script.src = 'https://acrobatservices.adobe.com/view-sdk/viewer.js';
+      script.async = true;
       
       // Set a timeout for the script loading
       const timeout = setTimeout(() => {
-        console.error('Adobe SDK loading timeout');
-        reject(new Error('Adobe SDK loading timeout - network issue or blocked'));
-      }, 10000); // 10 second timeout
+        console.error('❌ Adobe SDK loading timeout - check network/CSP');
+        script.remove();
+        reject(new Error('Adobe SDK loading timeout - network issue or blocked by CSP'));
+      }, 15000); // 15 second timeout
       
       script.onload = () => {
         clearTimeout(timeout);
-        console.log('Adobe PDF SDK script loaded');
+        console.log('✅ Adobe PDF SDK script loaded successfully');
         
         // Check if AdobeDC is immediately available
         if (window.AdobeDC) {
-          console.log('Adobe SDK ready immediately');
+          console.log('✅ Adobe SDK ready immediately after load');
           resolve();
           return;
         }
         
-        // Wait for Adobe SDK to initialize with shorter intervals
+        // Wait for Adobe SDK to initialize
         let attempts = 0;
         const checkInterval = setInterval(() => {
           attempts++;
+          console.log(`🔄 Checking Adobe SDK availability (attempt ${attempts})`);
+          
           if (window.AdobeDC) {
-            console.log(`Adobe SDK ready after ${attempts} attempts`);
+            console.log(`✅ Adobe SDK ready after ${attempts} attempts`);
             clearInterval(checkInterval);
             resolve();
-          } else if (attempts > 20) { // 10 seconds total (500ms * 20)
-            console.error('Adobe SDK initialization timeout after script load');
+          } else if (attempts > 30) { // 15 seconds total (500ms * 30)
+            console.error('❌ Adobe SDK initialization timeout after script load');
             clearInterval(checkInterval);
-            reject(new Error('Adobe SDK failed to initialize - possible API key/client ID issue'));
+            reject(new Error('Adobe SDK failed to initialize - possible Client ID issue'));
           }
         }, 500);
       };
       
       script.onerror = (error) => {
         clearTimeout(timeout);
-        console.error('Failed to load Adobe PDF SDK script:', error);
-        reject(new Error('Failed to load Adobe PDF SDK - network or CDN issue'));
+        console.error('❌ Failed to load Adobe PDF SDK script:', error);
+        script.remove();
+        reject(new Error('Failed to load Adobe PDF SDK - network or CSP blocking'));
       };
       
+      console.log('🚀 Adding Adobe script to document head...');
       window.document.head.appendChild(script);
     });
   };
@@ -199,44 +254,69 @@ export function DocumentViewer({ document, isOpen, onClose }: DocumentViewerProp
   // Initialize Adobe PDF Viewer
   const initializeAdobeViewer = async (url: string) => {
     try {
-      console.log('=== Adobe Viewer Initialization Started ===');
+      console.log('🚀 === Adobe Viewer Initialization Started ===');
+      console.log('📄 PDF URL:', url);
       setViewerError(false); // Reset error state
       
       let config = adobeConfig;
       if (!config) {
-        console.log('Fetching Adobe config...');
+        console.log('⚙️ No config in state, fetching Adobe config...');
         config = await getAdobeConfig();
-        if (!config) throw new Error('Adobe configuration unavailable');
+        if (!config) {
+          console.error('❌ Adobe configuration unavailable');
+          throw new Error('Adobe configuration unavailable');
+        }
+      } else {
+        console.log('✅ Using cached Adobe config:', config);
       }
 
-      console.log('Loading Adobe SDK...');
+      console.log('📦 Loading Adobe SDK...');
       await loadAdobeSDK();
 
       if (!window.AdobeDC) {
+        console.error('❌ Adobe SDK failed to load - window.AdobeDC is undefined');
         throw new Error('Adobe SDK failed to load');
       }
+      console.log('✅ Adobe SDK loaded successfully');
 
       if (!viewerRef.current) {
+        console.error('❌ Viewer container not ready');
         throw new Error('Viewer container not ready');
       }
+      console.log('✅ Viewer container ready');
 
-      // Setup container
+      // Setup container - clear safely
       viewerRef.current.id = 'adobe-dc-view';
-      viewerRef.current.innerHTML = '';
+      while (viewerRef.current.firstChild) {
+        viewerRef.current.removeChild(viewerRef.current.firstChild);
+      }
+      console.log('🧹 Viewer container cleared');
 
       // Wait for DOM updates
       await new Promise(resolve => setTimeout(resolve, 200));
 
-      console.log('Creating Adobe DC View...');
+      console.log('🎨 Creating Adobe DC View with Client ID:', config.clientId);
       const adobeDCView = new window.AdobeDC.View({
         clientId: config.clientId,
         divId: 'adobe-dc-view'
       });
+      console.log('✅ Adobe DC View instance created');
 
-      // Preview file with error handling
+      // Preview file with error handling - try ArrayBuffer first for CORS issues
       try {
+        console.log('📖 Attempting PDF preview with ArrayBuffer for CORS compatibility...');
+        
+        // Fetch the PDF as ArrayBuffer to avoid CORS issues
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch PDF: ${response.status}`);
+        }
+        
+        const arrayBuffer = await response.arrayBuffer();
+        console.log('✅ PDF fetched as ArrayBuffer, size:', arrayBuffer.byteLength);
+        
         adobeDCView.previewFile({
-          content: { location: { url } },
+          content: { promise: Promise.resolve(arrayBuffer) },
           metaData: { fileName: document?.document_name || 'document.pdf' }
         }, {
           embedMode: 'SIZED_CONTAINER',
@@ -247,20 +327,44 @@ export function DocumentViewer({ document, isOpen, onClose }: DocumentViewerProp
           showTopToolbar: true,
           defaultViewMode: 'FIT_PAGE'
         });
-      } catch (previewError) {
-        console.error('Adobe previewFile error:', previewError);
-        throw new Error('Failed to preview PDF');
+        console.log('✅ Adobe PDF viewer initialized with ArrayBuffer');
+        
+      } catch (arrayBufferError) {
+        console.warn('⚠️ ArrayBuffer method failed, trying URL method:', arrayBufferError);
+        
+        // Fallback to URL method
+        try {
+          adobeDCView.previewFile({
+            content: { location: { url } },
+            metaData: { fileName: document?.document_name || 'document.pdf' }
+          }, {
+            embedMode: 'SIZED_CONTAINER',
+            showAnnotationTools: false,
+            showLeftHandPanel: true,
+            showDownloadPDF: true,
+            showPrintPDF: true,
+            showTopToolbar: true,
+            defaultViewMode: 'FIT_PAGE'
+          });
+          console.log('✅ Adobe PDF viewer initialized with URL fallback');
+        } catch (urlError) {
+          console.error('❌ Both ArrayBuffer and URL methods failed:', urlError);
+          throw new Error('Failed to preview PDF with both methods');
+        }
       }
 
       setAdobeView(adobeDCView);
-      console.log('Adobe PDF viewer initialized successfully');
+      console.log('✅ Adobe PDF viewer initialized successfully');
       
     } catch (error) {
-      console.error('Adobe viewer initialization failed:', error);
+      console.error('❌ Adobe viewer initialization failed:', error);
+      console.error('Error details:', {
+        message: (error as Error).message,
+        stack: (error as Error).stack
+      });
       setViewerError(true);
       
-      // Don't show toast immediately, let the fallback UI handle it
-      console.log('Falling back to browser PDF viewer');
+      console.log('⚠️ Falling back to browser PDF viewer');
     }
   };
 
@@ -316,9 +420,11 @@ export function DocumentViewer({ document, isOpen, onClose }: DocumentViewerProp
       setDocumentUrl(null);
       setViewerError(false);
       setAdobeView(null);
-      // Clear Adobe viewer container
+      // Clear Adobe viewer container safely
       if (viewerRef.current) {
-        viewerRef.current.innerHTML = '';
+        while (viewerRef.current.firstChild) {
+          viewerRef.current.removeChild(viewerRef.current.firstChild);
+        }
       }
     }
   }, [isOpen, document?.file_path, documentUrl]);
@@ -326,8 +432,22 @@ export function DocumentViewer({ document, isOpen, onClose }: DocumentViewerProp
   // Initialize Adobe viewer when document URL is ready
   useEffect(() => {
     if (isOpen && documentUrl && isPdf && !viewerError && !adobeView) {
-      console.log('Document URL ready, initializing Adobe viewer...');
+      console.log('🎯 Conditions met for Adobe viewer initialization:');
+      console.log('- Modal open:', isOpen);
+      console.log('- Document URL ready:', !!documentUrl);
+      console.log('- Is PDF:', isPdf);
+      console.log('- No viewer error:', !viewerError);
+      console.log('- No existing Adobe view:', !adobeView);
+      console.log('📄 Document URL:', documentUrl);
+      console.log('🚀 Starting Adobe viewer initialization...');
       initializeAdobeViewer(documentUrl);
+    } else {
+      console.log('❌ Adobe viewer conditions not met:');
+      console.log('- Modal open:', isOpen);
+      console.log('- Document URL ready:', !!documentUrl);
+      console.log('- Is PDF:', isPdf);
+      console.log('- No viewer error:', !viewerError);
+      console.log('- No existing Adobe view:', !adobeView);
     }
   }, [isOpen, documentUrl, isPdf, viewerError, adobeView]);
 
@@ -353,15 +473,15 @@ export function DocumentViewer({ document, isOpen, onClose }: DocumentViewerProp
                 {document.document_name}
               </DialogTitle>
               <div className="flex items-center gap-2 mt-1">
-                <Badge variant="secondary" className="text-xs">
+                <span className="text-xs">
                   {document.document_type}
-                </Badge>
-                <Badge variant="outline" className="text-xs">
+                </span>
+                <span className="text-xs">
                   {document.file_mime_type || 'Unknown type'}
-                </Badge>
-                <Badge variant="outline" className="text-xs">
+                </span>
+                <span className="text-xs">
                   {formatFileSize(document.file_size)}
-                </Badge>
+                </span>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -405,31 +525,23 @@ export function DocumentViewer({ document, isOpen, onClose }: DocumentViewerProp
             <div className="h-[70vh] border rounded-lg overflow-hidden relative">
               {isPdf ? (
                 <div className="w-full h-full bg-gray-50 flex flex-col">
-                  <div className="flex items-center justify-between p-3 bg-white border-b">
+                  <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
                       <FileText className="h-4 w-4 text-red-600" />
                       <span className="text-sm font-medium">PDF Document</span>
-                      <Badge variant="default" className="text-xs">
-                        PDF Reader: Adobe PDF Embed {adobeConfig?.isDemo ? '(Demo)' : '(Licensed)'} 
-                        {viewerError && ' - Error'}
-                      </Badge>
+                      <span className="text-xs text-muted-foreground">
+                        Adobe PDF Embed {adobeConfig?.isDemo ? '(Demo)' : '(Licensed)'}
+                        {viewerError && ' - Error, showing browser fallback'}
+                      </span>
                     </div>
                     <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        onClick={() => window.open(documentUrl, '_blank')}
-                        className="gap-1"
-                      >
-                        <ExternalLink className="h-3 w-3" />
-                        Open in Browser
-                      </Button>
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={downloadDocument}
-                        className="gap-1"
+                        className="gap-2"
                       >
-                        <Download className="h-3 w-3" />
+                        <Download className="h-4 w-4" />
                         Download
                       </Button>
                     </div>
@@ -446,10 +558,10 @@ export function DocumentViewer({ document, isOpen, onClose }: DocumentViewerProp
                           <div>
                             <h3 className="font-medium text-lg">Adobe PDF Viewer Error</h3>
                             <p className="text-sm text-muted-foreground mt-1">
-                              The Adobe PDF viewer encountered an issue, but you can still access the file.
+                              The Adobe PDF viewer encountered an issue. Check browser console for details.
                             </p>
                           </div>
-                          <div className="flex gap-2">
+                          <div className="flex gap-2 justify-center">
                             <Button onClick={() => window.open(documentUrl, '_blank')} className="gap-2">
                               <ExternalLink className="h-4 w-4" />
                               Open PDF in Browser
@@ -463,23 +575,32 @@ export function DocumentViewer({ document, isOpen, onClose }: DocumentViewerProp
                             variant="outline" 
                             size="sm"
                             onClick={async () => {
-                              console.log('Retrying Adobe viewer initialization...');
+                              console.log('🔄 Manual retry requested - resetting all states...');
                               setViewerError(false);
                               setAdobeView(null);
-                              setAdobeConfig(null); // Clear config to force refresh
+                              setAdobeConfig(null);
                               
-                              // Refresh Adobe configuration to get latest credentials
+                              // Clear any existing Adobe elements
+                              const existingViewer = window.document.getElementById('adobe-dc-view');
+                              if (existingViewer) {
+                                while (existingViewer.firstChild) {
+                                  existingViewer.removeChild(existingViewer.firstChild);
+                                }
+                              }
+                              
+                              console.log('🔄 Fetching fresh Adobe config...');
                               const newConfig = await getAdobeConfig();
-                              console.log('Refreshed Adobe config:', newConfig);
+                              console.log('📋 Fresh config received:', newConfig);
                               
                               if (documentUrl) {
+                                console.log('🚀 Retrying Adobe viewer with fresh config...');
                                 initializeAdobeViewer(documentUrl);
                               }
                             }}
                             className="gap-1"
                           >
                             <Loader2 className="h-3 w-3" />
-                            Try Again with Latest Config
+                            Retry Adobe Viewer
                           </Button>
                         </div>
                       </div>

@@ -1,23 +1,23 @@
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useCallback } from 'react';
 
-export type UserRole = 'super_admin' | 'admin' | 'manager' | 'agent' | 'loan_originator' | 'loan_processor' | 'funder' | 'underwriter' | 'closer' | 'tech';
+export type UserRole = 'super_admin' | 'admin' | 'manager' | 'loan_originator' | 'loan_processor' | 'funder' | 'underwriter' | 'closer' | 'tech';
 
 interface RoleHierarchy {
   [key: string]: number;
 }
 
 const ROLE_HIERARCHY: RoleHierarchy = {
-  'super_admin': 4,
-  'admin': 3,
-  'manager': 2,
-  'loan_originator': 1,
-  'loan_processor': 1,
-  'funder': 1,
-  'underwriter': 1,
+  'tech': 0,
   'closer': 1,
-  'agent': 1,
-  'tech': 0
+  'underwriter': 1,
+  'funder': 1,
+  'loan_processor': 1,
+  'loan_originator': 1,
+  
+  'manager': 2,
+  'admin': 3,
+  'super_admin': 4
 };
 
 export const useRoleBasedAccess = () => {
@@ -33,8 +33,10 @@ export const useRoleBasedAccess = () => {
   }, [userRole]);
 
   const canAccessLeads = useCallback((): boolean => {
-    return hasRole('agent') || hasMinimumRole('agent');
-  }, [hasRole, hasMinimumRole]);
+    if (!userRole) return false;
+    // All roles except tech can access leads
+    return userRole !== 'tech';
+  }, [userRole]);
 
   const canManageUsers = useCallback((): boolean => {
     return hasMinimumRole('admin');
@@ -49,18 +51,23 @@ export const useRoleBasedAccess = () => {
   }, [hasMinimumRole]);
 
   const canDeleteLeads = useCallback((): boolean => {
-    return hasMinimumRole('manager');
+    // Admins and super_admins can delete all leads
+    return hasMinimumRole('admin');
   }, [hasMinimumRole]);
 
   const canViewReports = useCallback((): boolean => {
-    return hasMinimumRole('agent');
+    return hasMinimumRole('loan_originator');
   }, [hasMinimumRole]);
 
   const canManageClients = useCallback((): boolean => {
-    return hasMinimumRole('agent');
+    return hasMinimumRole('loan_originator');
   }, [hasMinimumRole]);
 
   // Loan-specific role permissions
+  const canOriginateLoans = useCallback((): boolean => {
+    return hasRole('loan_originator') || hasMinimumRole('manager');
+  }, [hasRole, hasMinimumRole]);
+
   const canProcessLoans = useCallback((): boolean => {
     return hasRole('loan_processor') || hasMinimumRole('manager');
   }, [hasRole, hasMinimumRole]);
@@ -88,6 +95,7 @@ export const useRoleBasedAccess = () => {
     canDeleteLeads,
     canViewReports,
     canManageClients,
+    canOriginateLoans,
     canProcessLoans,
     canFundLoans,
     canUnderwriteLoans,

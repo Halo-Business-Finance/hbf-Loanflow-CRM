@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { logger } from '@/lib/logger';
 
 export class SecurityMonitoring {
   private static instance: SecurityMonitoring;
@@ -27,7 +28,7 @@ export class SecurityMonitoring {
         }
       });
     } catch (error) {
-      console.error('Failed to log security event:', error);
+      logger.error('Failed to log security event:', error);
     }
   }
 
@@ -39,7 +40,7 @@ export class SecurityMonitoring {
     // Prevent privilege escalation attempts
     const roleHierarchy = {
       'tech': 0,
-      'agent': 1,
+      
       'loan_originator': 1,
       'loan_processor': 1,
       'funder': 1,
@@ -94,13 +95,13 @@ export class SecurityMonitoring {
       });
 
       if (error) {
-        console.error('Geo-security check failed:', error);
+        logger.error('Geo-security check failed:', error);
         return { allowed: false, risk_factors: ['geo_check_failed'] };
       }
 
       return data;
     } catch (error) {
-      console.error('Geo-security validation error:', error);
+      logger.error('Geo-security validation error:', error);
       return { allowed: false, risk_factors: ['geo_validation_error'] };
     }
   }
@@ -121,7 +122,7 @@ export class SecurityMonitoring {
         }
       });
     } catch (error) {
-      console.error('Failed to log audit event:', error);
+      logger.error('Failed to log audit event:', error);
     }
   }
 }

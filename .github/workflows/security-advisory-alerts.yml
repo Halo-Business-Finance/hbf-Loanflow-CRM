@@ -1,0 +1,191 @@
+name: Security Advisory Alerts
+
+on:
+  # Trigger on new security advisories
+  repository_vulnerability_alert:
+    types: [create]
+  
+  # Also run weekly to check for new advisories
+  schedule:
+    - cron: '0 10 * * 1'  # Every Monday at 10:00 AM UTC
+  
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+  issues: write
+
+jobs:
+  check-advisories:
+    name: Check Security Advisories
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check GitHub Security Advisories
+        uses: actions/github-script@v7
+        with:
+          script: |
+            console.log('Checking for security advisories...');
+            
+            try {
+              // Get repository vulnerability alerts
+              const alerts = await github.rest.dependabot.listAlertsForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: 'open'
+              });
+              
+              if (alerts.data.length === 0) {
+                core.info('✅ No open security advisories found');
+                await core.summary
+                  .addHeading('Security Advisory Check - All Clear', 2)
+                  .addRaw('No open security advisories detected.')
+                  .addRaw(`\n\n**Checked:** ${new Date().toISOString()}`)
+                  .write();
+                return;
+              }
+              
+              // Group by severity
+              const critical = alerts.data.filter(a => a.security_advisory.severity === 'critical');
+              const high = alerts.data.filter(a => a.security_advisory.severity === 'high');
+              const medium = alerts.data.filter(a => a.security_advisory.severity === 'medium');
+              const low = alerts.data.filter(a => a.security_advisory.severity === 'low');
+              
+              console.log(`Found ${alerts.data.length} open advisories:`);
+              console.log(`- Critical: ${critical.length}`);
+              console.log(`- High: ${high.length}`);
+              console.log(`- Medium: ${medium.length}`);
+              console.log(`- Low: ${low.length}`);
+              
+              // Create summary
+              let summary = core.summary
+                .addHeading('🚨 Security Advisories Detected', 2)
+                .addRaw(`**Total Open Advisories:** ${alerts.data.length}\n\n`);
+              
+              if (critical.length > 0) {
+                summary.addHeading('🔴 Critical Severity', 3);
+                critical.forEach(alert => {
+                  summary.addRaw(`- **${alert.security_advisory.cve_id || 'No CVE'}**: ${alert.security_advisory.summary}\n`);
+                  summary.addRaw(`  - Package: \`${alert.dependency.package.name}\`\n`);
+                  summary.addRaw(`  - Vulnerable: \`${alert.security_vulnerability.vulnerable_version_range}\`\n`);
+                  summary.addRaw(`  - Patched: \`${alert.security_vulnerability.first_patched_version?.identifier || 'No patch available'}\`\n`);
+                });
+              }
+              
+              if (high.length > 0) {
+                summary.addHeading('🟠 High Severity', 3);
+                high.forEach(alert => {
+                  summary.addRaw(`- **${alert.security_advisory.cve_id || 'No CVE'}**: ${alert.security_advisory.summary}\n`);
+                  summary.addRaw(`  - Package: \`${alert.dependency.package.name}\`\n`);
+                });
+              }
+              
+              if (medium.length > 0 || low.length > 0) {
+                summary.addRaw(`\n**Medium:** ${medium.length} | **Low:** ${low.length}\n`);
+              }
+              
+              await summary.write();
+              
+              // Create or update issue for critical/high vulnerabilities
+              if (critical.length > 0 || high.length > 0) {
+                const title = `🚨 Security Advisory: ${critical.length} Critical, ${high.length} High Severity`;
+                const body = `
+## Security Advisory Alert
+
+Our automated monitoring has detected **${critical.length + high.length}** high-priority security advisories.
+
+### Severity Breakdown
+- 🔴 Critical: ${critical.length}
+- 🟠 High: ${high.length}
+- 🟡 Medium: ${medium.length}
+- 🟢 Low: ${low.length}
+
+### Critical Vulnerabilities
+${critical.map(a => `
+#### ${a.security_advisory.cve_id || a.security_advisory.ghsa_id}
+- **Package:** \`${a.dependency.package.name}\`
+- **Summary:** ${a.security_advisory.summary}
+- **Vulnerable Versions:** \`${a.security_vulnerability.vulnerable_version_range}\`
+- **Patched Version:** \`${a.security_vulnerability.first_patched_version?.identifier || 'No patch available'}\`
+- **CVSS Score:** ${a.security_advisory.cvss.score}/10
+- **Published:** ${a.security_advisory.published_at}
+
+**Description:**
+${a.security_advisory.description}
+
+**References:**
+${a.security_advisory.references.map(r => `- ${r.url}`).join('\n')}
+`).join('\n---\n')}
+
+### High Severity Vulnerabilities
+${high.map(a => `
+#### ${a.security_advisory.cve_id || a.security_advisory.ghsa_id}
+- **Package:** \`${a.dependency.package.name}\`
+- **Summary:** ${a.security_advisory.summary}
+- **Patched Version:** \`${a.security_vulnerability.first_patched_version?.identifier || 'No patch available'}\`
+`).join('\n')}
+
+### Action Required
+1. Review each vulnerability above
+2. Check Dependabot PRs for automated fixes
+3. Update dependencies manually if needed:
+   \`\`\`bash
+   npm update <package-name>
+   \`\`\`
+4. Test thoroughly after updates
+
+### Useful Links
+- [Security Advisories Dashboard](https://github.com/${context.repo.owner}/${context.repo.repo}/security/dependabot)
+- [Workflow Run](${context.payload.repository.html_url}/actions/runs/${context.runId})
+
+---
+**Detected:** ${new Date().toISOString()}
+**Next Scan:** Weekly on Mondays
+`;
+
+                // Check for existing issue
+                const existingIssues = await github.rest.issues.listForRepo({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  state: 'open',
+                  labels: 'security,advisory'
+                });
+                
+                const existingIssue = existingIssues.data.find(issue => 
+                  issue.title.includes('Security Advisory:')
+                );
+                
+                if (existingIssue) {
+                  await github.rest.issues.update({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: existingIssue.number,
+                    body: body
+                  });
+                  console.log(`Updated issue #${existingIssue.number}`);
+                } else {
+                  await github.rest.issues.create({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    title: title,
+                    body: body,
+                    labels: ['security', 'advisory', 'critical', 'dependencies']
+                  });
+                  console.log('Created new security advisory issue');
+                }
+              }
+              
+            } catch (error) {
+              console.error('Error checking advisories:', error);
+              core.setFailed(error.message);
+            }
+
+      - name: Send notification summary
+        if: always()
+        run: |
+          echo "✅ Security advisory check complete"
+          echo "Check the Security tab in your repository for detailed information"
+          echo "GitHub URL: https://github.com/${{ github.repository }}/security/dependabot"

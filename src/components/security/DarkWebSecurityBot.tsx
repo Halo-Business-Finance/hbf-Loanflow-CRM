@@ -6,8 +6,9 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Shield, AlertTriangle, Eye, Globe, Users, Activity } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
-import { secureStorage } from "@/lib/secure-storage";
+import { serverSecureStorage } from "@/lib/server-encryption";
 
 interface DarkWebThreat {
   id: string;
@@ -39,19 +40,23 @@ export function DarkWebSecurityBot() {
   });
   const [isMonitoring, setIsMonitoring] = useState(false);
 
-  // Load monitoring state from secure storage
+  // Auto-activate monitoring on high alert mode
   useEffect(() => {
-    const loadMonitoringState = async () => {
+    const initializeHighAlert = async () => {
       try {
-        const storedState = await secureStorage.getItem('dark-web-monitoring');
-        setIsMonitoring(storedState === 'true');
+        // Always start in high alert mode for persistent monitoring
+        setIsMonitoring(true);
+        await serverSecureStorage.setItem('dark-web-monitoring', 'true');
+        console.log('🌐 Dark Web Security Bot: HIGH ALERT MODE ACTIVATED');
       } catch (error) {
-        console.error("Error loading monitoring state:", error);
+        console.error("Error initializing high alert mode:", error);
       }
     };
-    loadMonitoringState();
+    initializeHighAlert();
   }, []);
   const [loading, setLoading] = useState(true);
+  const { hasRole } = useAuth();
+  const isAdmin = hasRole('admin');
   const { toast } = useToast();
 
   const detectDarkWebActivity = useCallback(async () => {
@@ -125,8 +130,7 @@ export function DarkWebSecurityBot() {
   useEffect(() => {
     const fetchDarkWebData = async () => {
       setLoading(true);
-      
-      // Fetch recent dark web threats
+      if (!isAdmin) { setLoading(false); return; }
       const { data: incidents } = await supabase
         .from('threat_incidents')
         .select('*')
@@ -169,17 +173,18 @@ export function DarkWebSecurityBot() {
   useEffect(() => {
     let interval: NodeJS.Timeout;
     
-    if (isMonitoring) {
-      interval = setInterval(async () => {
-        const newThreat = await detectDarkWebActivity();
-        setThreats(prev => [newThreat, ...prev.slice(0, 9)]);
-        setMetrics(prev => ({
-          ...prev,
-          threats_blocked: prev.threats_blocked + 1,
-          threat_level: prev.threats_blocked > 10 ? "critical" : "high"
-        }));
-      }, 8000);
-    }
+    // Always monitoring in high alert mode - scan every 5 seconds
+    interval = setInterval(async () => {
+      if (!isMonitoring) return;
+      
+      const newThreat = await detectDarkWebActivity();
+      setThreats(prev => [newThreat, ...prev.slice(0, 9)]);
+      setMetrics(prev => ({
+        ...prev,
+        threats_blocked: prev.threats_blocked + 1,
+        threat_level: prev.threats_blocked > 10 ? "critical" : "high"
+      }));
+    }, 5000); // High alert: scan every 5 seconds
 
     return () => {
       if (interval) clearInterval(interval);
@@ -188,7 +193,7 @@ export function DarkWebSecurityBot() {
 
   const handleStartMonitoring = async () => {
     setIsMonitoring(true);
-    await secureStorage.setItem('dark-web-monitoring', 'true');
+    await serverSecureStorage.setItem('dark-web-monitoring', 'true');
     toast({
       title: "Dark Web Security Bot Activated",
       description: "AI bot is now monitoring for dark web threats and will persist across sessions."
@@ -197,7 +202,7 @@ export function DarkWebSecurityBot() {
 
   const handleStopMonitoring = async () => {
     setIsMonitoring(false);
-    await secureStorage.setItem('dark-web-monitoring', 'false');
+    await serverSecureStorage.setItem('dark-web-monitoring', 'false');
     toast({
       title: "Dark Web Security Bot Deactivated",
       description: "Monitoring has been stopped."
@@ -224,188 +229,144 @@ export function DarkWebSecurityBot() {
     }
   };
 
+  if (!isAdmin) {
+    return (
+      <div className="p-6">
+        <Alert variant="destructive">
+          <AlertDescription>
+            You do not have permission to view dark web threat intelligence.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Globe className="h-5 w-5" />
-            Dark Web Security Bot
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex items-center justify-center py-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Globe className="h-5 w-5" />
-            Dark Web Security Bot
-            <Badge variant={isMonitoring ? "default" : "outline"}>
-              {isMonitoring ? "Active" : "Inactive"}
-            </Badge>
-          </CardTitle>
-          <CardDescription>
-            AI-powered monitoring for dark web threats, Tor networks, and credential leaks
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {metrics.threat_level === "critical" && (
-            <Alert variant="destructive">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>
-                Critical dark web threat level detected! Multiple suspicious activities have been blocked.
-              </AlertDescription>
-            </Alert>
-          )}
+    <div className="space-y-5">
+      <div className="space-y-1">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold">Dark Web Security Bot</h3>
+          <span className="text-xs font-medium uppercase px-2 py-1 rounded bg-destructive text-destructive-foreground">
+            HIGH ALERT - CONTINUOUS
+          </span>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Continuous AI monitoring for dark web threats, Tor networks, and credential leaks
+        </p>
+      </div>
 
-          <Tabs defaultValue="metrics" className="space-y-4">
-            <TabsList>
-              <TabsTrigger value="metrics">Threat Metrics</TabsTrigger>
-              <TabsTrigger value="threats">Recent Threats</TabsTrigger>
-              <TabsTrigger value="control">Bot Control</TabsTrigger>
-            </TabsList>
+      {metrics.threat_level === "critical" && (
+        <Alert variant="destructive">
+          <AlertDescription>
+            Critical dark web threat level detected! Multiple suspicious activities have been blocked.
+          </AlertDescription>
+        </Alert>
+      )}
 
-            <TabsContent value="metrics" className="space-y-4">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="flex items-center space-x-2">
-                      <Shield className="h-4 w-4 text-green-600" />
-                      <div>
-                        <p className="text-sm font-medium">Threats Blocked</p>
-                        <p className="text-2xl font-bold">{metrics.threats_blocked}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+      <Tabs defaultValue="metrics" className="space-y-4">
+        <TabsList className="inline-flex h-10 items-center justify-center rounded-lg bg-muted p-1 text-muted-foreground">
+          <TabsTrigger value="metrics" className="rounded-md px-3 py-1.5 text-sm">Threat Metrics</TabsTrigger>
+          <TabsTrigger value="threats" className="rounded-md px-3 py-1.5 text-sm">Recent Threats</TabsTrigger>
+          <TabsTrigger value="control" className="rounded-md px-3 py-1.5 text-sm">Bot Control</TabsTrigger>
+        </TabsList>
 
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="flex items-center space-x-2">
-                      <Globe className="h-4 w-4 text-orange-600" />
-                      <div>
-                        <p className="text-sm font-medium">Suspicious Domains</p>
-                        <p className="text-2xl font-bold">{metrics.suspicious_domains}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+        <TabsContent value="metrics" className="space-y-4 mt-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="p-5 border rounded-lg bg-card space-y-2">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Threats Blocked</p>
+              <p className="text-3xl font-semibold">{metrics.threats_blocked}</p>
+            </div>
 
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="flex items-center space-x-2">
-                      <Eye className="h-4 w-4 text-purple-600" />
-                      <div>
-                        <p className="text-sm font-medium">Tor Attempts</p>
-                        <p className="text-2xl font-bold">{metrics.tor_attempts}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+            <div className="p-5 border rounded-lg bg-card space-y-2">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Suspicious Domains</p>
+              <p className="text-3xl font-semibold">{metrics.suspicious_domains}</p>
+            </div>
 
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="flex items-center space-x-2">
-                      <Users className="h-4 w-4 text-red-600" />
-                      <div>
-                        <p className="text-sm font-medium">Credential Leaks</p>
-                        <p className="text-2xl font-bold">{metrics.credential_leaks}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
+            <div className="p-5 border rounded-lg bg-card space-y-2">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Tor Attempts</p>
+              <p className="text-3xl font-semibold">{metrics.tor_attempts}</p>
+            </div>
 
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex justify-between items-center">
-                    <span className="font-medium">Current Threat Level:</span>
-                    <Badge variant={getSeverityColor(metrics.threat_level)} className={getThreatLevelColor(metrics.threat_level)}>
-                      {metrics.threat_level.toUpperCase()}
-                    </Badge>
+            <div className="p-5 border rounded-lg bg-card space-y-2">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Credential Leaks</p>
+              <p className="text-3xl font-semibold">{metrics.credential_leaks}</p>
+            </div>
+          </div>
+
+          <div className="p-4 border rounded-lg bg-card">
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium">Current Threat Level</span>
+              <span className={`text-sm font-semibold uppercase ${getThreatLevelColor(metrics.threat_level)}`}>
+                {metrics.threat_level}
+              </span>
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="threats" className="space-y-3 mt-4">
+          {threats.map((threat) => (
+            <div key={threat.id} className="p-4 border rounded-lg bg-card space-y-2">
+              <div className="flex items-start justify-between">
+                <div className="flex-1 space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium uppercase px-2 py-0.5 rounded bg-muted">{threat.severity}</span>
+                    <span className="font-medium text-sm">{threat.type}</span>
+                    {threat.blocked && (
+                      <span className="text-xs text-green-600 font-medium">
+                        BLOCKED
+                      </span>
+                    )}
                   </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="threats" className="space-y-4">
-              <div className="space-y-2">
-                {threats.map((threat) => (
-                  <Card key={threat.id}>
-                    <CardContent className="p-4">
-                      <div className="flex justify-between items-start">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <Badge variant={getSeverityColor(threat.severity)}>
-                              {threat.severity.toUpperCase()}
-                            </Badge>
-                            <span className="font-medium">{threat.type}</span>
-                            {threat.blocked && (
-                              <Badge variant="outline" className="text-green-600">
-                                BLOCKED
-                              </Badge>
-                            )}
-                          </div>
-                          <p className="text-sm text-muted-foreground">{threat.description}</p>
-                          <p className="text-xs text-muted-foreground">
-                            Source: {threat.source} | {new Date(threat.timestamp).toLocaleString()}
-                          </p>
-                        </div>
-                        <Activity className="h-4 w-4 text-red-500" />
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                  <p className="text-xs text-muted-foreground">{threat.description}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Source: {threat.source} • {new Date(threat.timestamp).toLocaleString()}
+                  </p>
+                </div>
               </div>
-            </TabsContent>
+            </div>
+          ))}
+        </TabsContent>
 
-            <TabsContent value="control" className="space-y-4">
-              <div className="flex gap-4">
-                <Button 
-                  onClick={handleStartMonitoring} 
-                  disabled={isMonitoring}
-                  className="flex items-center gap-2"
-                >
-                  <Shield className="h-4 w-4" />
-                  Start Dark Web Monitoring
-                </Button>
-                
-                <Button 
-                  onClick={handleStopMonitoring} 
-                  disabled={!isMonitoring}
-                  variant="outline"
-                  className="flex items-center gap-2"
-                >
-                  <Activity className="h-4 w-4" />
-                  Stop Monitoring
-                </Button>
-              </div>
+        <TabsContent value="control" className="space-y-4 mt-4">
+          <div className="flex gap-3">
+            <Button 
+              onClick={handleStartMonitoring} 
+              disabled={isMonitoring}
+              size="sm"
+            >
+              Start Monitoring
+            </Button>
+            
+            <Button 
+              onClick={handleStopMonitoring} 
+              disabled={!isMonitoring}
+              variant="outline"
+              size="sm"
+            >
+              Stop Monitoring
+            </Button>
+          </div>
 
-              <Card>
-                <CardContent className="p-4">
-                  <h4 className="font-medium mb-2">Bot Capabilities:</h4>
-                  <ul className="text-sm space-y-1 text-muted-foreground">
-                    <li>• Real-time Tor network detection</li>
-                    <li>• Dark web marketplace monitoring</li>
-                    <li>• Credential leak surveillance</li>
-                    <li>• Proxy chain analysis</li>
-                    <li>• Anonymous threat blocking</li>
-                  </ul>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
+          <div className="p-5 border rounded-lg bg-card space-y-3">
+            <h4 className="text-sm font-semibold">Bot Capabilities</h4>
+            <ul className="text-xs space-y-2 text-muted-foreground">
+              <li>• Real-time Tor network detection</li>
+              <li>• Dark web marketplace monitoring</li>
+              <li>• Credential leak surveillance</li>
+              <li>• Proxy chain analysis</li>
+              <li>• Anonymous threat blocking</li>
+            </ul>
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

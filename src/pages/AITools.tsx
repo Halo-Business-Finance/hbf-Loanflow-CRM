@@ -1,7 +1,5 @@
 import { useState, useEffect } from "react"
 import { useLocation } from "react-router-dom"
-import Layout from "@/components/Layout"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -9,13 +7,15 @@ import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Slider } from "@/components/ui/slider"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
-import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/hooks/use-toast"
 import { LeadScoring } from "@/components/ai/LeadScoring"
 import { PredictiveAnalytics } from "@/components/ai/PredictiveAnalytics"
 import { WorkflowAutomation } from "@/components/ai/WorkflowAutomation"
+import { StandardPageLayout } from "@/components/StandardPageLayout"
+import { IBMPageHeader } from "@/components/ui/IBMPageHeader"
+import { StandardContentCard } from "@/components/StandardContentCard"
+import { ResponsiveContainer } from "@/components/ResponsiveContainer"
 import { 
   Bot, 
   Target, 
@@ -27,8 +27,7 @@ import {
   Brain,
   AlertCircle,
   CheckCircle,
-  Sliders,
-  Database
+  Sliders
 } from "lucide-react"
 
 export default function AITools() {
@@ -145,24 +144,22 @@ export default function AITools() {
     if (!tool) return null
 
     return (
-      <Card className="w-full">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-               <div className="p-2 bg-primary/10 rounded-lg">
-                 <tool.icon className="w-5 h-5 text-white" />
-               </div>
-              <div>
-                <CardTitle>{tool.name} Configuration</CardTitle>
-                <CardDescription>{tool.description}</CardDescription>
-              </div>
+      <StandardContentCard className="w-full">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <tool.icon className="w-5 h-5 text-white" />
             </div>
-            <Badge variant={config.enabled ? "default" : "secondary"}>
-              {config.enabled ? "Active" : "Inactive"}
-            </Badge>
+            <div>
+              <h3 className="text-lg font-semibold">{tool.name} Configuration</h3>
+              <p className="text-sm text-muted-foreground">{tool.description}</p>
+            </div>
           </div>
-        </CardHeader>
-        <CardContent className="space-y-6">
+          <span className="text-sm font-medium">
+            {config.enabled ? "Active" : "Inactive"}
+          </span>
+        </div>
+        <div className="space-y-6">
           <div className="flex items-center justify-between">
             <div>
               <Label className="text-base font-medium text-foreground dark:text-white">Enable {tool.name}</Label>
@@ -388,142 +385,175 @@ export default function AITools() {
               </div>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </StandardContentCard>
     )
   }
 
   return (
-    <Layout>
-      <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
-        <div className="container mx-auto p-6 space-y-8">
-          {/* Header */}
-          <div className="text-center space-y-4 py-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-primary rounded-2xl mb-4">
-              <Brain className="w-8 h-8 text-white" />
-            </div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
-              AI Tools & Configuration
-            </h1>
-            <p className="text-lg text-foreground/70 max-w-2xl mx-auto">
-              Configure and manage AI-powered tools to enhance your CRM performance
-            </p>
+    <StandardPageLayout>
+      <IBMPageHeader 
+        title="AI Intelligence Center"
+        subtitle="Advanced AI-powered tools for enhanced CRM performance"
+      />
+
+      <ResponsiveContainer>
+        <div className="space-y-6">
+          {/* AI Tools Metrics */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <StandardContentCard className="border-l-4 border-l-primary">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Active Tools</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Zap className="w-5 h-5" />
+                    <p className="text-lg font-bold">{aiTools.filter(t => t.status === 'active').length}</p>
+                  </div>
+                </div>
+                <span className="text-sm font-medium">RUNNING</span>
+              </div>
+            </StandardContentCard>
+
+            <StandardContentCard>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Lead Scoring</p>
+                  <p className="text-2xl font-bold text-primary">95%</p>
+                </div>
+                <Target className="w-8 h-8 text-primary" />
+              </div>
+            </StandardContentCard>
+
+            <StandardContentCard>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Automation Tasks</p>
+                  <p className="text-2xl font-bold text-primary">47</p>
+                </div>
+                <Bot className="w-8 h-8 text-primary" />
+              </div>
+            </StandardContentCard>
+
+            <StandardContentCard>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Forecast Accuracy</p>
+                  <p className="text-2xl font-bold text-primary">88%</p>
+                </div>
+                <TrendingUp className="w-8 h-8 text-primary" />
+              </div>
+            </StandardContentCard>
           </div>
 
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
-            <TabsList className="grid w-full grid-cols-5 bg-card/50 backdrop-blur-sm rounded-2xl p-1">
-              <TabsTrigger value="lead-scoring" className="rounded-xl">
-                <Target className="w-4 h-4 mr-2" />
-                Lead Scoring
-              </TabsTrigger>
-              <TabsTrigger value="forecasting" className="rounded-xl">
-                <TrendingUp className="w-4 h-4 mr-2" />
-                Forecasting
-              </TabsTrigger>
-              <TabsTrigger value="automation" className="rounded-xl">
-                <Bot className="w-4 h-4 mr-2" />
-                Automation
-              </TabsTrigger>
-              <TabsTrigger value="analytics" className="rounded-xl">
-                <BarChart3 className="w-4 h-4 mr-2" />
-                Analytics
-              </TabsTrigger>
-              <TabsTrigger value="configuration" className="rounded-xl">
-                <Settings className="w-4 h-4 mr-2" />
-                Configuration
-              </TabsTrigger>
-            </TabsList>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
+          <TabsList className="grid w-full grid-cols-5 bg-card/50 backdrop-blur-sm rounded-2xl p-1">
+            <TabsTrigger value="lead-scoring" className="rounded-xl">
+              <Target className="w-4 h-4 mr-2" />
+              Lead Scoring
+            </TabsTrigger>
+            <TabsTrigger value="forecasting" className="rounded-xl">
+              <TrendingUp className="w-4 h-4 mr-2" />
+              Forecasting
+            </TabsTrigger>
+            <TabsTrigger value="automation" className="rounded-xl">
+              <Bot className="w-4 h-4 mr-2" />
+              Automation
+            </TabsTrigger>
+            <TabsTrigger value="analytics" className="rounded-xl">
+              <BarChart3 className="w-4 h-4 mr-2" />
+              Analytics
+            </TabsTrigger>
+            <TabsTrigger value="configuration" className="rounded-xl">
+              <Settings className="w-4 h-4 mr-2" />
+              Configuration
+            </TabsTrigger>
+          </TabsList>
 
-            <TabsContent value="lead-scoring">
-              <LeadScoring />
-            </TabsContent>
+          <TabsContent value="lead-scoring">
+            <LeadScoring />
+          </TabsContent>
 
-            <TabsContent value="forecasting">
-              <PredictiveAnalytics />
-            </TabsContent>
+          <TabsContent value="forecasting">
+            <PredictiveAnalytics />
+          </TabsContent>
 
-            <TabsContent value="automation">
-              <WorkflowAutomation />
-            </TabsContent>
+          <TabsContent value="automation">
+            <WorkflowAutomation />
+          </TabsContent>
 
-            <TabsContent value="analytics">
-              <PredictiveAnalytics />
-            </TabsContent>
+          <TabsContent value="analytics">
+            <PredictiveAnalytics />
+          </TabsContent>
 
-            <TabsContent value="configuration" className="space-y-6">
-              <div className="grid gap-6">
-                <Card className="border-0 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Sliders className="w-5 h-5" />
-                      AI Tools Configuration
-                    </CardTitle>
-                    <CardDescription>
-                      Configure individual AI tools and their parameters
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid gap-6">
-                      {configureToolId ? (
-                        renderToolConfiguration(configureToolId)
-                      ) : (
-                        <div className="grid gap-4">
-                          <p className="text-muted-foreground">
-                            Select an AI tool to configure its settings:
-                          </p>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {aiTools.map((tool) => (
-                              <Card 
-                                key={tool.id}
-                                className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.02]"
-                                onClick={() => setConfigureToolId(tool.id)}
-                              >
-                                <CardContent className="p-4">
-                                  <div className="flex items-center gap-3">
-                                     <div className="p-2 bg-primary/10 rounded-lg">
-                                       <tool.icon className="w-5 h-5 text-white" />
-                                     </div>
-                                    <div className="flex-1">
-                                      <h3 className="font-medium text-foreground dark:text-white">{tool.name}</h3>
-                                      <p className="text-sm text-muted-foreground">{tool.description}</p>
-                                    </div>
-                                    <Badge variant={tool.status === "active" ? "default" : "secondary"}>
-                                      {tool.status === "active" ? (
-                                        <CheckCircle className="w-3 h-3 mr-1" />
-                                      ) : (
-                                        <AlertCircle className="w-3 h-3 mr-1" />
-                                      )}
-                                      {tool.status}
-                                    </Badge>
-                                  </div>
-                                </CardContent>
-                              </Card>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      
-                      {configureToolId && (
-                        <div className="mt-6">
-                          {renderToolConfiguration(configureToolId)}
-                          <div className="mt-4 flex justify-start">
-                            <Button 
-                              variant="outline" 
-                              onClick={() => setConfigureToolId(null)}
+          <TabsContent value="configuration" className="space-y-6">
+            <div className="grid gap-6">
+              <StandardContentCard title="AI Tools Configuration" className="border-0 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm">
+                <div className="flex items-center gap-2 mb-4">
+                  <Sliders className="w-5 h-5" />
+                </div>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Configure individual AI tools and their parameters
+                </p>
+                  <div className="grid gap-6">
+                    {configureToolId ? (
+                      renderToolConfiguration(configureToolId)
+                    ) : (
+                      <div className="grid gap-4">
+                        <p className="text-muted-foreground">
+                          Select an AI tool to configure its settings:
+                        </p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {aiTools.map((tool) => (
+                            <div
+                              key={tool.id}
+                              className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.02]"
+                              onClick={() => setConfigureToolId(tool.id)}
                             >
-                              ← Back to Tool Selection
-                            </Button>
-                          </div>
+                              <StandardContentCard>
+                                <div className="flex items-center gap-3">
+                                  <div className="p-2 bg-primary/10 rounded-lg">
+                                    <tool.icon className="w-5 h-5 text-primary" />
+                                  </div>
+                                  <div className="flex-1">
+                                    <h3 className="font-medium text-foreground">{tool.name}</h3>
+                                    <p className="text-sm text-muted-foreground">{tool.description}</p>
+                                  </div>
+                                  <span className="text-sm font-medium">
+                                    {tool.status === "active" ? (
+                                      <CheckCircle className="w-3 h-3 mr-1 inline" />
+                                    ) : (
+                                      <AlertCircle className="w-3 h-3 mr-1 inline" />
+                                    )}
+                                    {tool.status}
+                                  </span>
+                                </div>
+                              </StandardContentCard>
+                            </div>
+                          ))}
                         </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </TabsContent>
-          </Tabs>
+                      </div>
+                    )}
+                    
+                    {configureToolId && (
+                      <div className="mt-6">
+                        {renderToolConfiguration(configureToolId)}
+                        <div className="mt-4 flex justify-start">
+                          <Button 
+                            variant="outline" 
+                            onClick={() => setConfigureToolId(null)}
+                          >
+                            ← Back to Tool Selection
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+              </StandardContentCard>
+            </div>
+          </TabsContent>
+        </Tabs>
         </div>
-      </div>
-    </Layout>
+      </ResponsiveContainer>
+    </StandardPageLayout>
   )
 }

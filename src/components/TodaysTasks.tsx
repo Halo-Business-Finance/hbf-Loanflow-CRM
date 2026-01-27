@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+
 import { Button } from "@/components/ui/button"
-import { Clock, Phone, Mail, Calendar, AlertCircle } from "lucide-react"
+import { Clock, Phone, Mail, Calendar, AlertCircle, LucideIcon } from "lucide-react"
 import { supabase } from "@/integrations/supabase/client"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { format, isToday, isBefore, startOfDay } from "date-fns"
@@ -72,7 +72,7 @@ export function TodaysTasks() {
     return 'low'
   }
 
-  const getIcon = (type: string) => {
+  const getIcon = (type: string): LucideIcon => {
     if (type.includes('call') || type.includes('follow_up')) return Phone
     if (type.includes('email')) return Mail
     if (type.includes('reminder')) return Clock
@@ -136,9 +136,9 @@ export function TodaysTasks() {
         <CardTitle className="dark:text-white no-underline">
           <span className="inline-block border-b-2 border-primary dark:border-white pb-1 no-underline">Today's Tasks</span>
           {(todaysTasks.length + overdueTasks.length) > 0 && (
-            <Badge variant="default" className="ml-auto">
+            <span className="ml-auto text-sm font-medium">
               {todaysTasks.length + overdueTasks.length}
-            </Badge>
+            </span>
           )}
         </CardTitle>
       </CardHeader>
@@ -170,9 +170,9 @@ export function TodaysTasks() {
                       Overdue - {format(new Date(task.created_at), 'MMM d')}
                     </div>
                   </div>
-                  <Badge variant="default" className="text-xs">
+                  <span className="text-xs">
                     Overdue
-                  </Badge>
+                  </span>
                 </div>
               )
             })}
@@ -193,12 +193,9 @@ export function TodaysTasks() {
                     <div className="font-medium text-sm">{task.title}</div>
                     <div className="text-xs text-muted-foreground truncate">{task.message}</div>
                   </div>
-                  <Badge 
-                    variant={task.priority === 'high' ? 'default' : task.priority === 'medium' ? 'default' : 'secondary'}
-                    className="text-xs capitalize"
-                  >
+                  <span className="text-xs capitalize">
                     {task.priority}
-                  </Badge>
+                  </span>
                 </div>
               )
             })}

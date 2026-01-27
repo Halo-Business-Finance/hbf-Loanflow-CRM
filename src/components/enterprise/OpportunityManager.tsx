@@ -322,7 +322,7 @@ export function OpportunityManager() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="stage">Stage</Label>
+                  <Label htmlFor="stage">Loan Stage</Label>
                   <Select
                     value={opportunityForm.stage}
                     onValueChange={(value) => {

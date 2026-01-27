@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+
 import { useToast } from "@/hooks/use-toast"
 import { supabase } from "@/integrations/supabase/client"
 import { Phone, Settings, CheckCircle, AlertCircle } from "lucide-react"
@@ -213,9 +213,9 @@ export function RingCentralSetup({ trigger }: RingCentralSetupProps) {
                     ) : (
                       <AlertCircle className="w-4 h-4 text-orange-600" />
                     )}
-                    <Badge variant={account.is_active ? "default" : "secondary"}>
+                    <span className="text-sm">
                       {account.is_active ? "Active" : "Inactive"}
-                    </Badge>
+                    </span>
                   </div>
                   <div className="text-sm text-muted-foreground">
                     Username: {account.username}

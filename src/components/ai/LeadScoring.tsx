@@ -79,56 +79,65 @@ export function LeadScoring() {
 
   const fetchLeadScores = async () => {
     try {
-      // Mock data for demonstration - in real implementation, this would come from your scoring algorithm
-      const mockScores: LeadScore[] = [
-        {
-          id: "1",
-          lead_id: "lead1",
-          score: 92,
-          factors: { demographic: 85, behavioral: 95, engagement: 90, fit: 88 },
-          priority: "hot",
+      // Fetch real leads from database and calculate scores
+      const { data: leads, error } = await supabase
+        .from('contact_entities')
+        .select(`
+          id,
+          user_id,
+          name,
+          business_name,
+          email,
+          phone,
+          loan_amount,
+          annual_revenue,
+          credit_score,
+          priority,
+          created_at
+        `)
+        .limit(10)
+
+      if (error) throw error
+
+      // Calculate AI scores based on real data
+      const calculatedScores: LeadScore[] = (leads || []).map(contact => {
+        if (!contact) return null
+
+        // Calculate scoring factors based on real data
+        const demographic = calculateDemographicScore(contact)
+        const behavioral = calculateBehavioralScore(contact)
+        const engagement = calculateEngagementScore(contact)
+        const fit = calculateFitScore(contact)
+        
+        const overallScore = Math.round(
+          (demographic * 0.25) + 
+          (behavioral * 0.30) + 
+          (engagement * 0.30) + 
+          (fit * 0.15)
+        )
+
+        let priority: 'hot' | 'warm' | 'cold' = 'cold'
+        if (overallScore >= 80) priority = 'hot'
+        else if (overallScore >= 60) priority = 'warm'
+
+        return {
+          id: `score_${contact.id}`,
+          lead_id: contact.id,
+          score: overallScore,
+          factors: { demographic, behavioral, engagement, fit },
+          priority,
           last_updated: new Date().toISOString(),
           lead: {
-            company_name: "Tech Innovations Inc",
-            contact_name: "Sarah Johnson",
-            email: "sarah@techinnovations.com",
-            phone: "(555) 123-4567",
-            stage: "Qualified"
-          }
-        },
-        {
-          id: "2", 
-          lead_id: "lead2",
-          score: 76,
-          factors: { demographic: 70, behavioral: 80, engagement: 75, fit: 82 },
-          priority: "warm",
-          last_updated: new Date().toISOString(),
-          lead: {
-            company_name: "Growing Business LLC",
-            contact_name: "Mike Chen",
-            email: "mike@growingbusiness.com",
-            phone: "(555) 987-6543",
-            stage: "Initial Contact"
-          }
-        },
-        {
-          id: "3",
-          lead_id: "lead3", 
-          score: 45,
-          factors: { demographic: 40, behavioral: 30, engagement: 50, fit: 60 },
-          priority: "cold",
-          last_updated: new Date().toISOString(),
-          lead: {
-            company_name: "Small Shop Co",
-            contact_name: "Anna Davis",
-            email: "anna@smallshop.com",
-            phone: "(555) 456-7890",
-            stage: "Initial Contact"
+            company_name: contact.business_name || contact.name,
+            contact_name: contact.name,
+            email: contact.email || '',
+            phone: contact.phone || '',
+            stage: 'New Lead' // Default since we're using contact_entities table
           }
         }
-      ]
+      }).filter(Boolean) as LeadScore[]
       
-      setLeadScores(mockScores)
+      setLeadScores(calculatedScores)
     } catch (error) {
       console.error("Error fetching lead scores:", error)
       toast({
@@ -139,6 +148,78 @@ export function LeadScoring() {
     } finally {
       setLoading(false)
     }
+  }
+
+  // Helper functions to calculate real scores
+  const calculateDemographicScore = (contact: any): number => {
+    let score = 50 // Base score
+    
+    // Revenue-based scoring
+    if (contact.annual_revenue) {
+      if (contact.annual_revenue >= 1000000) score += 30
+      else if (contact.annual_revenue >= 500000) score += 20
+      else if (contact.annual_revenue >= 250000) score += 10
+    }
+    
+    // Complete profile bonus
+    if (contact.business_name && contact.phone && contact.email) score += 20
+    
+    return Math.min(100, score)
+  }
+
+  const calculateBehavioralScore = (contact: any): number => {
+    let score = 40 // Base score
+    
+    // If we have loan amount, it indicates engagement
+    if (contact.loan_amount) {
+      score += 30 // Shows they've progressed beyond initial interest
+    }
+    
+    // Credit score indicates seriousness
+    if (contact.credit_score) {
+      score += 20 // Shows they've provided financial information
+    }
+    
+    return Math.min(100, score)
+  }
+
+  const calculateEngagementScore = (contact: any): number => {
+    let score = 30 // Base score
+    
+    // Recent activity bonus
+    const daysSinceCreated = Math.floor(
+      (Date.now() - new Date(contact.created_at).getTime()) / (1000 * 60 * 60 * 24)
+    )
+    
+    if (daysSinceCreated <= 7) score += 40
+    else if (daysSinceCreated <= 30) score += 20
+    else if (daysSinceCreated <= 90) score += 10
+    
+    // Priority bonus
+    if (contact.priority === 'high') score += 30
+    else if (contact.priority === 'medium') score += 10
+    
+    return Math.min(100, score)
+  }
+
+  const calculateFitScore = (contact: any): number => {
+    let score = 40 // Base score
+    
+    // Credit score bonus
+    if (contact.credit_score) {
+      if (contact.credit_score >= 750) score += 40
+      else if (contact.credit_score >= 700) score += 30
+      else if (contact.credit_score >= 650) score += 20
+      else if (contact.credit_score >= 600) score += 10
+    }
+    
+    // Loan amount fit
+    if (contact.loan_amount) {
+      if (contact.loan_amount >= 100000) score += 20
+      else if (contact.loan_amount >= 50000) score += 10
+    }
+    
+    return Math.min(100, score)
   }
 
   const recalculateScores = async () => {

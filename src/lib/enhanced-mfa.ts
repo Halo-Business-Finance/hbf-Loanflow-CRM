@@ -1,11 +1,14 @@
 /**
  * Enhanced Multi-Factor Authentication Implementation
  * Provides multiple layers of authentication security
+ * 
+ * SECURITY: Uses server-side encryption via Edge Functions
  */
 
 import { supabase } from "@/integrations/supabase/client";
 import { SecurityManager } from "./security";
-import { fortress } from "./fortress-security";
+import { encryptData, decryptData } from "./server-encryption";
+import { logger } from "./logger";
 
 export class EnhancedMFA {
   private static totpSecrets = new Map<string, string>();
@@ -20,9 +23,11 @@ export class EnhancedMFA {
     // Generate base32 secret for TOTP
     const secret = this.generateBase32Secret();
     
-    // Store encrypted secret
-    const encryptedSecret = await SecurityManager.encryptSensitiveData(secret);
-    this.totpSecrets.set(userId, encryptedSecret);
+    // Store encrypted secret using server-side encryption
+    const encryptResult = await encryptData(secret, 'totp_secret');
+    if (encryptResult.success && encryptResult.encrypted) {
+      this.totpSecrets.set(userId, encryptResult.encrypted);
+    }
     
     // Generate backup codes
     const backupCodes = Array.from({ length: 10 }, () => 
@@ -32,10 +37,14 @@ export class EnhancedMFA {
         .toUpperCase()
     );
     
-    // Store encrypted backup codes
-    const encryptedBackupCodes = await Promise.all(
-      backupCodes.map(code => SecurityManager.encryptSensitiveData(code))
-    );
+    // Store encrypted backup codes using server-side encryption
+    const encryptedBackupCodes: string[] = [];
+    for (const code of backupCodes) {
+      const result = await encryptData(code, 'backup_code');
+      if (result.success && result.encrypted) {
+        encryptedBackupCodes.push(result.encrypted);
+      }
+    }
     this.backupCodes.set(userId, encryptedBackupCodes);
     
     // Generate QR code data
@@ -55,10 +64,11 @@ export class EnhancedMFA {
     if (!encryptedSecret) return false;
     
     try {
-      const secret = await SecurityManager.decryptSensitiveData(encryptedSecret);
-      return await this.validateTOTPCode(secret, code);
+      const decryptResult = await decryptData(encryptedSecret, 'totp_secret');
+      if (!decryptResult.success || !decryptResult.decrypted) return false;
+      return await this.validateTOTPCode(decryptResult.decrypted, code);
     } catch (error) {
-      console.error('TOTP verification failed:', error);
+      logger.error('TOTP verification failed');
       return false;
     }
   }
@@ -72,9 +82,13 @@ export class EnhancedMFA {
         .toUpperCase()
     );
     
-    const encryptedBackupCodes = await Promise.all(
-      backupCodes.map(code => SecurityManager.encryptSensitiveData(code))
-    );
+    const encryptedBackupCodes: string[] = [];
+    for (const code of backupCodes) {
+      const result = await encryptData(code, 'backup_code');
+      if (result.success && result.encrypted) {
+        encryptedBackupCodes.push(result.encrypted);
+      }
+    }
     
     this.backupCodes.set(userId, encryptedBackupCodes);
     
@@ -87,13 +101,15 @@ export class EnhancedMFA {
     if (!encryptedBackupCodes) return false;
     
     try {
-      const backupCodes = await Promise.all(
-        encryptedBackupCodes.map(encrypted => 
-          SecurityManager.decryptSensitiveData(encrypted)
-        )
-      );
+      const decryptedCodes: string[] = [];
+      for (const encrypted of encryptedBackupCodes) {
+        const result = await decryptData(encrypted, 'backup_code');
+        if (result.success && result.decrypted) {
+          decryptedCodes.push(result.decrypted);
+        }
+      }
       
-      const codeIndex = backupCodes.indexOf(code.toUpperCase());
+      const codeIndex = decryptedCodes.indexOf(code.toUpperCase());
       if (codeIndex === -1) return false;
       
       // Remove used backup code
@@ -102,7 +118,7 @@ export class EnhancedMFA {
       
       return true;
     } catch (error) {
-      console.error('Backup code verification failed:', error);
+      logger.error('Backup code verification failed');
       return false;
     }
   }
@@ -139,7 +155,7 @@ export class EnhancedMFA {
       });
       
       if (credential) {
-        // Store biometric credential securely
+        // Store biometric credential securely via server-side encryption
         const pkCredential = credential as PublicKeyCredential;
         const credentialData = {
           id: credential.id,
@@ -147,13 +163,19 @@ export class EnhancedMFA {
           type: credential.type
         };
         
-        await fortress.secureStoreData('biometric_credential', credentialData, 'business');
-        return true;
+        const encryptResult = await encryptData(credentialData, 'biometric');
+        if (encryptResult.success && encryptResult.encrypted) {
+          await supabase.rpc('store_secure_session_data', {
+            p_key: 'biometric_credential',
+            p_value: encryptResult.encrypted
+          });
+          return true;
+        }
       }
       
       return false;
     } catch (error) {
-      console.error('Biometric authentication setup failed:', error);
+      logger.error('Biometric authentication setup failed');
       return false;
     }
   }
@@ -163,7 +185,15 @@ export class EnhancedMFA {
     if (!('credentials' in navigator)) return false;
     
     try {
-      const storedCredential = await fortress.secureRetrieveData('biometric_credential', 'business');
+      const { data: encryptedData } = await supabase.rpc('get_secure_session_data', {
+        p_key: 'biometric_credential'
+      });
+      if (!encryptedData) return false;
+      
+      const decryptResult = await decryptData(encryptedData as string, 'biometric');
+      if (!decryptResult.success || !decryptResult.decrypted) return false;
+      
+      const storedCredential = decryptResult.decrypted;
       if (!storedCredential) return false;
       
       const assertion = await navigator.credentials.get({
@@ -180,7 +210,7 @@ export class EnhancedMFA {
       
       return !!assertion;
     } catch (error) {
-      console.error('Biometric authentication failed:', error);
+      logger.error('Biometric authentication failed');
       return false;
     }
   }
@@ -200,38 +230,48 @@ export class EnhancedMFA {
         }
       });
       
-      // Store encrypted code temporarily
-      const encryptedCode = await SecurityManager.encryptSensitiveData(code);
-      localStorage.setItem(`_sms_code_${phoneNumber}`, encryptedCode);
+      // Store encrypted code using server-side encryption
+      const encryptResult = await encryptData(code, 'sms_code');
+      if (encryptResult.success && encryptResult.encrypted) {
+        await supabase.rpc('store_secure_session_data', {
+          p_key: `_sms_code_${phoneNumber}`,
+          p_value: encryptResult.encrypted,
+        });
+      }
       
       // Auto-expire in 5 minutes
       setTimeout(() => {
-        localStorage.removeItem(`_sms_code_${phoneNumber}`);
+        supabase.rpc('remove_secure_session_data', { p_key: `_sms_code_${phoneNumber}` });
       }, 300000);
       
       return code; // In production, don't return the actual code
     } catch (error) {
-      console.error('SMS verification failed:', error);
+      logger.error('SMS verification failed');
       throw error;
     }
   }
 
   // Verify SMS code
   static async verifySMSCode(phoneNumber: string, code: string): Promise<boolean> {
-    const encryptedStoredCode = localStorage.getItem(`_sms_code_${phoneNumber}`);
-    if (!encryptedStoredCode) return false;
+    // Retrieve encrypted code from server-side session storage
+    const { data: storedEncrypted, error } = await supabase.rpc('get_secure_session_data', {
+      p_key: `_sms_code_${phoneNumber}`,
+    });
+    if (error || !storedEncrypted) return false;
     
     try {
-      const storedCode = await SecurityManager.decryptSensitiveData(encryptedStoredCode);
-      const isValid = SecurityManager.secureCompare(code, storedCode);
+      const decryptResult = await decryptData(storedEncrypted as string, 'sms_code');
+      if (!decryptResult.success || !decryptResult.decrypted) return false;
+      
+      const isValid = SecurityManager.secureCompare(code, decryptResult.decrypted);
       
       if (isValid) {
-        localStorage.removeItem(`_sms_code_${phoneNumber}`);
+        await supabase.rpc('remove_secure_session_data', { p_key: `_sms_code_${phoneNumber}` });
       }
       
       return isValid;
     } catch (error) {
-      console.error('SMS code verification failed:', error);
+      logger.error('SMS code verification failed');
       return false;
     }
   }
@@ -249,8 +289,18 @@ export class EnhancedMFA {
       expiresAt: timestamp + (15 * 60 * 1000) // 15 minutes
     };
     
-    const encryptedData = await SecurityManager.encryptSensitiveData(JSON.stringify(verificationData));
-    localStorage.setItem(`_email_verification_${email}`, encryptedData);
+    const encryptResult = await encryptData(verificationData, 'email_verification');
+    if (encryptResult.success && encryptResult.encrypted) {
+      await supabase.rpc('store_secure_session_data', {
+        p_key: `_email_verification_${email}`,
+        p_value: encryptResult.encrypted,
+      });
+    }
+    
+    // Auto-expire in 15 minutes (client-side cleanup; server TTL is handled separately)
+    setTimeout(() => {
+      supabase.rpc('remove_secure_session_data', { p_key: `_email_verification_${email}` });
+    }, 15 * 60 * 1000);
     
     try {
       await supabase.functions.invoke('secure-external-api', {
@@ -262,31 +312,36 @@ export class EnhancedMFA {
         }
       });
     } catch (error) {
-      console.error('Email verification failed:', error);
+      logger.error('Email verification failed');
       throw error;
     }
   }
 
   // Verify email token
   static async verifyEmailToken(email: string, token: string): Promise<boolean> {
-    const encryptedData = localStorage.getItem(`_email_verification_${email}`);
-    if (!encryptedData) return false;
+    // Retrieve verification package from server-side session storage
+    const { data: storedEncrypted, error } = await supabase.rpc('get_secure_session_data', {
+      p_key: `_email_verification_${email}`,
+    });
+    if (error || !storedEncrypted) return false;
     
     try {
-      const decryptedData = await SecurityManager.decryptSensitiveData(encryptedData);
-      const verificationData = JSON.parse(decryptedData);
+      const decryptResult = await decryptData(storedEncrypted as string, 'email_verification');
+      if (!decryptResult.success || !decryptResult.decrypted) return false;
+      
+      const verificationData = decryptResult.decrypted;
       
       const isValidToken = SecurityManager.secureCompare(token, verificationData.token);
       const isNotExpired = Date.now() < verificationData.expiresAt;
       
       if (isValidToken && isNotExpired) {
-        localStorage.removeItem(`_email_verification_${email}`);
+        await supabase.rpc('remove_secure_session_data', { p_key: `_email_verification_${email}` });
         return true;
       }
       
       return false;
     } catch (error) {
-      console.error('Email token verification failed:', error);
+      logger.error('Email token verification failed');
       return false;
     }
   }
@@ -330,13 +385,19 @@ export class EnhancedMFA {
           type: credential.type
         };
         
-        await fortress.secureStoreData('security_key', credentialData, 'business');
-        return true;
+        const encryptResult = await encryptData(credentialData, 'security_key');
+        if (encryptResult.success && encryptResult.encrypted) {
+          await supabase.rpc('store_secure_session_data', {
+            p_key: 'security_key',
+            p_value: encryptResult.encrypted
+          });
+          return true;
+        }
       }
       
       return false;
     } catch (error) {
-      console.error('Security key registration failed:', error);
+      logger.error('Security key registration failed');
       return false;
     }
   }
@@ -346,7 +407,15 @@ export class EnhancedMFA {
     if (!('credentials' in navigator)) return false;
     
     try {
-      const storedCredential = await fortress.secureRetrieveData('security_key', 'business');
+      const { data: encryptedData } = await supabase.rpc('get_secure_session_data', {
+        p_key: 'security_key'
+      });
+      if (!encryptedData) return false;
+      
+      const decryptResult = await decryptData(encryptedData as string, 'security_key');
+      if (!decryptResult.success || !decryptResult.decrypted) return false;
+      
+      const storedCredential = decryptResult.decrypted;
       if (!storedCredential) return false;
       
       const assertion = await navigator.credentials.get({
@@ -363,7 +432,7 @@ export class EnhancedMFA {
       
       return !!assertion;
     } catch (error) {
-      console.error('Security key verification failed:', error);
+      logger.error('Security key verification failed');
       return false;
     }
   }
@@ -409,23 +478,52 @@ export class EnhancedMFA {
   }
 
   private static async generateTOTPCode(secret: string, time: number): Promise<string> {
-    // Simplified TOTP implementation - in production use a proper TOTP library
-    const timeBytes = new ArrayBuffer(8);
-    const timeView = new DataView(timeBytes);
-    timeView.setUint32(4, time, false);
-    
-    // This is a simplified implementation
-    // In production, use a proper HMAC-SHA1 implementation
-    const hash = await crypto.subtle.digest('SHA-256', timeBytes);
-    const hashArray = new Uint8Array(hash);
-    
-    const offset = hashArray[hashArray.length - 1] & 0xf;
-    const binary = ((hashArray[offset] & 0x7f) << 24) |
-                   ((hashArray[offset + 1] & 0xff) << 16) |
-                   ((hashArray[offset + 2] & 0xff) << 8) |
-                   (hashArray[offset + 3] & 0xff);
-    
-    const code = binary % 1000000;
-    return code.toString().padStart(6, '0');
+    // RFC 6238 (TOTP): HMAC-SHA1 with 30s time step and 6 digits
+    // 1) Base32-decode the shared secret
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+    const clean = secret.replace(/\s+/g, '').toUpperCase();
+
+    const bytes: number[] = [];
+    let bits = 0;
+    let value = 0;
+    for (let i = 0; i < clean.length; i++) {
+      const idx = alphabet.indexOf(clean[i]);
+      if (idx === -1) continue; // skip padding or invalid chars
+      value = (value << 5) | idx;
+      bits += 5;
+      if (bits >= 8) {
+        bytes.push((value >>> (bits - 8)) & 0xff);
+        bits -= 8;
+      }
+    }
+    const keyBytes = new Uint8Array(bytes);
+
+    // 2) Create 8-byte time counter (big-endian)
+    const counter = new ArrayBuffer(8);
+    const view = new DataView(counter);
+    // high 4 bytes stay 0, set low 4 bytes
+    view.setUint32(4, time, false);
+
+    // 3) HMAC-SHA1(counter, key)
+    const cryptoKey = await crypto.subtle.importKey(
+      'raw',
+      keyBytes,
+      { name: 'HMAC', hash: 'SHA-1' },
+      false,
+      ['sign']
+    );
+    const hmac = await crypto.subtle.sign('HMAC', cryptoKey, counter);
+    const h = new Uint8Array(hmac);
+
+    // 4) Dynamic truncation
+    const offset = h[h.length - 1] & 0x0f;
+    const binary = ((h[offset] & 0x7f) << 24) |
+                   ((h[offset + 1] & 0xff) << 16) |
+                   ((h[offset + 2] & 0xff) << 8) |
+                   (h[offset + 3] & 0xff);
+
+    // 5) Modulo to get 6 digits
+    const totpCode = (binary % 1_000_000).toString().padStart(6, '0');
+    return totpCode;
   }
 }

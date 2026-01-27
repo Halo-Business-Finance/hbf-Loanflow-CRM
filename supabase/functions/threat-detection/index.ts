@@ -1,5 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { SecureLogger } from '../_shared/secure-logger.ts';
+
+const logger = new SecureLogger('threat-detection');
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -34,7 +37,7 @@ serve(async (req) => {
 
     const userAgent = req.headers.get('user-agent') || user_agent || 'unknown';
 
-    console.log(`[THREAT-DETECTION] Processing ${action} from IP: ${clientIP}`);
+    logger.logRequest(req, { action });
 
     switch (action) {
       case 'analyze_request':
@@ -67,11 +70,12 @@ serve(async (req) => {
     }
 
   } catch (error) {
-    console.error('[THREAT-DETECTION] Error:', error);
+    logger.error('[THREAT-DETECTION] Error', error);
+    const message = error instanceof Error ? error.message : 'Unknown error'
     return new Response(
       JSON.stringify({ 
         error: 'Internal server error',
-        details: error.message 
+        details: message 
       }),
       { 
         status: 500, 
@@ -82,7 +86,7 @@ serve(async (req) => {
 });
 
 async function analyzeRequest(supabase: any, data: any) {
-  console.log('[ANALYZE-REQUEST] Starting analysis...');
+  logger.info('[ANALYZE-REQUEST] Starting analysis')
   
   let threatScore = 0;
   const threats = [];
@@ -156,7 +160,7 @@ async function analyzeRequest(supabase: any, data: any) {
       user_agent: data.user_agent
     });
     
-    console.log(`[THREAT-DETECTED] Score: ${threatScore}, Level: ${threatLevel}`);
+    logger.info('[THREAT-DETECTED]', { score: threatScore, level: threatLevel });
   }
   
   // Log request analytics
@@ -184,7 +188,7 @@ async function analyzeRequest(supabase: any, data: any) {
 }
 
 async function detectAIBehavior(supabase: any, data: any) {
-  console.log('[AI-DETECTION] Analyzing behavioral patterns...');
+  logger.info('[AI-DETECTION] Analyzing behavioral patterns')
   
   let aiScore = 0;
   const aiIndicators = [];
@@ -265,7 +269,7 @@ async function detectAIBehavior(supabase: any, data: any) {
       }
     });
     
-    console.log(`[AI-DETECTED] Score: ${aiScore}, Likelihood: ${aiLikelihood}`);
+    logger.info('[AI-DETECTED]', { score: aiScore, likelihood: aiLikelihood });
   }
   
   return new Response(
@@ -335,7 +339,7 @@ async function validateSession(supabase: any, req: Request) {
 }
 
 async function checkAnomalies(supabase: any, data: any) {
-  console.log('[ANOMALY-CHECK] Scanning for unusual patterns...');
+  logger.info('[ANOMALY-CHECK] Scanning for unusual patterns')
   
   let anomalyScore = 0;
   const anomalies = [];

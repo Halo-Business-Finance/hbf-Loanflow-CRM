@@ -34,11 +34,12 @@ serve(async (req) => {
         status: 200 
       }
     )
-  } catch (error) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error'
     return new Response(
       JSON.stringify({ 
         error: 'Internal server error',
-        message: error.message 
+        message 
       }),
       { 
         status: 500, 

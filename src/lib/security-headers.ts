@@ -31,16 +31,21 @@ export const getEnhancedSecurityHeaders = (config: SecurityHeadersConfig = {}) =
   if (enableCSP) {
     const defaultCSP = customCSP || [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com",
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-      "font-src 'self' https://fonts.gstatic.com",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com https://acrobatservices.adobe.com https://documentservices.adobe.com",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://acrobatservices.adobe.com https://documentservices.adobe.com",
+      "font-src 'self' https://fonts.gstatic.com https://acrobatservices.adobe.com https://documentservices.adobe.com",
       "img-src 'self' data: https: blob:",
-      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.github.com",
-      "frame-src 'none'",
+      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.github.com https://acrobatservices.adobe.com https://documentservices.adobe.com https://*.adobe.io https://*.adobe.com https://login.microsoftonline.com https://*.microsoftonline.com https://graph.microsoft.com",
+      "frame-src 'self' https://acrobatservices.adobe.com https://documentservices.adobe.com https://login.microsoftonline.com https://*.microsoftonline.com",
       "object-src 'none'",
       "base-uri 'self'",
       "form-action 'self'",
-      "frame-ancestors 'none'",
+      // frame-ancestors removed - only works via HTTP header, not meta tag
+      "manifest-src 'self'",
+      "media-src 'self'",
+      "worker-src 'self' blob: https://acrobatservices.adobe.com https://documentservices.adobe.com",
+      "child-src 'self' https://acrobatservices.adobe.com https://documentservices.adobe.com",
+      // report-uri removed - only works via HTTP header, not meta tag
       "upgrade-insecure-requests"
     ].join('; ');
 
@@ -67,6 +72,10 @@ export const getEnhancedSecurityHeaders = (config: SecurityHeadersConfig = {}) =
   headers['X-XSS-Protection'] = '1; mode=block';
   headers['X-Permitted-Cross-Domain-Policies'] = 'none';
   headers['X-Download-Options'] = 'noopen';
+  headers['X-DNS-Prefetch-Control'] = 'off';
+  headers['Expect-CT'] = 'max-age=86400, enforce';
+  headers['Feature-Policy'] = "geolocation 'none'; microphone 'none'; camera 'none'";
+  headers['Permissions-Policy'] = 'geolocation=(), microphone=(), camera=(), payment=(), usb=()';
   headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, private';
   headers['Pragma'] = 'no-cache';
   headers['Expires'] = '0';
@@ -84,13 +93,17 @@ export const applyClientSecurityHeaders = () => {
     csp.setAttribute('http-equiv', 'Content-Security-Policy');
     csp.setAttribute('content', [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net",
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-      "font-src 'self' https://fonts.gstatic.com",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://acrobatservices.adobe.com https://documentservices.adobe.com",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://acrobatservices.adobe.com https://documentservices.adobe.com",
+      "font-src 'self' https://fonts.gstatic.com https://acrobatservices.adobe.com https://documentservices.adobe.com",
       "img-src 'self' data: https: blob:",
-      "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
-      "frame-src 'none'",
-      "object-src 'none'"
+      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://acrobatservices.adobe.com https://documentservices.adobe.com https://*.adobe.io https://*.adobe.com https://login.microsoftonline.com https://*.microsoftonline.com https://graph.microsoft.com",
+      "frame-src 'self' https://acrobatservices.adobe.com https://documentservices.adobe.com https://login.microsoftonline.com https://*.microsoftonline.com",
+      "object-src 'none'",
+      "manifest-src 'self'",
+      "media-src 'self'",
+      "worker-src 'self' blob: https://acrobatservices.adobe.com https://documentservices.adobe.com",
+      "child-src 'self' https://acrobatservices.adobe.com https://documentservices.adobe.com"
     ].join('; '));
     document.head.appendChild(csp);
   }
@@ -115,7 +128,7 @@ export const applyClientSecurityHeaders = () => {
       });
     }
   } catch (error) {
-    console.error('Failed to apply client security measures');
+    // Silently fail in production to avoid exposing security implementation details
   }
 };
 

@@ -1,5 +1,8 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+import { SecureLogger } from '../_shared/secure-logger.ts';
+
+const logger = new SecureLogger('enhanced-auth');
 
 const enhancedSecurityHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -28,16 +31,16 @@ serve(async (req) => {
   }
 
   try {
-    const { action, email, password, ip_address, user_agent, device_fingerprint, location } = await req.json();
+    const { action, email, password, ip_address, user_agent, device_fingerprint, location, identifier, action_type } = await req.json();
     
-    console.log(`Enhanced auth request: ${action} for ${email}`);
+    logger.logAction(action, { identifier });
 
     switch (action) {
       case 'validate_password':
         return await validatePassword(password);
       
       case 'check_rate_limit':
-        return await checkRateLimit(ip_address || email, 'login');
+        return await checkRateLimit(identifier || ip_address || email, action_type || 'login');
         
       case 'log_security_event':
         return await logSecurityEvent(req);
@@ -50,7 +53,7 @@ serve(async (req) => {
     }
 
   } catch (error: any) {
-    console.error('Error in enhanced-auth function:', error);
+    logger.error('Error in enhanced-auth function', error);
     return new Response(
       JSON.stringify({ error: 'An unexpected error occurred. Please try again.' }),
       { 
@@ -240,7 +243,7 @@ async function calculateRiskScore(userId: string, ipAddress: string, userAgent: 
     }
 
   } catch (error) {
-    console.error('Error calculating risk score:', error);
+    logger.error('Error calculating risk score', error);
     // Default to medium risk if calculation fails
     riskScore = 25;
   }

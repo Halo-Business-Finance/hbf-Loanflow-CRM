@@ -8,119 +8,198 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    /* Light mode colors with more branded value colors */
-    --background: 220 60% 97%;
-    --foreground: 0 0% 0%;
+    /* IBM Carbon Design System Colors */
+    --background: 0 0% 100%;
+    --foreground: 0 0% 9%; /* #161616 */
 
-    --card: 220 40% 98%;
-    --card-foreground: 0 0% 0%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 9%;
 
-    --popover: 220 40% 98%;
-    --popover-foreground: 0 0% 0%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 84% 4.9%;
 
-    --primary: 220 91% 18%;
+    /* Primary - IBM Blue */
+    --primary: 217 91% 53%; /* #0f62fe */
     --primary-foreground: 0 0% 100%;
-    --primary-glow: 220 80% 35%;
+    --primary-glow: 217 100% 47%; /* #0353e9 */
+    
+    /* IBM Carbon Gray Scale */
+    --ibm-gray-10: 0 0% 98%; /* #fafafa */
+    --ibm-gray-20: 0 0% 96%; /* #f4f4f4 */
+    --ibm-gray-30: 0 0% 88%; /* #e0e0e0 */
+    --ibm-gray-40: 0 0% 78%; /* #c6c6c6 */
+    --ibm-gray-50: 0 0% 64%; /* #a8a8a8 */
+    --ibm-gray-60: 0 0% 51%; /* #8d8d8d */
+    --ibm-gray-70: 0 0% 32%; /* #525252 */
+    --ibm-gray-80: 0 0% 22%; /* #393939 */
+    --ibm-gray-90: 0 0% 15%; /* #262626 */
+    --ibm-gray-100: 0 0% 9%; /* #161616 */
 
-    --secondary: 220 60% 88%;
-    --secondary-foreground: 0 0% 0%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222 84% 4.9%;
 
-    --muted: 220 50% 92%;
-    --muted-foreground: 0 0% 20%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 32%;
 
-    --accent: 142 76% 36%;
-    --accent-foreground: 0 0% 0%;
+    --accent: 210 40% 94%;
+    --accent-foreground: 222 84% 4.9%;
 
     --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 0%;
+    --warning-foreground: 48 96% 89%;
 
     --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 0%;
+    --destructive-foreground: 210 40% 98%;
 
-    --border: 220 60% 85%;
-    --input: 220 50% 94%;
-    --ring: 220 91% 25%;
+    --border: 0 0% 88%; /* #e0e0e0 */
+    --input: 0 0% 96%;
+    --ring: 217 91% 53%;
 
-    --gradient-primary: linear-gradient(135deg, hsl(220 91% 25%), hsl(220 80% 35%));
-    --gradient-card: linear-gradient(145deg, hsl(220 40% 98%), hsl(220 60% 92%));
-    --gradient-accent: linear-gradient(135deg, hsl(142 76% 36%), hsl(142 60% 45%));
-    --gradient-blue: linear-gradient(135deg, hsl(212 90% 60%), hsl(212 80% 70%));
-    --gradient-green: linear-gradient(135deg, hsl(142 76% 50%), hsl(142 65% 60%));
-    --gradient-orange: linear-gradient(135deg, hsl(24 95% 53%), hsl(24 85% 63%));
-    --gradient-purple: linear-gradient(135deg, hsl(262 90% 55%), hsl(262 80% 65%));
-    --gradient-red: linear-gradient(135deg, hsl(0 84% 60%), hsl(0 74% 70%));
-    --shadow-soft: 0 1px 3px 0 hsl(220 91% 25% / 0.08), 0 1px 2px 0 hsl(220 60% 30% / 0.04);
-    --shadow-medium: 0 4px 6px -1px hsl(220 91% 25% / 0.1), 0 2px 4px -1px hsl(220 60% 30% / 0.06);
-    --shadow-large: 0 10px 15px -3px hsl(220 91% 25% / 0.12), 0 4px 6px -2px hsl(220 60% 30% / 0.05);
-    --shadow-glow: 0 0 20px hsl(220 91% 25% / 0.15);
+    /* Enhanced borders for enterprise look */
+    --input-border: 214 32% 91%;
+    --input-border-hover: 217 32% 85%;
+    --input-border-focus: 221 83% 53%;
 
-    --radius: 0.5rem;
+    /* Enterprise gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(221 83% 53%), hsl(221 70% 65%));
+    --gradient-card: linear-gradient(145deg, hsl(0 0% 100%), hsl(210 40% 98%));
+    --gradient-accent: linear-gradient(135deg, hsl(210 40% 94%), hsl(210 30% 97%));
+    --gradient-blue: linear-gradient(135deg, hsl(221 83% 53%), hsl(221 70% 65%));
+    --gradient-navy: linear-gradient(135deg, hsl(222 84% 25%), hsl(222 70% 35%));
+    --gradient-green: linear-gradient(135deg, hsl(142 76% 36%), hsl(142 60% 50%));
+    --gradient-orange: linear-gradient(135deg, hsl(25 95% 53%), hsl(25 85% 65%));
+    --gradient-purple: linear-gradient(135deg, hsl(262 83% 58%), hsl(262 70% 70%));
+    --gradient-red: linear-gradient(135deg, hsl(0 84% 60%), hsl(0 74% 72%));
 
-    /* Navy blue for navigation */
-    --navy: 220 91% 15%;
-    --navy-foreground: 0 0% 100%;
+    /* Enterprise shadows */
+    --shadow-soft: 0 1px 2px 0 hsl(0 0% 0% / 0.05);
+    --shadow-medium: 0 4px 6px -1px hsl(0 0% 0% / 0.1), 0 2px 4px -2px hsl(0 0% 0% / 0.1);
+    --shadow-large: 0 10px 15px -3px hsl(0 0% 0% / 0.1), 0 4px 6px -4px hsl(0 0% 0% / 0.1);
+    --shadow-glow: 0 0 20px hsl(221 83% 53% / 0.15);
+    
+    /* Glassmorphism Widget Effects */
+    --glass-bg: hsl(0 0% 100% / 0.85);
+    --glass-border: hsl(0 0% 100% / 0.2);
+    --glass-shadow: 0 8px 32px 0 hsl(221 83% 53% / 0.08);
+    --glass-backdrop: blur(8px);
+    --widget-glow: 0 0 0 1px hsl(221 83% 53% / 0.05), 0 4px 16px -4px hsl(221 83% 53% / 0.1);
+    --widget-pattern: radial-gradient(circle at 1px 1px, hsl(221 83% 53% / 0.03) 1px, transparent 0);
+    --widget-pattern-size: 20px 20px;
 
-    --sidebar-background: 220 60% 96%;
-    --sidebar-foreground: 0 0% 0%;
-    --sidebar-primary: 220 91% 25%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 70% 90%;
-    --sidebar-accent-foreground: 0 0% 0%;
-    --sidebar-border: 220 60% 85%;
-    --sidebar-ring: 220 91% 25%;
+    --radius: 0.25rem; /* IBM uses 4px border radius */
+
+    /* Professional color variants */
+    --navy: 222 84% 25%;
+    --navy-foreground: 210 40% 98%;
+    --navy-light: 222 70% 35%;
+    --navy-dark: 222 84% 15%;
+
+    /* Success/Info colors */
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
+    --info: 199 89% 48%;
+    --info-foreground: 0 0% 100%;
+
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 222 84% 4.9%;
+    --sidebar-primary: 221 83% 53%;
+    --sidebar-primary-foreground: 210 40% 98%;
+    --sidebar-accent: 210 40% 96%;
+    --sidebar-accent-foreground: 222 84% 4.9%;
+    --sidebar-border: 214 32% 91%;
+    --sidebar-ring: 221 83% 53%;
   }
 
   .dark {
-    --background: 220 25% 8%;
-    --foreground: 220 10% 95%;
+    /* Refined dark mode with better contrast */
+    --background: 222 47% 8%;
+    --foreground: 0 0% 100%;
 
-    --card: 220 23% 12%;
-    --card-foreground: 220 10% 95%;
+    --card: 222 47% 10%;
+    --card-foreground: 0 0% 100%;
 
-    --popover: 220 23% 12%;
-    --popover-foreground: 220 10% 95%;
+    --popover: 222 47% 10%;
+    --popover-foreground: 0 0% 100%;
 
-    --primary: 220 91% 60%;
+    /* Vibrant primary blue for dark mode */
+    --primary: 217 91% 60%;
     --primary-foreground: 0 0% 100%;
-    --primary-glow: 220 80% 70%;
+    --primary-glow: 217 100% 70%;
+    --royal-blue: 217 91% 60%;
+    
+    --navy: 217 91% 60%;
+    --navy-light: 217 80% 72%;
+    --navy-dark: 217 91% 50%;
 
-    --secondary: 220 25% 18%;
-    --secondary-foreground: 220 10% 95%;
+    /* Better secondary contrast */
+    --secondary: 217 32% 18%;
+    --secondary-foreground: 0 0% 100%;
 
-    --muted: 220 20% 15%;
-    --muted-foreground: 0 0% 100%;
+    /* Improved muted colors for readability - now white */
+    --muted: 217 25% 16%;
+    --muted-foreground: 0 0% 90%;
 
-    --accent: 142 76% 60%;
+    /* Enhanced accent for visibility */
+    --accent: 217 40% 20%;
     --accent-foreground: 0 0% 100%;
 
-    --warning: 38 92% 60%;
-    --warning-foreground: 220 25% 8%;
+    /* Warmer warning for dark backgrounds */
+    --warning: 45 93% 58%;
+    --warning-foreground: 0 0% 100%;
 
-    --destructive: 0 84% 70%;
-    --destructive-foreground: 220 25% 8%;
+    /* Softer destructive for dark mode */
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 220 25% 20%;
-    --input: 220 25% 20%;
-    --ring: 220 91% 60%;
+    /* More visible borders */
+    --border: 217 25% 22%;
+    --input: 217 32% 18%;
+    --input-border: 217 40% 30%;
+    --input-border-hover: 217 50% 40%;
+    --input-border-focus: 217 91% 60%;
+    --ring: 217 91% 60%;
 
-    --gradient-primary: linear-gradient(135deg, hsl(220 91% 60%), hsl(220 80% 70%));
-    --gradient-blue: linear-gradient(135deg, hsl(212 90% 70%), hsl(212 80% 80%));
-    --gradient-green: linear-gradient(135deg, hsl(142 76% 60%), hsl(142 65% 70%));
-    --gradient-orange: linear-gradient(135deg, hsl(24 95% 65%), hsl(24 85% 75%));
-    --gradient-purple: linear-gradient(135deg, hsl(262 90% 65%), hsl(262 80% 75%));
-    --gradient-red: linear-gradient(135deg, hsl(0 84% 70%), hsl(0 74% 80%));
-    --shadow-glow: 0 0 20px hsl(220 91% 60% / 0.15);
-    --gradient-card: linear-gradient(145deg, hsl(220 23% 12%), hsl(220 20% 15%));
-    --gradient-accent: linear-gradient(135deg, hsl(142 76% 60%), hsl(142 60% 70%));
+    /* Enhanced gradients for dark mode */
+    --gradient-primary: linear-gradient(135deg, hsl(217 91% 55%), hsl(217 80% 65%));
+    --gradient-blue: linear-gradient(135deg, hsl(217 91% 55%), hsl(217 80% 65%));
+    --gradient-navy: linear-gradient(135deg, hsl(217 91% 55%), hsl(217 80% 65%));
+    --gradient-green: linear-gradient(135deg, hsl(142 70% 50%), hsl(142 60% 62%));
+    --gradient-orange: linear-gradient(135deg, hsl(30 95% 55%), hsl(30 85% 67%));
+    --gradient-purple: linear-gradient(135deg, hsl(262 80% 60%), hsl(262 70% 72%));
+    --gradient-red: linear-gradient(135deg, hsl(0 72% 55%), hsl(0 62% 67%));
+    
+    /* Enhanced shadows and glows */
+    --shadow-soft: 0 1px 3px 0 hsl(0 0% 0% / 0.3);
+    --shadow-medium: 0 4px 8px -1px hsl(0 0% 0% / 0.4), 0 2px 4px -2px hsl(0 0% 0% / 0.3);
+    --shadow-large: 0 12px 20px -4px hsl(0 0% 0% / 0.5), 0 4px 8px -4px hsl(0 0% 0% / 0.3);
+    --shadow-glow: 0 0 30px hsl(217 91% 60% / 0.25);
+    
+    --gradient-card: linear-gradient(145deg, hsl(222 47% 10%), hsl(217 32% 12%));
+    --gradient-accent: linear-gradient(135deg, hsl(217 32% 18%), hsl(217 25% 22%));
+    
+    /* Refined Dark Mode Glassmorphism */
+    --glass-bg: hsl(222 47% 10% / 0.9);
+    --glass-border: hsl(217 91% 60% / 0.15);
+    --glass-shadow: 0 8px 32px 0 hsl(0 0% 0% / 0.4);
+    --glass-backdrop: blur(12px);
+    --widget-glow: 0 0 0 1px hsl(217 91% 60% / 0.12), 0 4px 20px -4px hsl(217 91% 60% / 0.2);
+    --widget-pattern: radial-gradient(circle at 1px 1px, hsl(217 91% 60% / 0.06) 1px, transparent 0);
+    --widget-pattern-size: 20px 20px;
 
-    --sidebar-background: 220 30% 6%;
-    --sidebar-foreground: 220 10% 95%;
-    --sidebar-primary: 0 0% 100%;
-    --sidebar-primary-foreground: 220 10% 95%;
-    --sidebar-accent: 220 25% 15%;
-    --sidebar-accent-foreground: 220 10% 95%;
-    --sidebar-border: 220 25% 18%;
-    --sidebar-ring: 220 91% 60%;
+    /* Sidebar refinements */
+    --sidebar-background: 222 47% 7%;
+    --sidebar-foreground: 210 40% 96%;
+    --sidebar-primary: 217 91% 60%;
+    --sidebar-primary-foreground: 222 47% 8%;
+    --sidebar-accent: 217 32% 18%;
+    --sidebar-accent-foreground: 210 40% 96%;
+    --sidebar-border: 217 25% 20%;
+    --sidebar-ring: 217 91% 60%;
+
+    /* Success/Info states for dark mode */
+    --success: 142 70% 50%;
+    --success-foreground: 222 47% 8%;
+    --info: 199 89% 55%;
+    --info-foreground: 222 47% 8%;
   }
 }
 
@@ -130,32 +209,39 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
-    font-family: sans-serif;
+    @apply bg-background text-foreground font-sans;
+    font-weight: 400;
+    letter-spacing: -0.01em;
+  }
+  
+  * {
+    @apply font-sans;
   }
 
-  /* Global underline styles for titles and column headers */
-  /* Only apply to elements that don't already have border-b classes or no-underline class */
-  h1:not([class*="border-b"]):not([class*="no-underline"]), 
-  h2:not([class*="border-b"]):not([class*="no-underline"]), 
-  h3:not([class*="border-b"]):not([class*="no-underline"]), 
-  h4:not([class*="border-b"]):not([class*="no-underline"]), 
-  h5:not([class*="border-b"]):not([class*="no-underline"]), 
-  h6:not([class*="border-b"]):not([class*="no-underline"]) {
-    @apply underline decoration-2 underline-offset-4;
+  /* Enterprise typography */
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold text-foreground;
+    letter-spacing: -0.025em;
   }
 
-  /* Table headers */
+  h1 { @apply text-3xl; }
+  h2 { @apply text-2xl; }
+  h3 { @apply text-xl; }
+  h4 { @apply text-lg; }
+
+  /* Professional table headers */
   th {
-    @apply underline decoration-1 underline-offset-2;
+    @apply font-semibold text-sm text-muted-foreground uppercase tracking-wide;
   }
 
-  /* Card titles - only if they don't have border-b */
+  /* Card titles */
+  .card h3:not([class*="border-b"]),
   [data-testid="card-title"]:not([class*="border-b"]),
   .card-title:not([class*="border-b"]),
   [class*="CardTitle"]:not([class*="border-b"]),
   [class*="card-title"]:not([class*="border-b"]) {
-    @apply underline decoration-2 underline-offset-4;
+    @apply font-sans font-semibold !important;
+    text-decoration: none !important;
   }
 
   /* Dialog titles */
@@ -163,7 +249,7 @@ All colors MUST be HSL.
   .dialog-title,
   [class*="DialogTitle"],
   [class*="dialog-title"] {
-    @apply underline decoration-2 underline-offset-4;
+    @apply font-sans font-semibold;
   }
 
   /* Sheet titles */
@@ -171,7 +257,7 @@ All colors MUST be HSL.
   .sheet-title,
   [class*="SheetTitle"],
   [class*="sheet-title"] {
-    @apply underline decoration-2 underline-offset-4;
+    @apply font-sans font-semibold;
   }
 
   /* Alert dialog titles */
@@ -179,6 +265,227 @@ All colors MUST be HSL.
   .alertdialog-title,
   [class*="AlertDialogTitle"],
   [class*="alertdialog-title"] {
-    @apply underline decoration-2 underline-offset-4;
+    @apply font-sans font-semibold;
+  }
+
+  /* Icons inside buttons should inherit color from button */
+  .dark button svg,
+  .dark [role="button"] svg {
+    color: currentColor;
+  }
+
+  /* Enhanced input field styling */
+  input[type="text"],
+  input[type="email"],
+  input[type="tel"],
+  input[type="number"],
+  input[type="password"],
+  input[type="search"],
+  input[type="url"],
+  textarea,
+  select,
+  .input-enhanced {
+    @apply border border-primary bg-background text-foreground;
+    @apply transition-colors duration-200;
+    @apply focus:border-primary focus:ring-2 focus:ring-primary/20;
+    @apply hover:border-primary;
+  }
+
+  /* Specific styling for shadcn input components */
+  [data-testid="input"],
+  .input-component,
+  [class*="Input"] {
+    @apply border border-primary bg-background text-foreground;
+    @apply hover:border-primary;
+    @apply focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20;
+  }
+
+  /* Field display styling - makes view mode fields look like outlined inputs */
+  .field-display {
+    @apply border border-primary bg-background text-foreground;
+    @apply px-3 py-2 rounded-md min-h-[32px] flex items-center;
+    @apply text-sm transition-colors duration-200;
+  }
+
+  /* Readonly field styling */
+  .field-readonly {
+    @apply border border-input-border bg-muted/20 text-foreground;
+    @apply px-3 py-2 rounded-md min-h-[32px] flex items-center;
+    @apply text-sm cursor-default;
+  }
+
+  /* Enterprise card styling */
+  .card, [data-card="true"], .bg-card {
+    @apply border border-border shadow-medium bg-gradient-card rounded-lg;
+    backdrop-filter: blur(10px);
+  }
+
+  /* Glassmorphism Widget Styles */
+  .widget-glass {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+    backdrop-filter: var(--glass-backdrop);
+    -webkit-backdrop-filter: var(--glass-backdrop);
+    border-radius: 12px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .widget-glass::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: var(--widget-pattern);
+    background-size: var(--widget-pattern-size);
+    opacity: 0.5;
+    pointer-events: none;
+  }
+
+  .widget-glow {
+    box-shadow: var(--widget-glow);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .widget-glow:hover {
+    box-shadow: 
+      0 0 0 1px hsl(var(--primary) / 0.1), 
+      0 8px 32px -8px hsl(var(--primary) / 0.2),
+      var(--widget-glow);
+    transform: translateY(-1px);
+  }
+
+  /* Widget content positioning */
+  .widget-content {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Professional dashboard widgets */
+  .widget, .metric-card, .stats-card {
+    @apply border border-border shadow-medium bg-gradient-card rounded-lg p-6;
+    backdrop-filter: blur(10px);
+  }
+
+  /* Enhanced dropdown styling */
+  [data-radix-dropdown-menu-content] {
+    @apply bg-card border border-border shadow-large rounded-lg z-50;
+    backdrop-filter: blur(20px);
+  }
+
+  /* Hide native scrollbars but keep scrolling */
+  .no-scrollbar {
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none;    /* Firefox */
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;            /* Chrome, Safari */
+  }
+
+  /* Professional button enhancements */
+  .btn-primary {
+    @apply bg-gradient-primary shadow-medium hover:shadow-large transition-all duration-200;
+  }
+
+  /* Global IBM-style hover effects */
+  .hover-outline {
+    @apply transition-all duration-200;
+  }
+  
+  .hover-outline:hover {
+    @apply outline outline-2 outline-blue-500 outline-offset-[-2px];
+  }
+
+  /* Interactive card/widget hover effect */
+  .interactive-card {
+    @apply cursor-pointer transition-all duration-200;
+  }
+  
+  .interactive-card:hover {
+    @apply outline outline-2 outline-blue-500 outline-offset-[-2px];
+  }
+
+  /* Button hover override - apply blue outline to all outline buttons */
+  button[class*="outline"]:not([class*="destructive"]):hover {
+    @apply outline outline-2 outline-blue-500 outline-offset-[-2px];
+  }
+
+  /* Dark mode specific refinements */
+  .dark {
+    /* Enhanced text rendering */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  .dark input,
+  .dark textarea,
+  .dark select {
+    @apply border-input-border bg-muted/50 text-foreground;
+    @apply focus:border-primary focus:ring-2 focus:ring-primary/30;
+  }
+
+  .dark .card,
+  .dark [data-card="true"],
+  .dark .bg-card {
+    @apply border-border/50;
+    background: linear-gradient(145deg, hsl(222 47% 10%), hsl(217 32% 12%));
+  }
+
+  .dark .widget-glass {
+    background: hsl(222 47% 10% / 0.92);
+    border-color: hsl(217 91% 60% / 0.15);
+  }
+
+  /* Improved badge contrast in dark mode */
+  .dark .badge-outline {
+    @apply border-border text-foreground;
+  }
+
+  /* Better table styling in dark mode */
+  .dark table th {
+    @apply bg-muted/30 text-foreground;
+  }
+
+  .dark table tr:hover {
+    @apply bg-muted/20;
+  }
+
+  /* Enhanced scrollbar for dark mode */
+  .dark ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .dark ::-webkit-scrollbar-track {
+    background: hsl(222 47% 8%);
+  }
+
+  .dark ::-webkit-scrollbar-thumb {
+    background: hsl(217 25% 25%);
+    border-radius: 4px;
+  }
+
+  .dark ::-webkit-scrollbar-thumb:hover {
+    background: hsl(217 30% 35%);
+  }
+
+  /* Success and info colors */
+  .text-success {
+    color: hsl(var(--success));
+  }
+
+  .bg-success {
+    background-color: hsl(var(--success));
+  }
+
+  .text-info {
+    color: hsl(var(--info));
+  }
+
+  .bg-info {
+    background-color: hsl(var(--info));
   }
 }

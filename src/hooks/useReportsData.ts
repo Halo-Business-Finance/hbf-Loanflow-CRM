@@ -109,7 +109,7 @@ export function useReportsData() {
         .not('resolution_date', 'is', null)
         .gte('created_at', `${currentYear}-${currentMonth.toString().padStart(2, '0')}-01`)
 
-      const avgProcessingTime = cases?.length > 0 
+      const avgProcessingTime = cases && cases.length > 0 
         ? Math.round(cases.reduce((sum, case_item) => {
             const created = new Date(case_item.created_at)
             const resolved = new Date(case_item.resolution_date!)
@@ -117,7 +117,7 @@ export function useReportsData() {
           }, 0) / cases.length)
         : 18
 
-      const avgSatisfaction = cases?.length > 0
+      const avgSatisfaction = cases && cases.length > 0
         ? cases.reduce((sum, case_item) => sum + (case_item.customer_satisfaction_score || 0), 0) / cases.length
         : 4.6
 

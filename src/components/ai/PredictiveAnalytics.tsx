@@ -30,7 +30,7 @@ export function PredictiveAnalytics() {
     {
       leadId: "1",
       leadName: "Sarah Johnson",
-      currentStage: "Qualified",
+      currentStage: "Loan Application Signed",
       closeProbability: 85,
       predictedCloseDate: "2025-02-15",
       estimatedValue: 450000,

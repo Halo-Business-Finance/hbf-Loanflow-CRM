@@ -3,7 +3,7 @@ import { format, addDays, addWeeks } from "date-fns"
 import { Calendar as CalendarIcon, Clock, Phone, Mail, Bell, X, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+
 import { Separator } from "@/components/ui/separator"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
@@ -30,7 +30,7 @@ interface ActionReminderProps {
   entityName: string
   entityType: 'lead' | 'client'
   isOpen: boolean
-  onClose: () => void
+  onClose?: () => void
 }
 
 export function ActionReminder({ entityId, entityName, entityType, isOpen, onClose }: ActionReminderProps) {
@@ -50,7 +50,18 @@ export function ActionReminder({ entityId, entityName, entityType, isOpen, onClo
   ]
 
   const timeOptions = [
-    "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00"
+    { value: "09:00", label: "9:00 AM" },
+    { value: "10:00", label: "10:00 AM" },
+    { value: "11:00", label: "11:00 AM" },
+    { value: "12:00", label: "12:00 PM" },
+    { value: "13:00", label: "1:00 PM" },
+    { value: "14:00", label: "2:00 PM" },
+    { value: "15:00", label: "3:00 PM" },
+    { value: "16:00", label: "4:00 PM" },
+    { value: "17:00", label: "5:00 PM" },
+    { value: "18:00", label: "6:00 PM" },
+    { value: "19:00", label: "7:00 PM" },
+    { value: "20:00", label: "8:00 PM" }
   ]
 
   const reminderTypes = [
@@ -59,7 +70,7 @@ export function ActionReminder({ entityId, entityName, entityType, isOpen, onClo
       label: 'Call Reminder',
       icon: Phone,
       description: 'Schedule a phone call',
-      color: 'bg-blue-500'
+      color: 'bg-navy'
     },
     {
       id: 'email' as const,
@@ -94,10 +105,27 @@ export function ActionReminder({ entityId, entityName, entityType, isOpen, onClo
           message: customNote || `${reminderType === 'call' ? 'Call' : reminderType === 'email' ? 'Email' : 'Follow up with'} ${entityName}`,
           type: `${reminderType}_reminder`,
           related_id: entityId,
-          created_at: reminderDateTime.toISOString()
+          related_type: entityType,
+          scheduled_for: reminderDateTime.toISOString()
         })
 
       if (error) throw error
+
+      // Create audit log entry for reminder creation
+      await supabase
+        .from('audit_logs')
+        .insert({
+          user_id: user?.id,
+          action: `${reminderType}_reminder_created`,
+          table_name: 'notifications',
+          record_id: entityId,
+          new_values: {
+            reminder_type: reminderType,
+            scheduled_for: reminderDateTime.toISOString(),
+            entity_name: entityName,
+            entity_type: entityType
+          }
+        })
 
       toast({
         title: "Reminder Created",
@@ -108,7 +136,7 @@ export function ActionReminder({ entityId, entityName, entityType, isOpen, onClo
       setSelectedDate(undefined)
       setReminderType(undefined)
       setCustomNote("")
-      onClose()
+      onClose?.()
     } catch (error) {
       console.error('Error creating reminder:', error)
       toast({
@@ -123,10 +151,14 @@ export function ActionReminder({ entityId, entityName, entityType, isOpen, onClo
 
   if (!isOpen) return null
 
+  const handleClose = () => {
+    onClose?.();
+  };
+
   return (
     <div 
       className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2"
-      onClick={onClose}
+      onClick={handleClose}
     >
       <div 
         className="w-full max-w-md max-h-[85vh] overflow-y-auto"
@@ -137,14 +169,14 @@ export function ActionReminder({ entityId, entityName, entityType, isOpen, onClo
         <CardTitle className="text-base font-semibold dark:text-white">
           Create Reminder
         </CardTitle>
-        <Button variant="ghost" size="sm" onClick={onClose}>
+        <Button variant="ghost" size="sm" onClick={handleClose}>
           <X className="h-4 w-4" />
         </Button>
       </CardHeader>
       <CardContent className="space-y-4 px-4 pb-4">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <span>For:</span>
-          <Badge variant="outline">{entityName}</Badge>
+          <span className="font-medium">{entityName}</span>
         </div>
 
         {/* Reminder Type Selection */}
@@ -212,8 +244,8 @@ export function ActionReminder({ entityId, entityName, entityType, isOpen, onClo
               </SelectTrigger>
               <SelectContent>
                 {timeOptions.map((time) => (
-                  <SelectItem key={time} value={time}>
-                    {time}
+                  <SelectItem key={time.value} value={time.value}>
+                    {time.label}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -252,7 +284,7 @@ export function ActionReminder({ entityId, entityName, entityType, isOpen, onClo
               </>
             )}
           </Button>
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline" onClick={handleClose}>
             Cancel
           </Button>
         </div>

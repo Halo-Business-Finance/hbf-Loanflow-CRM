@@ -23,9 +23,8 @@ interface LeadAssignmentProps {
   leadName: string
   currentAssignments?: {
     loan_originator_id?: string | null
-    loan_processor_id?: string | null
-    closer_id?: string | null
-    funder_id?: string | null
+    processor_id?: string | null
+    underwriter_id?: string | null
   }
   onAssignmentUpdate?: () => void
   trigger?: React.ReactNode
@@ -45,12 +44,11 @@ export function LeadAssignment({
   const { user, hasRole } = useAuth()
   const { toast } = useToast()
 
-  // Assignment state
+  // Assignment state - matches database schema
   const [assignments, setAssignments] = useState({
     loan_originator_id: currentAssignments.loan_originator_id || "",
-    loan_processor_id: currentAssignments.loan_processor_id || "",
-    closer_id: currentAssignments.closer_id || "",
-    funder_id: currentAssignments.funder_id || ""
+    processor_id: currentAssignments.processor_id || "",
+    underwriter_id: currentAssignments.underwriter_id || ""
   })
 
   // Fetch team members when dialog opens
@@ -60,9 +58,8 @@ export function LeadAssignment({
       // Reset assignments to current values when opening
       setAssignments({
         loan_originator_id: currentAssignments.loan_originator_id || "",
-        loan_processor_id: currentAssignments.loan_processor_id || "",
-        closer_id: currentAssignments.closer_id || "",
-        funder_id: currentAssignments.funder_id || ""
+        processor_id: currentAssignments.processor_id || "",
+        underwriter_id: currentAssignments.underwriter_id || ""
       })
     }
   }, [isOpen, currentAssignments])
@@ -89,7 +86,7 @@ export function LeadAssignment({
         first_name: profile.first_name,
         last_name: profile.last_name,
         email: profile.email,
-        role: Array.isArray(profile.user_roles) ? profile.user_roles[0]?.role || 'agent' : 'agent'
+        role: Array.isArray(profile.user_roles) ? profile.user_roles[0]?.role || 'loan_originator' : 'loan_originator'
       })) || []
 
       setTeamMembers(members)
@@ -127,9 +124,9 @@ export function LeadAssignment({
       // Prepare the update object, converting empty strings to null
       const updateData = {
         loan_originator_id: assignments.loan_originator_id || null,
-        loan_processor_id: assignments.loan_processor_id || null,
-        closer_id: assignments.closer_id || null,
-        funder_id: assignments.funder_id || null,
+        processor_id: assignments.processor_id || null,
+        underwriter_id: assignments.underwriter_id || null,
+        assigned_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       }
 
@@ -141,16 +138,7 @@ export function LeadAssignment({
 
       if (leadError) throw leadError
 
-      // Also update the contact_entities table to keep in sync
-      const { error: contactError } = await supabase
-        .from('contact_entities')
-        .update(updateData)
-        .eq('id', (await supabase.from('leads').select('contact_entity_id').eq('id', leadId).single()).data?.contact_entity_id)
-
-      if (contactError) {
-        console.warn('Could not update contact entity:', contactError)
-        // Don't throw error as lead update was successful
-      }
+      // Note: Assignment fields only exist on leads table, not contact_entities
 
       toast({
         title: "Success",
@@ -175,13 +163,11 @@ export function LeadAssignment({
     return teamMembers.filter(member => {
       switch (targetRole) {
         case 'loan_originator':
-          return ['agent', 'manager', 'admin', 'super_admin'].includes(member.role)
-        case 'loan_processor':
+          return ['loan_originator', 'manager', 'admin', 'super_admin'].includes(member.role)
+        case 'processor':
           return ['loan_processor', 'manager', 'admin', 'super_admin'].includes(member.role)
-        case 'closer':
-          return ['agent', 'manager', 'admin', 'super_admin'].includes(member.role)
-        case 'funder':
-          return ['funder', 'manager', 'admin', 'super_admin'].includes(member.role)
+        case 'underwriter':
+          return ['underwriter', 'manager', 'admin', 'super_admin'].includes(member.role)
         default:
           return true
       }
@@ -197,10 +183,8 @@ export function LeadAssignment({
   const getRoleDisplayName = (role: string) => {
     switch (role) {
       case 'loan_originator': return 'Loan Originator'
-      case 'loan_processor': return 'Loan Processor'
-      case 'closer': return 'Closer'
-      case 'funder': return 'Loan Funder'
-      case 'underwriter': return 'Loan Underwriter'
+      case 'processor': return 'Loan Processor'
+      case 'underwriter': return 'Underwriter'
       default: return role
     }
   }
@@ -260,7 +244,7 @@ export function LeadAssignment({
 
             {/* Assignment Controls */}
             <div className="space-y-4">
-              {['loan_originator', 'loan_processor', 'closer', 'funder'].map((role) => (
+              {['loan_originator', 'processor', 'underwriter'].map((role) => (
                 <div key={role} className="space-y-2">
                   <Label htmlFor={role} className="text-sm font-medium">
                     {getRoleDisplayName(role)}

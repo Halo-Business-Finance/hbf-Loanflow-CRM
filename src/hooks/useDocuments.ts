@@ -23,7 +23,13 @@ export interface LeadDocument {
   updated_at: string;
   contact_entity?: {
     name: string;
+    business_name?: string;
     loan_amount?: number;
+    loan_type?: string;
+    location?: string;
+    business_city?: string;
+    business_state?: string;
+    business_address?: string;
   };
 }
 
@@ -40,7 +46,7 @@ export function useDocuments() {
         .from('lead_documents')
         .select(`
           *,
-          contact_entity:contact_entities(name, loan_amount)
+          contact_entity:contact_entities!contact_entity_id(name, business_name, loan_amount, loan_type, location, business_city, business_state, business_address)
         `)
         .order('created_at', { ascending: false });
 
@@ -106,11 +112,17 @@ export function useDocuments() {
 
       fetchDocuments();
       return data;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error uploading document:', error);
+      console.error('Error details:', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint
+      });
       toast({
         title: "Error",
-        description: "Failed to upload document",
+        description: error.message || "Failed to upload document",
         variant: "destructive",
       });
       return null;

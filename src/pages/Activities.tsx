@@ -1,764 +1,894 @@
-import { useState, useEffect } from "react"
-import { useNavigate } from "react-router-dom"
-import Layout from "@/components/Layout"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Search, Filter, Phone, Mail, Calendar, FileText, DollarSign, Clock, User, Bell, AlertCircle, Plus, CheckCircle2, X, Users, Edit, Trash2 } from "lucide-react"
-import { supabase } from "@/integrations/supabase/client"
-import { useAuth } from "@/components/auth/AuthProvider"
-import { useToast } from "@/hooks/use-toast"
-import { format } from "date-fns"
-
+import React, { useState, useEffect } from 'react'
+import { StandardKPICard } from '@/components/StandardKPICard'
+import { StandardContentCard } from '@/components/StandardContentCard'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { useAuth } from '@/components/auth/AuthProvider'
+import { useToast } from '@/hooks/use-toast'
+import { formatDistanceToNow, format } from 'date-fns'
+import { 
+  Bell, 
+  Activity, 
+  AlertTriangle, 
+  CheckCircle, 
+  Info, 
+  UserPlus, 
+  FileText, 
+  TrendingUp, 
+  Calendar as CalendarIcon, 
+  Clock,
+  Users,
+  Phone,
+  Mail,
+  RefreshCw,
+  Trash2,
+  Edit,
+  Check,
+  X
+} from 'lucide-react'
+import { supabase } from '@/integrations/supabase/client'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Label } from '@/components/ui/label'
+import { Separator } from '@/components/ui/separator'
+import { Calendar } from '@/components/ui/calendar'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { IBMPageHeader } from "@/components/ui/IBMPageHeader"
 interface Notification {
   id: string
-  title: string
   message: string
-  type: string
-  is_read: boolean
-  created_at: string
+  timestamp: Date
+  type: 'warning' | 'success' | 'info'
+  notificationType?: string  // The actual type from database (call_reminder, email_reminder, etc.)
+  scheduled_for?: Date
   related_id?: string
   related_type?: string
+  borrower_name?: string
+  company_name?: string
 }
 
-interface Activity {
+interface ActivityItem {
   id: string
-  type: string
-  title: string
-  description: string
-  customer?: string
-  officer: string
-  timestamp: string
-  status: string
-  outcome?: string
-  notification_type?: string
+  action: string
+  details: string
+  timestamp: Date
+  user: string
 }
 
 export default function Activities() {
   const [notifications, setNotifications] = useState<Notification[]>([])
-  const [activities, setActivities] = useState<Activity[]>([])
-  const [filteredActivities, setFilteredActivities] = useState<Activity[]>([])
+  const [activities, setActivities] = useState<ActivityItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [searchTerm, setSearchTerm] = useState("")
-  const [filterType, setFilterType] = useState("all")
-  const [filterStatus, setFilterStatus] = useState("all")
-  const [newActivityOpen, setNewActivityOpen] = useState(false)
-  const [editingActivity, setEditingActivity] = useState<Activity | null>(null)
-  const [editActivityOpen, setEditActivityOpen] = useState(false)
+  const [actualTodaysActions, setActualTodaysActions] = useState(0)
+  const [scheduledReminders, setScheduledReminders] = useState(0)
+  const [editingNotificationId, setEditingNotificationId] = useState<string | null>(null)
+  const [editTitle, setEditTitle] = useState('')
+  const [editMessage, setEditMessage] = useState('')
+  const [editReminderType, setEditReminderType] = useState<'call' | 'email' | 'follow_up'>('follow_up')
+  const [editDate, setEditDate] = useState<Date>()
+  const [editTime, setEditTime] = useState("09:00")
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
   const { user } = useAuth()
   const { toast } = useToast()
-  const navigate = useNavigate()
 
-  const fetchNotifications = async () => {
+  useEffect(() => {
+    fetchData()
+  }, [user])
+
+  const fetchData = async () => {
     if (!user) return
 
     try {
-      const { data, error } = await supabase
+      setLoading(true)
+
+      // Fetch real notifications from database
+      const { data: notificationData, error: notificationError } = await supabase
         .from('notifications')
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
+        .limit(20)
 
-      if (error) throw error
+      if (notificationError) {
+        console.error('Error fetching notifications:', notificationError)
+      }
 
-      const notificationData = (data as Notification[]) || []
-      setNotifications(notificationData)
+      // Count scheduled reminders (future scheduled_for dates)
+      const now = new Date()
+      const scheduledCount = (notificationData || []).filter(n => 
+        n.scheduled_for && new Date(n.scheduled_for) > now && !n.is_read
+      ).length
 
-      // Convert notifications to activities format
-      const notificationActivities: Activity[] = notificationData.map(notification => ({
-        id: notification.id,
-        type: getActivityTypeFromNotification(notification.type),
-        title: notification.title,
-        description: notification.message,
-        officer: "System", // Since notifications are system-generated
-        timestamp: formatTimestamp(notification.created_at),
-        status: notification.is_read ? "Completed" : "Pending",
-        notification_type: notification.type
-      }))
+      // Fetch related contact entities for the notifications
+      const relatedIds = (notificationData || [])
+        .filter(n => n.related_id && n.related_type === 'lead')
+        .map(n => n.related_id)
 
-      setActivities(notificationActivities)
-      setLoading(false)
+      let contactEntityMap = new Map()
+      if (relatedIds.length > 0) {
+        const { data: contactData } = await supabase
+          .from('leads')
+          .select(`
+            id,
+            contact_entities!inner(
+              name,
+              business_name,
+              first_name,
+              last_name
+            )
+          `)
+          .in('id', relatedIds)
+
+        if (contactData) {
+          contactData.forEach(lead => {
+            const contact = (lead as any).contact_entities
+            contactEntityMap.set(lead.id, contact)
+          })
+        }
+      }
+
+      // Convert database notifications to our format, prioritizing scheduled items
+      const dbNotifications: Notification[] = (notificationData || [])
+        .sort((a, b) => {
+          // Prioritize unread scheduled items
+          const aScheduled = a.scheduled_for && new Date(a.scheduled_for) > now && !a.is_read
+          const bScheduled = b.scheduled_for && new Date(b.scheduled_for) > now && !b.is_read
+          if (aScheduled && !bScheduled) return -1
+          if (!aScheduled && bScheduled) return 1
+          
+          // Then sort by scheduled_for or created_at
+          const aTime = a.scheduled_for || a.created_at
+          const bTime = b.scheduled_for || b.created_at
+          return new Date(bTime).getTime() - new Date(aTime).getTime()
+        })
+        .slice(0, 10)
+        .map(n => {
+          const contactEntity = n.related_id ? contactEntityMap.get(n.related_id) : null
+          const borrowerName = contactEntity 
+            ? (contactEntity.name || `${contactEntity.first_name || ''} ${contactEntity.last_name || ''}`.trim())
+            : null
+          const companyName = contactEntity?.business_name
+
+          return {
+            id: n.id,
+            message: n.message || n.title,
+            timestamp: new Date(n.scheduled_for || n.created_at),
+            type: n.is_read ? 'success' : (n.scheduled_for ? 'warning' : 'info'),
+            notificationType: n.type,  // Preserve the actual notification type from database
+            scheduled_for: n.scheduled_for ? new Date(n.scheduled_for) : undefined,
+            related_id: n.related_id,
+            related_type: n.related_type,
+            borrower_name: borrowerName || undefined,
+            company_name: companyName || undefined
+          }
+        })
+
+      // Fetch real activities from audit logs with user profile information
+      const { data: auditData, error: auditError } = await supabase
+        .from('audit_logs')
+        .select(`
+          *,
+          profiles!audit_logs_user_id_fkey(
+            first_name,
+            last_name,
+            email
+          )
+        `)
+        .order('created_at', { ascending: false })
+        .limit(50)
+
+      if (auditError) {
+        console.error('Error fetching audit logs:', auditError)
+      }
+
+      // Convert audit logs to activities format
+      const dbActivities: ActivityItem[] = (auditData || []).map(a => {
+        const profile = (a as any).profiles
+        const userName = profile 
+          ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || profile.email
+          : 'System'
+        
+        return {
+          id: a.id,
+          action: a.action === 'lead_updated' 
+            ? 'Lead Updated' 
+            : a.action?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'System Action',
+          details: a.table_name 
+            ? `Updated ${a.table_name.replace(/_/g, ' ')}`
+            : 'Activity performed',
+          timestamp: new Date(a.created_at),
+          user: userName
+        }
+      })
+
+      // Calculate live metrics
+      const allActivities = dbActivities
+      const allNotifications = dbNotifications
+      
+      const todaysActions = allActivities.filter(activity => {
+        const today = new Date()
+        const activityDate = activity.timestamp
+        return activityDate.toDateString() === today.toDateString()
+      }).length
+
+      setActualTodaysActions(todaysActions)
+      setScheduledReminders(scheduledCount)
+      setNotifications(allNotifications)
+      setActivities(allActivities)
+      
     } catch (error) {
-      console.error('Error fetching notifications:', error)
+      console.error('Error fetching data:', error)
+      toast({
+        title: "Error",
+        description: "Failed to load activities and notifications",
+        variant: "destructive",
+      })
+    } finally {
       setLoading(false)
     }
   }
 
-  useEffect(() => {
-    fetchNotifications()
-
-    // Set up real-time subscription for new notifications
-    if (user) {
-      const channel = supabase
-        .channel('notifications_activities')
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'notifications',
-            filter: `user_id=eq.${user.id}`
-          },
-          () => {
-            fetchNotifications()
-          }
-        )
-        .subscribe()
-
-      return () => {
-        supabase.removeChannel(channel)
-      }
+  const getTypeIcon = (type: string) => {
+    switch (type) {
+      case 'warning': return <AlertTriangle className="h-4 w-4 text-yellow-600" />
+      case 'success': return <CheckCircle className="h-4 w-4 text-green-600" />
+      case 'info': return <Info className="h-4 w-4 text-blue-600" />
+      default: return <Bell className="h-4 w-4 text-gray-600" />
     }
-  }, [user])
+  }
 
-  // Filter activities based on search and filters
-  useEffect(() => {
-    let filtered = activities;
-
-    if (searchTerm) {
-      filtered = filtered.filter(activity => 
-        activity.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        activity.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        activity.officer.toLowerCase().includes(searchTerm.toLowerCase())
-      );
+  const getActionIcon = (action: string) => {
+    switch (action) {
+      case 'Lead Created': return <UserPlus className="h-4 w-4 text-blue-600" />
+      case 'Document Uploaded': return <FileText className="h-4 w-4 text-green-600" />
+      case 'Deal Closed': return <TrendingUp className="h-4 w-4 text-purple-600" />
+      case 'Follow-up Scheduled': return <Calendar className="h-4 w-4 text-orange-600" />
+      case 'Call Made': return <Phone className="h-4 w-4 text-blue-600" />
+      case 'Email Sent': return <Mail className="h-4 w-4 text-green-600" />
+      default: return <Activity className="h-4 w-4 text-gray-600" />
     }
+  }
 
-    if (filterType !== "all") {
-      filtered = filtered.filter(activity => 
-        activity.type.toLowerCase() === filterType.toLowerCase()
-      );
+  const reminderTypes = [
+    {
+      id: 'call' as const,
+      label: 'Call Reminder',
+      icon: Phone,
+      description: 'Schedule a phone call',
+      color: 'bg-navy'
+    },
+    {
+      id: 'email' as const,
+      label: 'Email Reminder',
+      icon: Mail,
+      description: 'Send an email follow-up',
+      color: 'bg-green-500'
+    },
+    {
+      id: 'follow_up' as const,
+      label: 'General Follow-up',
+      icon: Bell,
+      description: 'General reminder to follow up',
+      color: 'bg-purple-500'
     }
+  ]
 
-    if (filterStatus !== "all") {
-      filtered = filtered.filter(activity => 
-        activity.status.toLowerCase() === filterStatus.toLowerCase()
-      );
-    }
+  const timeOptions = [
+    { value: "09:00", label: "9:00 AM" },
+    { value: "10:00", label: "10:00 AM" },
+    { value: "11:00", label: "11:00 AM" },
+    { value: "12:00", label: "12:00 PM" },
+    { value: "13:00", label: "1:00 PM" },
+    { value: "14:00", label: "2:00 PM" },
+    { value: "15:00", label: "3:00 PM" },
+    { value: "16:00", label: "4:00 PM" },
+    { value: "17:00", label: "5:00 PM" },
+    { value: "18:00", label: "6:00 PM" },
+    { value: "19:00", label: "7:00 PM" },
+    { value: "20:00", label: "8:00 PM" }
+  ]
 
-    setFilteredActivities(filtered);
-  }, [activities, searchTerm, filterType, filterStatus])
+  const handleEditNotification = (notification: Notification) => {
+    setEditingNotificationId(notification.id)
+    setEditTitle(notification.message.split(' - ')[0] || notification.message)
+    setEditMessage(notification.message)
+    setEditReminderType('follow_up')
+    setEditDate(notification.scheduled_for || new Date())
+    setEditTime("09:00")
+  }
 
-  const markAsRead = async (notificationId: string) => {
+  const handleSaveEdit = async () => {
+    if (!editingNotificationId || !editDate) return
+    
     try {
-      const { error } = await supabase
-        .from('notifications')
-        .update({ is_read: true })
-        .eq('id', notificationId);
+      const reminderDateTime = new Date(editDate)
+      const [hours, minutes] = editTime.split(':')
+      reminderDateTime.setHours(parseInt(hours), parseInt(minutes))
 
-      if (error) throw error;
-
-      toast({
-        title: "Success",
-        description: "Notification marked as read",
-      });
-
-      fetchNotifications();
-    } catch (error) {
-      console.error('Error marking notification as read:', error);
-      toast({
-        title: "Error", 
-        description: "Failed to mark notification as read",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const markAllAsRead = async () => {
-    try {
-      const { error } = await supabase
-        .from('notifications')
-        .update({ is_read: true })
-        .eq('user_id', user?.id)
-        .eq('is_read', false);
-
-      if (error) throw error;
-
-      toast({
-        title: "Success",
-        description: "All notifications marked as read",
-      });
-
-      fetchNotifications();
-    } catch (error) {
-      console.error('Error marking all notifications as read:', error);
-      toast({
-        title: "Error",
-        description: "Failed to mark all notifications as read", 
-        variant: "destructive",
-      });
-    }
-  };
-
-  const createActivity = async (activityData: Partial<Activity>) => {
-    try {
-      const { error } = await supabase
-        .from('notifications')
-        .insert({
-          user_id: user?.id,
-          title: activityData.title,
-          message: activityData.description,
-          type: 'manual_activity',
-          is_read: false
-        });
-
-      if (error) throw error;
-
-      toast({
-        title: "Success",
-        description: "Activity created successfully",
-      });
-
-      setNewActivityOpen(false);
-      fetchNotifications();
-    } catch (error) {
-      console.error('Error creating activity:', error);
-      toast({
-        title: "Error",
-        description: "Failed to create activity",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const editActivity = async (activityId: string, updates: { title?: string; message?: string; type?: string }) => {
-    try {
       const { error } = await supabase
         .from('notifications')
         .update({
-          title: updates.title,
-          message: updates.message,
-          type: updates.type,
+          title: editTitle,
+          message: editMessage,
+          type: `${editReminderType}_reminder`,
+          scheduled_for: reminderDateTime.toISOString(),
           updated_at: new Date().toISOString()
         })
-        .eq('id', activityId);
+        .eq('id', editingNotificationId)
 
-      if (error) throw error;
+      if (error) throw error
 
       toast({
         title: "Success",
-        description: "Activity updated successfully",
-      });
+        description: "Notification updated successfully",
+      })
 
-      setEditActivityOpen(false);
-      setEditingActivity(null);
-      fetchNotifications();
+      setEditingNotificationId(null)
+      setEditTitle('')
+      setEditMessage('')
+      setEditReminderType('follow_up')
+      setEditDate(undefined)
+      setEditTime("09:00")
+      fetchData()
     } catch (error) {
-      console.error('Error updating activity:', error);
+      console.error('Error updating notification:', error)
       toast({
         title: "Error",
-        description: "Failed to update activity",
+        description: "Failed to update notification",
         variant: "destructive",
-      });
+      })
     }
-  };
+  }
 
-  const deleteActivity = async (activityId: string) => {
-    console.log('Attempting to delete activity:', activityId);
+  const handleCancelEdit = () => {
+    setEditingNotificationId(null)
+    setEditTitle('')
+    setEditMessage('')
+    setEditReminderType('follow_up')
+    setEditDate(undefined)
+    setEditTime("09:00")
+  }
+
+  const handleDeleteNotification = async (notificationId: string) => {
     try {
-      // First, remove from local state immediately for optimistic UI update
-      setActivities(prevActivities => prevActivities.filter(a => a.id !== activityId));
-      setNotifications(prevNotifications => prevNotifications.filter(n => n.id !== activityId));
-
       const { error } = await supabase
         .from('notifications')
         .delete()
-        .eq('id', activityId);
+        .eq('id', notificationId)
 
-      if (error) {
-        console.error('Database deletion error:', error);
-        // Revert the optimistic update if deletion failed
-        fetchNotifications();
-        throw error;
-      }
+      if (error) throw error
 
-      console.log('Activity deleted successfully from database');
-      
       toast({
         title: "Success",
-        description: "Activity deleted successfully",
-      });
+        description: "Notification deleted successfully",
+      })
 
-      // Don't call fetchNotifications() here as the real-time subscription will handle it
-      // and we've already updated the local state optimistically
+      setDeleteConfirmId(null)
+      fetchData()
     } catch (error) {
-      console.error('Error deleting activity:', error);
+      console.error('Error deleting notification:', error)
       toast({
         title: "Error",
-        description: "Failed to delete activity",
+        description: "Failed to delete notification",
         variant: "destructive",
-      });
-    }
-  };
-
-  const openEditDialog = (activity: Activity) => {
-    setEditingActivity(activity);
-    setEditActivityOpen(true);
-  };
-
-  const getActivityTypeFromNotification = (notificationType: string) => {
-    switch (notificationType) {
-      case 'follow_up_reminder':
-      case 'lead_status_change':
-        return 'Call'
-      case 'client_created':
-      case 'lead_created':
-        return 'Contact'
-      case 'loan_created':
-        return 'Document'
-      default:
-        return 'Notification'
+      })
     }
   }
 
-  const formatTimestamp = (timestamp: string) => {
-    const date = new Date(timestamp)
-    const now = new Date()
-    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60))
-    
-    if (diffInHours < 1) {
-      return 'Just now'
-    } else if (diffInHours < 24) {
-      return `${diffInHours} hour${diffInHours > 1 ? 's' : ''} ago`
-    } else {
-      const diffInDays = Math.floor(diffInHours / 24)
-      return `${diffInDays} day${diffInDays > 1 ? 's' : ''} ago`
-    }
-  }
-
-  const getActivityIcon = (type: string) => {
-    switch (type.toLowerCase()) {
-      case 'call': return Phone
-      case 'email': return Mail
-      case 'meeting': return Calendar
-      case 'document': return FileText
-      case 'contact': return User
-      case 'notification': return Bell
-      default: return Clock
-    }
-  }
-
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'completed': return 'default'
-      case 'scheduled': return 'secondary'
-      case 'pending': return 'destructive'
-      default: return 'secondary'
-    }
-  }
-
-  const activityStats = {
-    today: activities.filter(a => a.timestamp.includes('hour') || a.timestamp.includes('Just now')).length,
-    thisWeek: activities.filter(a => a.timestamp.includes('day') || a.timestamp.includes('hour') || a.timestamp.includes('Just now')).length,
-    notifications: activities.length,
-    unread: activities.filter(a => a.status === 'Pending').length
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="p-8 space-y-8 animate-fade-in">
+          <div className="space-y-1 animate-pulse">
+            <div className="h-8 bg-muted rounded w-64 mb-2"></div>
+            <div className="h-5 bg-muted rounded w-96"></div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="animate-pulse bg-card rounded-lg p-6 border border-blue-600">
+                <div className="h-6 bg-muted rounded w-24 mb-4"></div>
+                <div className="h-8 bg-muted rounded w-16 mb-2"></div>
+                <div className="h-8 w-8 bg-muted rounded"></div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <Layout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground dark:text-white">Activities & Notifications</h1>
-            <p className="text-foreground">Track all notifications, reminders, and system activities</p>
-          </div>
-          <div className="flex gap-4">
-            <Button onClick={fetchNotifications} variant="outline" className="gap-2">
-              <Clock className="h-4 w-4 text-white" />
-              Refresh
+    <div className="min-h-screen bg-background">
+      <div className="p-8 space-y-8 animate-fade-in">
+        <IBMPageHeader 
+          title="Activity Command Center"
+          subtitle="Monitor system notifications, user activities, and important updates in real-time"
+          actions={
+            <Button onClick={fetchData} variant="outline" size="sm" className="h-8 text-xs font-medium">
+              <RefreshCw className="h-3 w-3 mr-2" />
+              Refresh Data
             </Button>
-            <Dialog open={newActivityOpen} onOpenChange={setNewActivityOpen}>
-              <DialogTrigger asChild>
-                <Button className="gap-2">
-                  <Plus className="h-4 w-4 text-white" />
-                  New Activity
+          }
+        />
+
+        {/* Content */}
+        <div className="space-y-6">
+        {/* Metrics Overview */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <StandardKPICard
+            title="Total Activities"
+            value={activities.length}
+            className="border border-blue-600"
+          />
+          
+          <StandardKPICard
+            title="Notifications"
+            value={notifications.length}
+            className="border border-blue-600"
+          />
+          
+          <StandardKPICard
+            title="Today's Activities"
+            value={actualTodaysActions}
+            className="border border-blue-600"
+          />
+          
+          <StandardKPICard
+            title="Scheduled Reminders"
+            value={scheduledReminders}
+            className="border border-blue-600"
+          />
+        </div>
+
+        {/* Main Content Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          
+          {/* Call Notifications */}
+          <StandardContentCard 
+            title="Call Reminders"
+            headerActions={<Phone className="h-5 w-5 text-navy" />}
+          >
+            <div className="space-y-4">
+              {notifications
+                .filter(n => n.notificationType?.includes('call'))
+                .slice(0, 5)
+                .map((notification) => (
+                <div key={notification.id} className="flex items-start space-x-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors group">
+                  <Phone className="h-4 w-4 text-navy mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1">
+                        {notification.borrower_name && (
+                          <p className="text-sm font-semibold text-foreground">
+                            {notification.borrower_name}
+                          </p>
+                        )}
+                        {notification.company_name && (
+                          <p className="text-xs text-muted-foreground">
+                            {notification.company_name}
+                          </p>
+                        )}
+                        <p className="text-sm text-foreground mt-1">
+                          {notification.message}
+                        </p>
+                      </div>
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0"
+                          onClick={() => handleEditNotification(notification)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                          onClick={() => setDeleteConfirmId(notification.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 mt-2">
+                      <CalendarIcon className="h-3 w-3 text-muted-foreground" />
+                      <p className="text-xs text-muted-foreground">
+                        {notification.scheduled_for && notification.scheduled_for > new Date() 
+                          ? format(notification.scheduled_for, 'MMM d, yyyy • h:mm a')
+                          : format(notification.timestamp, 'MMM d, yyyy • h:mm a')
+                        }
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {notifications.filter(n => n.notificationType?.includes('call')).length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-8">No call reminders</p>
+              )}
+            </div>
+          </StandardContentCard>
+
+          {/* Email Notifications */}
+          <StandardContentCard 
+            title="Email Reminders"
+            headerActions={<Mail className="h-5 w-5 text-green-600" />}
+          >
+            <div className="space-y-4">
+              {notifications
+                .filter(n => n.notificationType?.includes('email'))
+                .slice(0, 5)
+                .map((notification) => (
+                <div key={notification.id} className="flex items-start space-x-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors group">
+                  <Mail className="h-4 w-4 text-green-600 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1">
+                        {notification.borrower_name && (
+                          <p className="text-sm font-semibold text-foreground">
+                            {notification.borrower_name}
+                          </p>
+                        )}
+                        {notification.company_name && (
+                          <p className="text-xs text-muted-foreground">
+                            {notification.company_name}
+                          </p>
+                        )}
+                        <p className="text-sm text-foreground mt-1">
+                          {notification.message}
+                        </p>
+                      </div>
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0"
+                          onClick={() => handleEditNotification(notification)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                          onClick={() => setDeleteConfirmId(notification.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 mt-2">
+                      <CalendarIcon className="h-3 w-3 text-muted-foreground" />
+                      <p className="text-xs text-muted-foreground">
+                        {notification.scheduled_for && notification.scheduled_for > new Date() 
+                          ? format(notification.scheduled_for, 'MMM d, yyyy • h:mm a')
+                          : format(notification.timestamp, 'MMM d, yyyy • h:mm a')
+                        }
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {notifications.filter(n => n.notificationType?.includes('email')).length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-8">No email reminders</p>
+              )}
+            </div>
+          </StandardContentCard>
+
+          {/* General Follow-up Notifications */}
+          <StandardContentCard 
+            title="General Follow-ups"
+            headerActions={<Bell className="h-5 w-5 text-purple-600" />}
+          >
+            <div className="space-y-4">
+              {notifications
+                .filter(n => n.notificationType?.includes('follow_up'))
+                .slice(0, 5)
+                .map((notification) => (
+                <div key={notification.id} className="flex items-start space-x-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors group">
+                  <Bell className="h-4 w-4 text-purple-600 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1">
+                        {notification.borrower_name && (
+                          <p className="text-sm font-semibold text-foreground">
+                            {notification.borrower_name}
+                          </p>
+                        )}
+                        {notification.company_name && (
+                          <p className="text-xs text-muted-foreground">
+                            {notification.company_name}
+                          </p>
+                        )}
+                        <p className="text-sm text-foreground mt-1">
+                          {notification.message}
+                        </p>
+                      </div>
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0"
+                          onClick={() => handleEditNotification(notification)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                          onClick={() => setDeleteConfirmId(notification.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 mt-2">
+                      <CalendarIcon className="h-3 w-3 text-muted-foreground" />
+                      <p className="text-xs text-muted-foreground">
+                        {notification.scheduled_for && notification.scheduled_for > new Date() 
+                          ? format(notification.scheduled_for, 'MMM d, yyyy • h:mm a')
+                          : format(notification.timestamp, 'MMM d, yyyy • h:mm a')
+                        }
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {notifications.filter(n => n.notificationType?.includes('follow_up')).length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-8">No follow-up reminders</p>
+              )}
+            </div>
+          </StandardContentCard>
+
+        {/* Recent Activities */}
+        <StandardContentCard 
+          title="Recent Activities"
+          headerActions={<Activity className="h-5 w-5 text-blue-600" />}
+        >
+          <div className="space-y-4">
+            {activities.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">No recent activities</p>
+            ) : (
+              activities.map((activity) => (
+                <div key={activity.id} className="flex items-start space-x-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
+                  {getActionIcon(activity.action)}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium text-foreground">
+                        {activity.action}
+                      </p>
+                      <Badge variant="outline" className="text-xs">
+                        {activity.user}
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {activity.details}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      {formatDistanceToNow(activity.timestamp)} ago
+                    </p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </StandardContentCard>
+
+        {/* Activity Timeline */}
+        <StandardContentCard 
+          title="Activity Timeline"
+          headerActions={<Clock className="h-5 w-5 text-green-600" />}
+        >
+          <div className="space-y-6">
+            {[...activities, ...notifications.map(n => ({
+              id: n.id,
+              action: 'System Notification',
+              details: n.message,
+              timestamp: n.timestamp,
+              user: 'System'
+            }))].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()).slice(0, 8).map((item, index) => (
+              <div key={item.id} className="flex items-center space-x-4 relative">
+                <div className="flex-shrink-0">
+                  <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
+                    {getActionIcon(item.action)}
+                  </div>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium text-foreground">{item.action}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatDistanceToNow(item.timestamp)} ago
+                    </p>
+                  </div>
+                  <p className="text-sm text-muted-foreground">{item.details}</p>
+                  <Badge variant="secondary" className="text-xs mt-1">{item.user}</Badge>
+                </div>
+                {index < 7 && (
+                  <div className="absolute left-4 top-8 w-px h-6 bg-border"></div>
+                )}
+              </div>
+            ))}
+          </div>
+        </StandardContentCard>
+      </div>
+
+      {/* Edit Notification Modal */}
+      {editingNotificationId && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2"
+          onClick={handleCancelEdit}
+        >
+          <div 
+            className="w-full max-w-md max-h-[85vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Card className="w-full shadow-xl border animate-in slide-in-from-top-4 duration-300">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-4 pt-4">
+                <CardTitle className="text-base font-semibold dark:text-white">
+                  Edit Notification
+                </CardTitle>
+                <Button variant="ghost" size="sm" onClick={handleCancelEdit}>
+                  <X className="h-4 w-4" />
                 </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Create New Activity</DialogTitle>
-                </DialogHeader>
-                <form onSubmit={(e) => {
-                  e.preventDefault();
-                  const formData = new FormData(e.target as HTMLFormElement);
-                  createActivity({
-                    title: formData.get('title') as string,
-                    description: formData.get('description') as string,
-                    type: formData.get('type') as string,
-                  });
-                }} className="space-y-4">
-                  <div>
-                    <Label htmlFor="title">Title</Label>
-                    <Input name="title" placeholder="Activity title" required />
+              </CardHeader>
+              <CardContent className="space-y-4 px-4 pb-4">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <span>For:</span>
+                  <span className="font-medium text-foreground">{editTitle || 'Notification'}</span>
+                </div>
+
+                {/* Reminder Type Selection */}
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium">Reminder Type</Label>
+                  <div className="grid grid-cols-1 gap-2">
+                    {reminderTypes.map((type) => {
+                      const Icon = type.icon
+                      return (
+                        <Button
+                          key={type.id}
+                          variant={editReminderType === type.id ? "default" : "outline"}
+                          className="justify-start h-auto p-3"
+                          onClick={() => setEditReminderType(type.id)}
+                        >
+                          <div className={`w-3 h-3 rounded-full ${type.color} mr-3`} />
+                          <Icon className="h-4 w-4 mr-2" />
+                          <div className="text-left">
+                            <div className="font-medium">{type.label}</div>
+                            <div className="text-xs text-muted-foreground">{type.description}</div>
+                          </div>
+                        </Button>
+                      )
+                    })}
                   </div>
-                  <div>
-                    <Label htmlFor="description">Description</Label>
-                    <Textarea name="description" placeholder="Activity description" required />
-                  </div>
-                  <div>
-                    <Label htmlFor="type">Type</Label>
-                    <Select name="type" defaultValue="notification">
+                </div>
+
+                <Separator />
+
+                {/* Date Selection */}
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium">When?</Label>
+                  
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start text-left font-normal"
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {editDate ? format(editDate, 'PPP') : 'Pick a date'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={editDate}
+                        onSelect={setEditDate}
+                        disabled={(date) => date < new Date()}
+                        initialFocus
+                        className="p-3 pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                {/* Time Selection */}
+                {editDate && (
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium">Time</Label>
+                    <Select value={editTime} onValueChange={setEditTime}>
                       <SelectTrigger>
-                        <SelectValue />
+                        <SelectValue placeholder="Select time" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="call">Call</SelectItem>
-                        <SelectItem value="email">Email</SelectItem>
-                        <SelectItem value="meeting">Meeting</SelectItem>
-                        <SelectItem value="document">Document</SelectItem>
-                        <SelectItem value="notification">Notification</SelectItem>
+                        {timeOptions.map((time) => (
+                          <SelectItem key={time.value} value={time.value}>
+                            {time.label}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="flex gap-2">
-                    <Button type="submit" className="flex-1">Create Activity</Button>
-                    <Button type="button" variant="outline" onClick={() => setNewActivityOpen(false)}>
-                      Cancel
-                    </Button>
-                  </div>
-                </form>
-              </DialogContent>
-            </Dialog>
-            {activityStats.unread > 0 && (
-              <Button onClick={markAllAsRead} variant="outline" className="gap-2">
-                <CheckCircle2 className="h-4 w-4 text-white" />
-                Mark All Read
-              </Button>
-            )}
-          </div>
-        </div>
-
-        <Card className="shadow-soft">
-          <CardContent className="p-6">
-            <div className="flex gap-4">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-white" />
-                <Input
-                  placeholder="Search activities..."
-                  className="pl-10"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-              <Select value={filterType} onValueChange={setFilterType}>
-                <SelectTrigger className="w-40">
-                  <SelectValue placeholder="Filter by type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="call">Call</SelectItem>
-                  <SelectItem value="email">Email</SelectItem>
-                  <SelectItem value="meeting">Meeting</SelectItem>
-                  <SelectItem value="document">Document</SelectItem>
-                  <SelectItem value="notification">Notification</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={filterStatus} onValueChange={setFilterStatus}>
-                <SelectTrigger className="w-40">
-                  <SelectValue placeholder="Filter by status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                  <SelectItem value="scheduled">Scheduled</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Activity Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <Card className="shadow-soft">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Today's Activities</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{activityStats.today}</div>
-            </CardContent>
-          </Card>
-          <Card className="shadow-soft">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">This Week</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{activityStats.thisWeek}</div>
-            </CardContent>
-          </Card>
-          <Card className="shadow-soft">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Total Notifications</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{filteredActivities.length}</div>
-            </CardContent>
-          </Card>
-          <Card className="shadow-soft">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Unread</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-destructive">{activityStats.unread}</div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Activities Timeline */}
-        <Card className="shadow-soft">
-          <CardHeader>
-            <CardTitle>Recent Notifications & Activities</CardTitle>
-          </CardHeader>
-          <CardContent className="p-6">
-            {loading ? (
-              <div className="flex items-center justify-center py-8">
-                <Clock className="h-6 w-6 animate-spin text-white" />
-                <span className="ml-2">Loading activities...</span>
-              </div>
-            ) : filteredActivities.length === 0 ? (
-              <div className="text-center py-8">
-                <Bell className="h-12 w-12 text-white mx-auto mb-4" />
-                <p className="text-foreground">
-                  {searchTerm || filterType !== "all" || filterStatus !== "all" 
-                    ? "No activities match your filters" 
-                    : "No notifications or activities yet"
-                  }
-                </p>
-                {(searchTerm || filterType !== "all" || filterStatus !== "all") && (
-                  <Button 
-                    variant="outline" 
-                    className="mt-2" 
-                    onClick={() => {
-                      setSearchTerm("");
-                      setFilterType("all");
-                      setFilterStatus("all");
-                    }}
-                  >
-                    Clear Filters
-                  </Button>
                 )}
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {filteredActivities.map((activity, index) => {
-                  const IconComponent = getActivityIcon(activity.type)
-                  return (
-                    <div key={activity.id} className="group">
-                      <Card className="p-4 hover:shadow-md transition-shadow border-l-4 border-l-primary/20 hover:border-l-primary/50">
-                        <div className="flex gap-4">
-                          {/* Timeline indicator */}
-                          <div className="flex flex-col items-center">
-                            <div className={`flex h-10 w-10 items-center justify-center rounded-full ${
-                              activity.status === 'Pending' ? 'bg-blue-500/20' : 'bg-primary/10'
-                            }`}>
-                              <IconComponent className="h-4 w-4 text-white" />
-                            </div>
-                          </div>
-                          
-                          {/* Activity Content */}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <h3 className="font-medium text-foreground">{activity.title}</h3>
-                                  <Badge variant={getStatusColor(activity.status)} className="text-xs">
-                                    {activity.status}
-                                  </Badge>
-                                </div>
-                                <p className="text-sm text-muted-foreground mb-3">
-                                  {activity.description}
-                                </p>
-                                <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                                  <span className="flex items-center gap-1">
-                                    <User className="h-3 w-3" />
-                                    {activity.officer}
-                                  </span>
-                                  <span className="flex items-center gap-1">
-                                    <Clock className="h-3 w-3" />
-                                    {activity.timestamp}
-                                  </span>
-                                  {activity.type && (
-                                    <Badge variant="outline" className="text-xs">
-                                      {activity.type}
-                                    </Badge>
-                                  )}
-                                </div>
-                              </div>
-                              
-                              {/* Action Buttons */}
-                              <div className="flex items-start gap-2 transition-opacity">
-                                {activity.status === 'Pending' && (
-                                   <Button
-                                     size="sm"
-                                     variant="outline"
-                                     onClick={(e) => {
-                                       e.stopPropagation();
-                                       markAsRead(activity.id);
-                                     }}
-                                     className="h-8 px-3"
-                                   >
-                                     <CheckCircle2 className="h-3 w-3 mr-1 text-white" />
-                                     Mark Read
-                                   </Button>
-                                )}
-                                {activity.notification_type && ['lead_created', 'lead_status_change', 'follow_up_reminder'].includes(activity.notification_type) && (
-                                   <Button
-                                     size="sm"
-                                     variant="outline"
-                                     onClick={(e) => {
-                                       e.stopPropagation();
-                                        const notification = notifications.find(n => n.id === activity.id);
-                                        if (notification?.related_type === 'lead' && notification?.related_id) {
-                                          navigate(`/leads/${notification.related_id}`);
-                                        } else {
-                                          navigate('/leads');
-                                        }
-                                     }}
-                                     className="h-8 px-3"
-                                   >
-                                     <User className="h-3 w-3 mr-1 text-white" />
-                                     View Lead
-                                   </Button>
-                                )}
-                                 {activity.notification_type === 'client_created' && (
-                                   <Button
-                                     size="sm"
-                                     variant="outline"
-                                     onClick={(e) => {
-                                       e.stopPropagation();
-                                        navigate('/clients');
-                                     }}
-                                     className="h-8 px-3"
-                                   >
-                                     <Users className="h-3 w-3 mr-1 text-white" />
-                                     View Client
-                                   </Button>
-                                 )}
-                                 {activity.notification_type === 'loan_created' && (
-                                   <Button
-                                     size="sm"
-                                     variant="outline"
-                                     onClick={(e) => {
-                                       e.stopPropagation();
-                                       navigate('/clients');
-                                     }}
-                                     className="h-8 px-3"
-                                   >
-                                     <DollarSign className="h-3 w-3 mr-1 text-white" />
-                                     View Loan
-                                   </Button>
-                                  )}
-                                 
-                                 {/* Edit and Delete buttons */}
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      openEditDialog(activity);
-                                    }}
-                                    className="h-8 px-3"
-                                  >
-                                    <Edit className="h-3 w-3 mr-1 text-white" />
-                                    Edit
-                                  </Button>
-                                 
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      if (window.confirm('Are you sure you want to delete this activity?')) {
-                                        deleteActivity(activity.id);
-                                      }
-                                    }}
-                                    className="h-8 px-3 text-red-600 hover:text-red-700"
-                                  >
-                                    <Trash2 className="h-3 w-3 mr-1 text-white" />
-                                    Delete
-                                  </Button>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </Card>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
 
-        {/* Edit Activity Dialog */}
-        <Dialog open={editActivityOpen} onOpenChange={setEditActivityOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle className="dark:text-white">Edit Activity</DialogTitle>
-            </DialogHeader>
-            {editingActivity && (
-              <form onSubmit={(e) => {
-                e.preventDefault();
-                const formData = new FormData(e.target as HTMLFormElement);
-                editActivity(editingActivity.id, {
-                  title: formData.get('title') as string,
-                  message: formData.get('description') as string,
-                  type: formData.get('type') as string,
-                });
-              }} className="space-y-4">
-                <div>
-                  <Label htmlFor="edit-title">Title</Label>
-                  <Input 
-                    id="edit-title"
-                    name="title" 
-                    defaultValue={editingActivity.title}
-                    placeholder="Activity title" 
-                    required 
+                {/* Custom Note */}
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium">Custom Note (Optional)</Label>
+                  <Textarea
+                    value={editMessage}
+                    onChange={(e) => setEditMessage(e.target.value)}
+                    placeholder="Add any specific details for this reminder..."
+                    rows={3}
                   />
                 </div>
-                <div>
-                  <Label htmlFor="edit-description">Description</Label>
-                  <Textarea 
-                    id="edit-description"
-                    name="description" 
-                    defaultValue={editingActivity.description}
-                    placeholder="Activity description" 
-                    required 
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="edit-type">Type</Label>
-                  <Select name="type" defaultValue={editingActivity.notification_type || "notification"}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="call_reminder">Call Reminder</SelectItem>
-                      <SelectItem value="email_reminder">Email Reminder</SelectItem>
-                      <SelectItem value="follow_up_reminder">Follow-up Reminder</SelectItem>
-                      <SelectItem value="meeting_reminder">Meeting Reminder</SelectItem>
-                      <SelectItem value="document_reminder">Document Reminder</SelectItem>
-                      <SelectItem value="notification">General Notification</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+
+                {/* Actions */}
                 <div className="flex gap-2">
-                  <Button type="submit" className="flex-1">Update Activity</Button>
-                  <Button type="button" variant="outline" onClick={() => setEditActivityOpen(false)}>
+                  <Button
+                    onClick={handleSaveEdit}
+                    disabled={!editDate}
+                    className="flex-1"
+                  >
+                    <Check className="w-4 h-4 mr-2" />
+                    Save Changes
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleCancelEdit}
+                  >
                     Cancel
                   </Button>
                 </div>
-              </form>
-            )}
-          </DialogContent>
-        </Dialog>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteConfirmId} onOpenChange={(open) => !open && setDeleteConfirmId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Notification</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this notification? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteConfirmId && handleDeleteNotification(deleteConfirmId)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+        </div>
       </div>
-    </Layout>
+    </div>
   )
 }

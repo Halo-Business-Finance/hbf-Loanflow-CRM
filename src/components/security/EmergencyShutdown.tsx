@@ -329,7 +329,7 @@ export function EmergencyShutdown() {
   return (
     <div className="space-y-6">
       {/* Current Status */}
-      <Card>
+      <Card className="border-2 border-[#0A1628]">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <ShieldAlert className="h-5 w-5" />
@@ -371,7 +371,7 @@ export function EmergencyShutdown() {
                   <Button 
                     onClick={() => triggerEmergencyShutdown("Manual security shutdown", "partial")}
                     variant="outline"
-                    className="flex items-center gap-2"
+                    className="flex items-center gap-2 border-2 border-[#001f3f] hover:bg-[#001f3f] hover:text-white"
                   >
                     <Power className="h-4 w-4" />
                     Partial Shutdown
@@ -379,7 +379,7 @@ export function EmergencyShutdown() {
                   <Button 
                     onClick={() => triggerEmergencyShutdown("Manual emergency shutdown", "complete")}
                     variant="destructive"
-                    className="flex items-center gap-2"
+                    className="flex items-center gap-2 border-2 border-red-800"
                   >
                     <Lock className="h-4 w-4" />
                     Complete Shutdown
@@ -389,7 +389,7 @@ export function EmergencyShutdown() {
                 <Button 
                   onClick={restoreSystem}
                   variant="default"
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-2 border-2 border-[#001f3f]"
                 >
                   <Unlock className="h-4 w-4" />
                   Restore System
@@ -401,7 +401,7 @@ export function EmergencyShutdown() {
       </Card>
 
       {/* Recent Emergency Events */}
-      <Card>
+      <Card className="border-2 border-[#0A1628]">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Activity className="h-5 w-5" />
@@ -416,14 +416,14 @@ export function EmergencyShutdown() {
           ) : (
             <div className="space-y-3">
               {emergencyEvents.map((event) => (
-                <div key={event.id} className="flex items-center justify-between p-3 border rounded">
+                <div key={event.id} className="flex items-center justify-between p-3 border border-[#0A1628] rounded">
                   <div className="flex-1">
                     <div className="flex items-center space-x-2">
                       <Badge variant={event.severity === 'critical' ? 'destructive' : 'default'}>
                         {event.severity}
                       </Badge>
                       {event.auto_shutdown && (
-                        <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                        <Badge variant="outline" className="text-red-700 border-red-200">
                           AUTO-SHUTDOWN
                         </Badge>
                       )}
@@ -446,7 +446,7 @@ export function EmergencyShutdown() {
       </Card>
 
       {/* Bot Integration Info */}
-      <Card>
+      <Card className="border-2 border-[#0A1628]">
         <CardHeader>
           <CardTitle>AI Security Bot Integration</CardTitle>
         </CardHeader>

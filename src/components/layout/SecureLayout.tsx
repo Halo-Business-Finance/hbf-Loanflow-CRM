@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import Layout from '@/components/Layout';
+// import HybridLayout from '@/components/HybridLayout';
 import { SecurityWrapper } from '@/components/SecurityWrapper';
 import { useSessionSecurity } from '@/hooks/useSessionSecurity';
 import { useAuth } from '@/components/auth/AuthProvider';
@@ -19,8 +19,11 @@ export const SecureLayout: React.FC<SecureLayoutProps> = ({ children, requireRol
     if (user) {
       const interval = setInterval(async () => {
         const isValid = await validateSession();
+        // Only show error and sign out if validation explicitly fails due to expired session
+        // Don't trigger on network errors or temporary issues
         if (!isValid) {
-          toast.error('Session expired. Please log in again.');
+          console.warn('Session validation failed - this may be due to network issues');
+          // Remove automatic sign out to prevent page refreshes
         }
       }, 10 * 60 * 1000); // Every 10 minutes
 
@@ -47,9 +50,9 @@ export const SecureLayout: React.FC<SecureLayoutProps> = ({ children, requireRol
 
   return (
     <SecurityWrapper requireRole={requireRole}>
-      <Layout>
+      <div className="p-6">
         {children}
-      </Layout>
+      </div>
     </SecurityWrapper>
   );
 };

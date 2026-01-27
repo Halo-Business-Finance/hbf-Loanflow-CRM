@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { Search, User, Users, DollarSign, FileText } from "lucide-react"
+import { Search, User, Users, DollarSign, FileText, LucideIcon } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import {
@@ -9,7 +9,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Badge } from "@/components/ui/badge"
+
 import { supabase } from "@/integrations/supabase/client"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { useNavigate } from "react-router-dom"
@@ -32,38 +32,47 @@ export function GlobalSearch() {
   const navigate = useNavigate()
 
   const searchData = async (searchQuery: string) => {
-    if (!user || !searchQuery || searchQuery.length < 2) {
+    if (!user || !searchQuery || searchQuery.length < 1) {
       setResults([])
       return
     }
 
     setLoading(true)
     try {
-      // Search leads with contact entity data
-      const { data: leads } = await supabase
+      // First, find matching contact entities
+      const { data: matchingContacts } = await supabase
+        .from('contact_entities')
+        .select('id, name, email, stage, loan_amount')
+        .eq('user_id', user.id)
+        .or(`name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%`)
+
+      const contactIds = matchingContacts?.map(c => c.id) || []
+
+      // Search leads with matching contact entities
+      const { data: leads } = contactIds.length > 0 ? await supabase
         .from('leads')
         .select(`
-          id, user_id,
+          id, user_id, contact_entity_id,
           contact_entity:contact_entities!contact_entity_id (
             name, email, stage, loan_amount
           )
         `)
         .eq('user_id', user.id)
-        .or(`contact_entities.name.ilike.%${searchQuery}%,contact_entities.email.ilike.%${searchQuery}%`)
-        .limit(5)
+        .in('contact_entity_id', contactIds)
+        .limit(5) : { data: [] }
 
-      // Search clients with contact entity data
-      const { data: clients } = await supabase
+      // Search clients with matching contact entities
+      const { data: clients } = contactIds.length > 0 ? await supabase
         .from('clients')
         .select(`
-          id, user_id, status,
+          id, user_id, status, contact_entity_id,
           contact_entity:contact_entities!contact_entity_id (
             name, email
           )
         `)
         .eq('user_id', user.id)
-        .or(`contact_entities.name.ilike.%${searchQuery}%,contact_entities.email.ilike.%${searchQuery}%`)
-        .limit(5)
+        .in('contact_entity_id', contactIds)
+        .limit(5) : { data: [] }
 
       // Search loans
       const { data: loans } = await supabase
@@ -136,16 +145,16 @@ export function GlobalSearch() {
     if (result.type === 'lead') {
       navigate(`/leads/${result.id}`)
     } else if (result.type === 'client') {
-      navigate(`/clients/${result.id}`)
+      navigate(`/existing-borrowers/${result.id}`)
     } else if (result.type === 'loan') {
-      // Navigate to client who owns this loan
-      navigate('/clients') // Could be improved to navigate to specific client
+      // Navigate to existing borrowers list
+      navigate('/existing-borrowers')
     }
     setIsOpen(false)
     setQuery("")
   }
 
-  const getIcon = (type: string) => {
+  const getIcon = (type: string): LucideIcon => {
     switch (type) {
       case 'lead': return User
       case 'client': return Users
@@ -180,7 +189,7 @@ export function GlobalSearch() {
               placeholder="Search leads, clients, loans..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="pl-10"
+              className="pl-10 text-center text-white placeholder:text-white/70"
               autoFocus
             />
           </div>
@@ -206,33 +215,33 @@ export function GlobalSearch() {
                       <div className="font-medium truncate">{result.title}</div>
                       <div className="text-sm text-muted-foreground truncate">{result.subtitle}</div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      {result.stage && (
-                        <Badge variant="secondary" className="text-xs">
-                          {result.stage}
-                        </Badge>
-                      )}
-                      <Badge variant="outline" className="text-xs capitalize">
-                        {result.type}
-                      </Badge>
-                    </div>
+                     <div className="flex items-center gap-2">
+                       {result.stage && (
+                         <span className="text-xs">
+                           {result.stage}
+                         </span>
+                       )}
+                       <span className="text-xs capitalize">
+                         {result.type}
+                       </span>
+                     </div>
                   </div>
                 )
               })}
             </div>
           )}
 
-          {!loading && query.length >= 2 && results.length === 0 && (
+          {!loading && query.length >= 1 && results.length === 0 && (
             <div className="text-center py-8 text-muted-foreground">
               <Search className="h-8 w-8 mx-auto mb-2 opacity-50 text-muted-foreground" />
               <p>No results found for "{query}"</p>
             </div>
           )}
 
-          {query.length < 2 && (
+          {query.length < 1 && (
             <div className="text-center py-8 text-muted-foreground">
               <Search className="h-8 w-8 mx-auto mb-2 opacity-50 text-muted-foreground" />
-              <p>Type at least 2 characters to search</p>
+              <p>Start typing to search leads, clients, and loans...</p>
             </div>
           )}
         </div>

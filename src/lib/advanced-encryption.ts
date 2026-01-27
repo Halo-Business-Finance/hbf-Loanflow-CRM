@@ -85,7 +85,7 @@ export class AdvancedEncryption {
     return await crypto.subtle.deriveKey(
       {
         name: 'PBKDF2',
-        salt: salt,
+        salt: salt as BufferSource,
         iterations: iterations,
         hash: 'SHA-256'
       },
@@ -153,7 +153,7 @@ export class AdvancedEncryption {
       const encryptedBuffer = await crypto.subtle.encrypt(
         {
           name: 'AES-GCM',
-          iv: iv
+          iv: iv as BufferSource
         },
         derivedKey,
         encoder.encode(data)
@@ -161,8 +161,8 @@ export class AdvancedEncryption {
 
       const encryptedData: EncryptedData = {
         encryptedValue: this.arrayBufferToBase64(encryptedBuffer),
-        salt: this.arrayBufferToBase64(salt.buffer),
-        iv: this.arrayBufferToBase64(iv.buffer),
+        salt: this.arrayBufferToBase64(salt.buffer as ArrayBuffer),
+        iv: this.arrayBufferToBase64(iv.buffer as ArrayBuffer),
         algorithm: this.config.algorithm,
         keyId: keyId
       }
@@ -273,7 +273,7 @@ export class AdvancedEncryption {
       const encryptedBuffer = await crypto.subtle.encrypt(
         {
           name: 'AES-GCM',
-          iv: iv
+          iv: iv as BufferSource
         },
         key,
         data

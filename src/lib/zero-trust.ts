@@ -1,11 +1,14 @@
 /**
  * Zero Trust Architecture Implementation
  * Never trust, always verify - every request is authenticated and authorized
+ * 
+ * SECURITY: Uses server-side encryption via Edge Functions
  */
 
 import { supabase } from "@/integrations/supabase/client";
 import { SecurityManager } from "./security";
-import { fortress } from "./fortress-security";
+import { encryptData, decryptData } from "./server-encryption";
+import { logger } from "./logger";
 import { EnhancedMFA } from "./enhanced-mfa";
 
 export class ZeroTrustManager {
@@ -51,7 +54,10 @@ export class ZeroTrustManager {
     
     // Device fingerprint verification
     const currentFingerprint = SecurityManager.generateDeviceFingerprint();
-    const storedFingerprint = await fortress.secureRetrieveData(`device_${userId}`, 'business');
+    const { data: storedFingerprintData } = await supabase.rpc('get_secure_session_data', {
+      p_key: `device_${userId}`
+    });
+    const storedFingerprint = storedFingerprintData as string | null;
     
     if (storedFingerprint && storedFingerprint !== currentFingerprint) {
       await this.handleIdentityAnomaly(userId, 'device_fingerprint_mismatch', {
@@ -62,7 +68,10 @@ export class ZeroTrustManager {
     
     // Location verification
     const locationData = await SecurityManager.getLocationData();
-    const lastKnownLocation = await fortress.secureRetrieveData(`location_${userId}`, 'pii');
+    const { data: lastKnownLocationData } = await supabase.rpc('get_secure_session_data', {
+      p_key: `location_${userId}`
+    });
+    const lastKnownLocation = lastKnownLocationData ? JSON.parse(lastKnownLocationData as string) : null;
     
     if (lastKnownLocation && this.calculateLocationDistance(locationData, lastKnownLocation) > 1000) {
       await this.handleIdentityAnomaly(userId, 'location_anomaly', {
@@ -95,7 +104,7 @@ export class ZeroTrustManager {
         button: event.button
       };
       
-      this.recordBehavioralData('click_pattern', clickData).catch(console.error);
+      this.recordBehavioralData('click_pattern', clickData).catch(() => logger.error('Failed to record click pattern'));
     });
   }
 
@@ -110,7 +119,7 @@ export class ZeroTrustManager {
         timestamp: now,
         timeSinceLastNav: timeDiff,
         url: window.location.href
-      }).catch(console.error);
+      }).catch(() => logger.error('Failed to record navigation pattern'));
       
       lastNavigation = now;
     });
@@ -137,15 +146,15 @@ export class ZeroTrustManager {
           method: init?.method || 'GET',
           responseTime: Date.now() - startTime,
           status: response.status
-        }).catch(console.error);
+        }).catch(() => logger.error('Failed to record API access'));
         
         return response;
-      } catch (error) {
+      } catch (error: any) {
         this.recordBehavioralData('api_error', {
           timestamp: startTime,
           url,
           error: error.message
-        }).catch(console.error);
+        }).catch(() => logger.error('Failed to record API error'));
         throw error;
       }
     };
@@ -155,7 +164,7 @@ export class ZeroTrustManager {
     let keystrokes: number[] = [];
     let lastKeyTime = 0;
     
-    document.addEventListener('keydown', (event) => {
+    document.addEventListener('keydown', () => {
       const now = Date.now();
       
       if (lastKeyTime > 0) {
@@ -186,7 +195,7 @@ export class ZeroTrustManager {
       avgKeystrokeTime: avgTime,
       variance: variance,
       pattern: keystrokes.slice(-10) // Last 10 for pattern analysis
-    }).catch(console.error);
+    }).catch(() => logger.error('Failed to record typing pattern'));
   }
 
   private async recordBehavioralData(type: string, data: any): Promise<void> {
@@ -311,13 +320,22 @@ export class ZeroTrustManager {
     
     this.riskScores.set(userId, riskScore);
     
-    // Adjust required authentication methods based on risk
+    // Adjust required authentication methods based on risk using server-side encryption
     const requiredMethods = await EnhancedMFA.getRequiredAuthMethods(riskScore);
-    await fortress.secureStoreData(`required_auth_${userId}`, requiredMethods, 'business');
+    const encryptResult = await encryptData(requiredMethods, 'required_auth');
+    if (encryptResult.success && encryptResult.encrypted) {
+      await supabase.rpc('store_secure_session_data', {
+        p_key: `required_auth_${userId}`,
+        p_value: encryptResult.encrypted
+      });
+    }
     
     // Adjust session timeout based on risk
     const sessionTimeout = this.calculateSessionTimeout(riskScore);
-    await fortress.secureStoreData(`session_timeout_${userId}`, sessionTimeout, 'business');
+    await supabase.rpc('store_secure_session_data', {
+      p_key: `session_timeout_${userId}`,
+      p_value: sessionTimeout.toString()
+    });
     
     // Trigger additional verification if risk is high
     if (riskScore > 80) {
@@ -340,16 +358,27 @@ export class ZeroTrustManager {
     );
     riskScore += recentAnomalies.length * 10;
     
-    // Risk from security events
-    const securityEvents = JSON.parse(localStorage.getItem('_security_incidents') || '[]');
-    const recentSecurityEvents = securityEvents.filter((event: any) => 
-      Date.now() - event.timestamp < 3600000 // Last hour
-    );
-    riskScore += recentSecurityEvents.length * 15;
+    // Risk from security events - query server-side
+    try {
+      const { data: recentSecurityEvents } = await supabase
+        .from('security_events')
+        .select('id')
+        .eq('user_id', userId)
+        .gte('created_at', new Date(Date.now() - 3600000).toISOString());
+      
+      if (recentSecurityEvents) {
+        riskScore += recentSecurityEvents.length * 15;
+      }
+    } catch {
+      // Silently fail if unable to fetch security events
+    }
     
     // Risk from location/device changes
     const deviceFingerprint = SecurityManager.generateDeviceFingerprint();
-    const storedFingerprint = await fortress.secureRetrieveData(`device_${userId}`, 'business');
+    const { data: storedFingerprintData } = await supabase.rpc('get_secure_session_data', {
+      p_key: `device_${userId}`
+    });
+    const storedFingerprint = storedFingerprintData as string | null;
     if (storedFingerprint && deviceFingerprint !== storedFingerprint) {
       riskScore += 25;
     }
@@ -377,11 +406,16 @@ export class ZeroTrustManager {
   private async handleIdentityAnomaly(userId: string, type: string, details: any): Promise<void> {
     const severity = this.getAnomalySeverity(type);
     
-    await fortress.logSecurityIncident(`identity_anomaly_${type}`, {
-      userId,
-      severity,
-      details,
-      timestamp: new Date().toISOString()
+    // Log to security_events table
+    await supabase.from('security_events').insert({
+      user_id: userId,
+      event_type: `identity_anomaly_${type}`,
+      severity: severity >= 8 ? 'critical' : severity >= 5 ? 'high' : 'medium',
+      details: {
+        severity,
+        details,
+        timestamp: new Date().toISOString()
+      }
     });
     
     // Reduce trust level
@@ -395,11 +429,16 @@ export class ZeroTrustManager {
   }
 
   private async handleBehavioralAnomaly(userId: string, type: string, anomalyScore: number, data: any): Promise<void> {
-    await fortress.logSecurityIncident(`behavioral_anomaly_${type}`, {
-      userId,
-      anomalyScore,
-      data,
-      timestamp: new Date().toISOString()
+    // Log to security_events table
+    await supabase.from('security_events').insert({
+      user_id: userId,
+      event_type: `behavioral_anomaly_${type}`,
+      severity: anomalyScore >= 80 ? 'critical' : anomalyScore >= 60 ? 'high' : 'medium',
+      details: {
+        anomalyScore,
+        data,
+        timestamp: new Date().toISOString()
+      }
     });
     
     // Record anomaly in behavioral data
@@ -415,13 +454,21 @@ export class ZeroTrustManager {
   private async triggerAdditionalVerification(userId: string, riskScore: number): Promise<void> {
     const requiredMethods = await EnhancedMFA.getRequiredAuthMethods(riskScore);
     
-    // Store verification requirement
-    await fortress.secureStoreData(`pending_verification_${userId}`, {
+    // Store verification requirement server-side using secure encryption
+    const verificationData = {
       methods: requiredMethods,
       riskScore,
       timestamp: Date.now(),
       expiresAt: Date.now() + (5 * 60 * 1000) // 5 minutes
-    }, 'business');
+    };
+    
+    const encryptResult = await encryptData(verificationData, 'pending_verification');
+    if (encryptResult.success && encryptResult.encrypted) {
+      await supabase.rpc('store_secure_session_data', {
+        p_key: `pending_verification_${userId}`,
+        p_value: encryptResult.encrypted
+      });
+    }
     
     // Notify user
     this.notifyAdditionalVerificationRequired(requiredMethods);
@@ -429,7 +476,7 @@ export class ZeroTrustManager {
 
   private notifyAdditionalVerificationRequired(methods: string[]): void {
     // In production, show modal or redirect to verification page
-    console.warn('🔒 Additional verification required:', methods);
+    logger.warn('Additional verification required', { methods });
   }
 
   private getAnomalySeverity(type: string): number {
@@ -465,79 +512,12 @@ export class ZeroTrustManager {
   }
 
   private async updateTrustLevel(userId: string): Promise<void> {
+    // Update trust level based on successful verifications
     const currentTrust = this.trustLevels.get(userId) || 50;
-    
-    // Gradually increase trust over time for good behavior
-    const timeSinceLastIncident = this.getTimeSinceLastSecurityIncident(userId);
-    
-    if (timeSinceLastIncident > 24 * 60 * 60 * 1000) { // 24 hours
-      this.trustLevels.set(userId, Math.min(100, currentTrust + 1));
-    }
-  }
-
-  private getTimeSinceLastSecurityIncident(userId: string): number {
-    const incidents = JSON.parse(localStorage.getItem('_security_incidents') || '[]');
-    const userIncidents = incidents.filter((incident: any) => 
-      incident.data?.userId === userId
-    );
-    
-    if (userIncidents.length === 0) return Infinity;
-    
-    const lastIncident = Math.max(...userIncidents.map((incident: any) => incident.timestamp));
-    return Date.now() - lastIncident;
-  }
-
-  // Public methods
-  async verifyAccess(resource: string, action: string): Promise<boolean> {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user) return false;
-    
-    const userId = session.user.id;
-    const riskScore = this.riskScores.get(userId) || 50;
-    
-    // Check if additional verification is required
-    const pendingVerification = await fortress.secureRetrieveData(`pending_verification_${userId}`, 'business');
-    if (pendingVerification && Date.now() < pendingVerification.expiresAt) {
-      return false; // Block access until verification is complete
-    }
-    
-    // Risk-based access control
-    const resourceRiskThreshold = this.getResourceRiskThreshold(resource, action);
-    
-    return riskScore <= resourceRiskThreshold;
-  }
-
-  private getResourceRiskThreshold(resource: string, action: string): number {
-    // Define risk thresholds for different resources and actions
-    const thresholds: Record<string, Record<string, number>> = {
-      'financial_data': {
-        'read': 60,
-        'write': 40,
-        'delete': 20
-      },
-      'pii_data': {
-        'read': 70,
-        'write': 50,
-        'delete': 30
-      },
-      'system_settings': {
-        'read': 50,
-        'write': 30,
-        'delete': 10
-      }
-    };
-    
-    return thresholds[resource]?.[action] || 50;
-  }
-
-  getRiskScore(userId: string): number {
-    return this.riskScores.get(userId) || 50;
-  }
-
-  getTrustLevel(userId: string): number {
-    return this.trustLevels.get(userId) || 50;
+    // Gradually increase trust with successful verifications (max 100)
+    this.trustLevels.set(userId, Math.min(100, currentTrust + 1));
   }
 }
 
 // Export singleton instance
-export const zeroTrust = ZeroTrustManager.getInstance();
+export const zeroTrustManager = ZeroTrustManager.getInstance();

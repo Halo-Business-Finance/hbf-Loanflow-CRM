@@ -2,7 +2,7 @@ import React from "react"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
+
 import { Search, Filter, X, SlidersHorizontal } from "lucide-react"
 
 interface LeadFiltersProps {
@@ -81,7 +81,7 @@ export function LeadFilters({
         
         <Select value={selectedStage} onValueChange={setSelectedStage}>
           <SelectTrigger className="w-auto min-w-[130px] h-9 bg-background/50 border-muted/30">
-            <SelectValue placeholder="Stage" />
+            <SelectValue placeholder="Loan Stage" />
           </SelectTrigger>
           <SelectContent>
             {stages.map(stage => (
@@ -110,9 +110,9 @@ export function LeadFilters({
             <div className="w-px h-6 bg-muted/50" />
             <div className="flex items-center gap-2">
               {activeFilters.map((filter, index) => (
-                <Badge key={index} variant="secondary" className="text-xs">
+                <span key={index} className="text-xs">
                   {filter}
-                </Badge>
+                </span>
               ))}
               <Button
                 variant="ghost"

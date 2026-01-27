@@ -1,0 +1,53 @@
+version: 2
+updates:
+  # Enable version updates for npm dependencies
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "your-team"
+    assignees:
+      - "your-team"
+    labels:
+      - "dependencies"
+      - "security"
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+    # Group updates by type
+    groups:
+      # Group all patch updates together
+      patch-updates:
+        patterns:
+          - "*"
+        update-types:
+          - "patch"
+      # Group security updates separately for visibility
+      security-updates:
+        patterns:
+          - "*"
+        update-types:
+          - "security"
+    # Security-only updates for production dependencies
+    allow:
+      - dependency-type: "all"
+    # Increase pull request limit for security updates
+    versioning-strategy: increase
+
+  # Enable version updates for GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "chore(ci)"

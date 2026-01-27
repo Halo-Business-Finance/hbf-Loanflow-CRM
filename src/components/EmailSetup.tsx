@@ -1,55 +1,29 @@
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Mail, Check, X, Loader2 } from "lucide-react"
+import { Mail, Check, X, Loader2, Shield } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { supabase } from "@/integrations/supabase/client"
-import type { Database } from "@/integrations/supabase/types"
+import { useSecureEmailAccounts } from "@/hooks/useSecureEmailAccounts"
 
 interface EmailSetupProps {
   trigger: React.ReactNode
 }
 
-type EmailAccount = Database['public']['Tables']['email_accounts']['Row']
-
 export function EmailSetup({ trigger }: EmailSetupProps) {
   const [isOpen, setIsOpen] = useState(false)
-  const [emailAccount, setEmailAccount] = useState<EmailAccount | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
   const [isConnecting, setIsConnecting] = useState(false)
   const { toast } = useToast()
-
-  useEffect(() => {
-    if (isOpen) {
-      loadEmailAccount()
-    }
-  }, [isOpen])
-
-  const loadEmailAccount = async () => {
-    try {
-      setIsLoading(true)
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error("Not authenticated")
-
-      const { data, error } = await supabase
-        .from('email_accounts')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('is_active', true)
-        .maybeSingle()
-
-      if (error) {
-        throw error
-      }
-
-      setEmailAccount(data)
-    } catch (error: any) {
-      console.error('Error loading email account:', error)
-    } finally {
-      setIsLoading(false)
-    }
-  }
+  
+  // Use secure email accounts hook
+  const { 
+    emailAccounts, 
+    isLoading, 
+    deactivateAccount 
+  } = useSecureEmailAccounts()
+  
+  const primaryAccount = emailAccounts[0] || null
 
   const handleMicrosoftConnect = async () => {
     try {
@@ -81,30 +55,12 @@ export function EmailSetup({ trigger }: EmailSetupProps) {
   }
 
   const handleDisconnect = async () => {
+    if (!primaryAccount) return
+    
     try {
-      setIsLoading(true)
-      
-      const { error } = await supabase
-        .from('email_accounts')
-        .update({ is_active: false })
-        .eq('id', emailAccount?.id)
-
-      if (error) throw error
-
-      setEmailAccount(null)
-      toast({
-        title: "Disconnected",
-        description: "Microsoft 365 email account disconnected successfully",
-      })
+      await deactivateAccount(primaryAccount.id)
     } catch (error: any) {
       console.error('Error disconnecting account:', error)
-      toast({
-        title: "Error",
-        description: error.message || "Failed to disconnect account",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
     }
   }
 
@@ -129,11 +85,14 @@ export function EmailSetup({ trigger }: EmailSetupProps) {
             <div className="flex items-center justify-center py-8">
               <Loader2 className="w-6 h-6 animate-spin" />
             </div>
-          ) : emailAccount ? (
+          ) : primaryAccount ? (
             <Card>
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-sm font-medium">Connected Account</CardTitle>
+                  <CardTitle className="text-sm font-medium flex items-center gap-2">
+                    <Shield className="w-4 h-4 text-green-600" />
+                    Secure Connected Account
+                  </CardTitle>
                   <div className="flex items-center gap-1 text-xs text-green-600">
                     <Check className="w-3 h-3" />
                     Active
@@ -142,8 +101,11 @@ export function EmailSetup({ trigger }: EmailSetupProps) {
               </CardHeader>
               <CardContent className="space-y-3">
                 <div>
-                  <p className="text-sm font-medium">{emailAccount.display_name}</p>
-                  <p className="text-xs text-muted-foreground">{emailAccount.email_address}</p>
+                  <p className="text-sm font-medium">{primaryAccount.display_name}</p>
+                  <p className="text-xs text-muted-foreground">{primaryAccount.email_address}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    🔒 Tokens encrypted at rest for maximum security
+                  </p>
                 </div>
                 <Button 
                   variant="destructive" 

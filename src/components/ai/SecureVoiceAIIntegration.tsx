@@ -16,7 +16,7 @@ import {
   Shield
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { enhancedSecureStorage } from "@/lib/enhanced-secure-storage"
+import { serverSecureStorage } from "@/lib/server-encryption"
 
 export function SecureVoiceAIIntegration() {
   const [apiKey, setApiKey] = useState("")
@@ -30,9 +30,9 @@ export function SecureVoiceAIIntegration() {
   useEffect(() => {
     const loadSecureConfig = async () => {
       try {
-        const savedApiKey = await enhancedSecureStorage.getItem('elevenlabs_api_key', true)
-        const savedAgentId = await enhancedSecureStorage.getItem('elevenlabs_agent_id', true)
-        const savedWebhook = await enhancedSecureStorage.getItem('zapier_webhook', true)
+        const savedApiKey = await serverSecureStorage.getItem('elevenlabs_api_key')
+        const savedAgentId = await serverSecureStorage.getItem('elevenlabs_agent_id')
+        const savedWebhook = await serverSecureStorage.getItem('zapier_webhook')
         
         if (savedApiKey) {
           setApiKey('••••••••••••••••')
@@ -52,25 +52,19 @@ export function SecureVoiceAIIntegration() {
     try {
       // Only save if API key is not masked
       if (apiKey && !apiKey.includes('•')) {
-        await enhancedSecureStorage.setItem('elevenlabs_api_key', apiKey, { 
-          serverSide: true, 
-          autoCleanup: true,
-          ttl: 30 * 24 * 60 * 60 * 1000 // 30 days
+        await serverSecureStorage.setItem('elevenlabs_api_key', apiKey, { 
+          ttl: 30 * 24 * 60 // 30 days (in minutes)
         })
         setApiKey('••••••••••••••••')
         setIsConfigured(true)
       }
       
       if (agentId) {
-        await enhancedSecureStorage.setItem('elevenlabs_agent_id', agentId, { 
-          serverSide: true 
-        })
+        await serverSecureStorage.setItem('elevenlabs_agent_id', agentId)
       }
       
       if (zapierWebhook) {
-        await enhancedSecureStorage.setItem('zapier_webhook', zapierWebhook, { 
-          serverSide: true 
-        })
+        await serverSecureStorage.setItem('zapier_webhook', zapierWebhook)
       }
 
       toast({
@@ -98,7 +92,7 @@ export function SecureVoiceAIIntegration() {
 
     // Get actual API key for use
     try {
-      const actualApiKey = await enhancedSecureStorage.getItem('elevenlabs_api_key', true)
+      const actualApiKey = await serverSecureStorage.getItem('elevenlabs_api_key')
       if (!actualApiKey) {
         throw new Error('API key not found')
       }
@@ -161,9 +155,9 @@ export function SecureVoiceAIIntegration() {
 
   const handleClearConfig = async () => {
     try {
-      await enhancedSecureStorage.removeItem('elevenlabs_api_key')
-      await enhancedSecureStorage.removeItem('elevenlabs_agent_id')
-      await enhancedSecureStorage.removeItem('zapier_webhook')
+      await serverSecureStorage.removeItem('elevenlabs_api_key')
+      await serverSecureStorage.removeItem('elevenlabs_agent_id')
+      await serverSecureStorage.removeItem('zapier_webhook')
       
       setApiKey("")
       setAgentId("")
@@ -229,7 +223,7 @@ export function SecureVoiceAIIntegration() {
             <Label htmlFor="webhook">Zapier Webhook URL</Label>
             <Input
               id="webhook"
-              placeholder="https://hooks.zapier.com/hooks/catch/..."
+              placeholder="https://your-automation-service.com/webhook"
               value={zapierWebhook}
               onChange={(e) => setZapierWebhook(e.target.value)}
             />

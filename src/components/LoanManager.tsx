@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+
 import { useToast } from "@/hooks/use-toast"
 import { supabase } from "@/integrations/supabase/client"
 import { useAuth } from "@/components/auth/AuthProvider"
@@ -331,8 +331,8 @@ export function LoanManager({ clientId, clientName, loans, onLoansUpdate }: Loan
                     <div>
                       <CardTitle className="text-lg">{formatCurrency(loan.loan_amount)}</CardTitle>
                       <div className="flex gap-2 mt-1">
-                        <Badge variant={getLoanTypeColor(loan.loan_type)}>{loan.loan_type}</Badge>
-                        <Badge variant={getStatusColor(loan.status)}>{loan.status}</Badge>
+                        <span className="text-sm">{loan.loan_type}</span>
+                        <span className="text-sm">{loan.status}</span>
                       </div>
                     </div>
                   </div>

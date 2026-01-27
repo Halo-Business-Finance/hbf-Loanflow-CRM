@@ -25,7 +25,14 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('ErrorBoundary caught an error:', error, errorInfo)
+    // Production-safe error logging
+    import('@/lib/production-logger').then(({ logger }) => {
+      logger.error('ErrorBoundary caught an error', {
+        message: error.message,
+        componentStack: errorInfo.componentStack?.slice(0, 500),
+        timestamp: new Date().toISOString()
+      })
+    })
     
     this.setState({
       error,
@@ -63,7 +70,7 @@ export class ErrorBoundary extends Component<Props, State> {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {process.env.NODE_ENV === 'development' && this.state.error && (
+              {this.state.error && (
                 <details className="text-sm bg-muted p-3 rounded-md overflow-auto max-h-32">
                   <summary className="cursor-pointer font-medium mb-2">Error Details</summary>
                   <pre className="whitespace-pre-wrap text-xs">

@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { applyClientSecurityHeaders } from '@/lib/security-headers';
 import { getCurrentNonce } from '@/security/nonce';
+import { applyClientSecurityHeaders, getEnhancedSecurityHeaders } from '@/lib/security-headers';
 
 interface SecurityHeader {
   header_name: string;
@@ -125,7 +126,14 @@ export const CSPHeaders: React.FC = () => {
     const nonce = getCurrentNonce();
     
     // Apply enhanced client-side security headers (backward compatibility)
+    // Always apply baseline client-side measures
     applyClientSecurityHeaders();
+
+    // Skip dynamic CSP when in development or embedded in an iframe (Lovable preview)
+    const isIframe = window.self !== window.top;
+    if (import.meta.env.DEV || isIframe) {
+      return; // Prevent preview blank screens caused by restrictive dynamic CSP
+    }
     
     // Apply additional security meta tags for development preview
     applySecurityMetaTags();
@@ -159,6 +167,7 @@ export const CSPHeaders: React.FC = () => {
     applyStrictCSP();
     
     // Fetch and apply dynamic security headers from database (preserve existing functionality)
+    // Fetch and apply dynamic security headers from database (production only, not embedded)
     const applyDynamicSecurityHeaders = async () => {
       try {
         const { data: headers } = await supabase
@@ -168,10 +177,11 @@ export const CSPHeaders: React.FC = () => {
 
         if (headers) {
           headers.forEach((header: SecurityHeader) => {
-            // Apply CSP via meta tag for browsers that support it
             if (header.header_name === 'Content-Security-Policy') {
               // Remove existing dynamic CSP meta tag
-              const existingCSP = document.querySelector('meta[http-equiv="Content-Security-Policy"][data-dynamic="true"]');
+              const existingCSP = document.querySelector(
+                'meta[http-equiv="Content-Security-Policy"][data-dynamic="true"]'
+              );
               if (existingCSP) {
                 existingCSP.remove();
               }
@@ -185,6 +195,7 @@ export const CSPHeaders: React.FC = () => {
                   .replace(/(style-src[^;]*)/i, `$1 'nonce-${nonce}'`);
               }
               
+
               // Create new dynamic CSP meta tag
               const metaCSP = document.createElement('meta');
               metaCSP.setAttribute('http-equiv', 'Content-Security-Policy');
@@ -204,11 +215,33 @@ export const CSPHeaders: React.FC = () => {
       }
     };
 
-    applyDynamicSecurityHeaders();
-    
-    // Refresh dynamic headers every 10 seconds to catch updates
-    const interval = setInterval(applyDynamicSecurityHeaders, 10000);
-    
+    // Defer security headers fetch until after page load to avoid blocking critical rendering path
+    // Only fetch after window load event completes
+    const loadHandler = () => {
+      setTimeout(() => {
+        if ('requestIdleCallback' in window) {
+          requestIdleCallback(() => applyDynamicSecurityHeaders(), { timeout: 5000 });
+        } else {
+          applyDynamicSecurityHeaders();
+        }
+      }, 2000);
+    };
+
+    if (document.readyState === 'complete') {
+      loadHandler();
+    } else {
+      window.addEventListener('load', loadHandler, { once: true });
+    }
+
+    // Refresh dynamic headers every 60 seconds (reduced frequency, also deferred)
+    const interval = setInterval(() => {
+      if ('requestIdleCallback' in window) {
+        requestIdleCallback(() => applyDynamicSecurityHeaders(), { timeout: 5000 });
+      } else {
+        applyDynamicSecurityHeaders();
+      }
+    }, 60000);
+
     return () => clearInterval(interval);
   }, []);
 

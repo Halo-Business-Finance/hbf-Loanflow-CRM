@@ -1,0 +1,105 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:base"],
+  "timezone": "UTC",
+  "schedule": ["before 6am on monday"],
+  "labels": ["dependencies"],
+  "assignees": ["@vdinkha"],
+  "prConcurrentLimit": 5,
+  "prHourlyLimit": 2,
+  "semanticCommits": "enabled",
+  "commitMessagePrefix": "🔧",
+  "branchPrefix": "renovate/",
+  "gitAuthor": "Renovate Bot <bot@renovateapp.com>",
+  
+  "packageRules": [
+    {
+      "description": "Group all non-major dependencies together for weekly updates",
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "all non-major dependencies",
+      "groupSlug": "all-minor-patch",
+      "schedule": ["before 6am on monday"]
+    },
+    {
+      "description": "Security updates get immediate attention",
+      "matchDepTypes": ["dependencies", "devDependencies"],
+      "matchCurrentValue": "/.*/",
+      "vulnerabilityAlerts": true,
+      "schedule": ["at any time"],
+      "labels": ["security", "dependencies"],
+      "assignees": ["@vdinkha"],
+      "reviewers": ["@vdinkha"],
+      "prPriority": 10
+    },
+    {
+      "description": "Automerge non-breaking dev dependency updates",
+      "matchDepTypes": ["devDependencies"],
+      "matchUpdateTypes": ["patch", "minor"],
+      "automerge": true,
+      "automergeType": "pr",
+      "platformAutomerge": true,
+      "labels": ["dependencies", "automerge"]
+    },
+    {
+      "description": "Hold back major updates for manual review",
+      "matchUpdateTypes": ["major"],
+      "schedule": ["before 6am on monday"],
+      "labels": ["major-update", "dependencies"],
+      "reviewers": ["@vdinkha"],
+      "prPriority": 5
+    },
+    {
+      "description": "Group ESLint related packages",
+      "matchPackagePatterns": ["eslint", "@eslint/", "eslint-"],
+      "groupName": "ESLint packages",
+      "schedule": ["before 6am on monday"]
+    },
+    {
+      "description": "Group React related packages",
+      "matchPackagePatterns": ["react", "@types/react"],
+      "groupName": "React packages", 
+      "schedule": ["before 6am on monday"]
+    },
+    {
+      "description": "Group Radix UI packages",
+      "matchPackagePatterns": ["@radix-ui/"],
+      "groupName": "Radix UI packages",
+      "schedule": ["before 6am on monday"]
+    },
+    {
+      "description": "Group Vite and build tools",
+      "matchPackagePatterns": ["vite", "@vitejs/", "typescript", "postcss", "tailwindcss"],
+      "groupName": "Build tools",
+      "schedule": ["before 6am on monday"]
+    }
+  ],
+  
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "schedule": ["at any time"],
+    "labels": ["security", "vulnerability"],
+    "assignees": ["@vdinkha"],
+    "reviewers": ["@vdinkha"],
+    "prPriority": 15
+  },
+  
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 6am on monday"],
+    "commitMessageAction": "Lock file maintenance",
+    "branchTopic": "lock-file-maintenance"
+  },
+  
+  "osvVulnerabilityAlerts": true,
+  "suppressNotifications": ["prIgnoreNotification"],
+  
+  "platformAutomerge": true,
+  "automergeStrategy": "squash",
+  
+  "ignoreDeps": [],
+  "ignorePaths": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/build/**"
+  ]
+}

@@ -18,7 +18,7 @@ env:
   REGISTRY_NAMESPACE: hbf-crm
   # Image name must match what IBM Code Engine is configured to pull
   IMAGE_NAME: hbf-crm
-  CE_PROJECT: crm-code-engine
+  CE_PROJECT: Halo Business Finance
   # App name must match the Code Engine application name exactly
   CE_APP_NAME: hbf-crm
   # Private endpoint — required for Code Engine pulling from IBM Container Registry

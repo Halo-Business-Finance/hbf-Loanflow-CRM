@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: crm-frontend
-          image: us.icr.io/hbf-crm/loanflow-crm:latest
+          image: private.us.icr.io/hbf-crm/hbf-crm:main
           ports:
             - containerPort: 8080
           resources:

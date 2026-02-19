@@ -1,0 +1,179 @@
+name: IBM Cloud — Deploy LoanFlow CRM
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'production'
+        type: choice
+        options: [production, staging]
+
+env:
+  IBM_REGION: us-south
+  IBM_RESOURCE_GROUP: crm-production
+  REGISTRY_NAMESPACE: hbf-crm
+  IMAGE_NAME: loanflow-crm
+  CE_PROJECT: crm-code-engine
+  CE_APP_NAME: loanflow-crm
+
+jobs:
+  # ── Security Scan ──────────────────────────────────────────────────────────
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run npm audit
+        run: npm audit --audit-level=high
+
+      - name: Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          exit-code: 1
+
+  # ── Build & Push Image ─────────────────────────────────────────────────────
+  build:
+    name: Build & Push to IBM Container Registry
+    runs-on: ubuntu-latest
+    needs: security
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set image tag
+        id: meta
+        run: echo "tag=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Install IBM Cloud CLI
+        run: |
+          curl -fsSL https://clis.cloud.ibm.com/install/linux | sh
+          ibmcloud plugin install container-registry -f
+
+      - name: IBM Cloud login
+        run: |
+          ibmcloud login --apikey "${{ secrets.IBM_CLOUD_API_KEY }}" \
+            -r "${{ env.IBM_REGION }}" \
+            -g "${{ env.IBM_RESOURCE_GROUP }}" -q
+
+      - name: Docker login to IBM CR
+        run: ibmcloud cr login --client docker
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            --platform linux/amd64 \
+            --build-arg VITE_IBM_APPID_CLIENT_ID="${{ secrets.VITE_IBM_APPID_CLIENT_ID }}" \
+            --build-arg VITE_IBM_APPID_DISCOVERY_ENDPOINT="${{ secrets.VITE_IBM_APPID_DISCOVERY_ENDPOINT }}" \
+            --build-arg VITE_IBM_FUNCTIONS_BASE_URL="${{ secrets.VITE_IBM_FUNCTIONS_BASE_URL }}" \
+            --build-arg VITE_IBM_COS_ENDPOINT="${{ secrets.VITE_IBM_COS_ENDPOINT }}" \
+            --build-arg VITE_IBM_COS_INSTANCE_ID="${{ secrets.VITE_IBM_COS_INSTANCE_ID }}" \
+            --build-arg VITE_IBM_REGION="${{ env.IBM_REGION }}" \
+            -f ibm-cloud/Dockerfile \
+            -t "us.icr.io/${{ env.REGISTRY_NAMESPACE }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.tag }}" \
+            -t "us.icr.io/${{ env.REGISTRY_NAMESPACE }}/${{ env.IMAGE_NAME }}:latest" \
+            .
+
+      - name: Push to IBM Container Registry
+        run: |
+          docker push "us.icr.io/${{ env.REGISTRY_NAMESPACE }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.tag }}"
+          docker push "us.icr.io/${{ env.REGISTRY_NAMESPACE }}/${{ env.IMAGE_NAME }}:latest"
+
+      - name: IBM Container Registry vulnerability scan
+        run: |
+          ibmcloud cr va "us.icr.io/${{ env.REGISTRY_NAMESPACE }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.tag }}" || true
+
+  # ── Deploy Cloud Functions ─────────────────────────────────────────────────
+  deploy-functions:
+    name: Deploy IBM Cloud Functions
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install IBM Cloud CLI
+        run: |
+          curl -fsSL https://clis.cloud.ibm.com/install/linux | sh
+          ibmcloud plugin install cloud-functions -f
+
+      - name: IBM Cloud login
+        run: |
+          ibmcloud login --apikey "${{ secrets.IBM_CLOUD_API_KEY }}" \
+            -r "${{ env.IBM_REGION }}" \
+            -g "${{ env.IBM_RESOURCE_GROUP }}" -q
+
+      - name: Deploy db-gateway function
+        run: |
+          cd ibm-cloud/functions/db-gateway && npm ci --ignore-scripts
+          zip -r ../db-gateway.zip .
+          ibmcloud fn action update crm/db-gateway ../db-gateway.zip \
+            --kind nodejs:20 --web true --timeout 60000 --memory 512 \
+            --param IBM_DB_CONNECTION_STRING "${{ secrets.IBM_DB_CONNECTION_STRING }}" \
+            --param IBM_APPID_JWKS_URI "${{ secrets.IBM_APPID_JWKS_URI }}" \
+            --param IBM_APPID_ISSUER "${{ secrets.IBM_APPID_ISSUER }}"
+
+      - name: Deploy storage-sign function
+        run: |
+          cd ibm-cloud/functions/storage-sign && npm ci --ignore-scripts
+          zip -r ../storage-sign.zip .
+          ibmcloud fn action update crm/storage-sign ../storage-sign.zip \
+            --kind nodejs:20 --web true --timeout 30000 --memory 256 \
+            --param IBM_COS_HMAC_ACCESS_KEY "${{ secrets.IBM_COS_HMAC_ACCESS_KEY }}" \
+            --param IBM_COS_HMAC_SECRET_KEY "${{ secrets.IBM_COS_HMAC_SECRET_KEY }}" \
+            --param IBM_COS_ENDPOINT "${{ secrets.IBM_COS_ENDPOINT }}" \
+            --param IBM_APPID_JWKS_URI "${{ secrets.IBM_APPID_JWKS_URI }}"
+
+  # ── Deploy Frontend to Code Engine ────────────────────────────────────────
+  deploy-frontend:
+    name: Deploy Frontend to IBM Code Engine
+    runs-on: ubuntu-latest
+    needs: [build, deploy-functions]
+    environment: ${{ github.event.inputs.environment || 'production' }}
+    steps:
+      - name: Install IBM Cloud CLI
+        run: |
+          curl -fsSL https://clis.cloud.ibm.com/install/linux | sh
+          ibmcloud plugin install code-engine -f
+
+      - name: IBM Cloud login
+        run: |
+          ibmcloud login --apikey "${{ secrets.IBM_CLOUD_API_KEY }}" \
+            -r "${{ env.IBM_REGION }}" \
+            -g "${{ env.IBM_RESOURCE_GROUP }}" -q
+
+      - name: Select Code Engine project
+        run: ibmcloud ce project select --name "${{ env.CE_PROJECT }}"
+
+      - name: Deploy to Code Engine
+        run: |
+          ibmcloud ce application update \
+            --name "${{ env.CE_APP_NAME }}" \
+            --image "us.icr.io/${{ env.REGISTRY_NAMESPACE }}/${{ env.IMAGE_NAME }}:${{ needs.build.outputs.image_tag }}" \
+            --min-scale 1 --max-scale 10 \
+            --cpu 0.5 --memory 1G || \
+          ibmcloud ce application create \
+            --name "${{ env.CE_APP_NAME }}" \
+            --image "us.icr.io/${{ env.REGISTRY_NAMESPACE }}/${{ env.IMAGE_NAME }}:${{ needs.build.outputs.image_tag }}" \
+            --registry-secret icr-secret \
+            --port 8080 --min-scale 1 --max-scale 10 \
+            --cpu 0.5 --memory 1G
+
+      - name: Verify deployment
+        run: |
+          sleep 15
+          URL=$(ibmcloud ce application get --name "${{ env.CE_APP_NAME }}" --output json | grep -o '"url":"[^"]*"' | head -1 | cut -d'"' -f4)
+          echo "Deployed to: $URL"
+          curl -f "${URL}/health" || exit 1
+          echo "✅ Health check passed"

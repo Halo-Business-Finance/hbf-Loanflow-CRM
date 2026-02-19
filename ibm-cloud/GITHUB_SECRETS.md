@@ -7,13 +7,16 @@ To use the IBM Cloud deployment pipeline, add these secrets to your GitHub repos
 
 | Secret Name | Description | Where to Find |
 |-------------|-------------|---------------|
-| `IBM_CLOUD_API_KEY` | IBM Cloud API key | IBM Cloud Console → Manage → Access (IAM) → API keys |
+| `IBM_CLOUD_API_KEY` | IBM Cloud platform API key | IBM Cloud Console → Manage → Access (IAM) → API keys |
 | `IBM_DB_CONNECTION_STRING` | PostgreSQL connection string | IBM Cloud → Databases for PostgreSQL → Service credentials |
 | `IBM_APPID_JWKS_URI` | App ID JWKS endpoint | IBM App ID → Service credentials → oauthServerUrl + `/publickeys` |
 | `IBM_APPID_ISSUER` | App ID token issuer | IBM App ID → Service credentials → oauthServerUrl |
-| `IBM_COS_HMAC_ACCESS_KEY` | COS HMAC access key | IBM COS → Service credentials (with HMAC: true) → cos_hmac_keys.access_key_id |
-| `IBM_COS_HMAC_SECRET_KEY` | COS HMAC secret key | IBM COS → Service credentials → cos_hmac_keys.secret_access_key |
-| `IBM_COS_ENDPOINT` | COS endpoint | IBM COS → Endpoints → select region |
+| `IBM_COS_API_KEY` | **Preferred** — COS service IAM API key | IBM COS → Service credentials → `apikey` |
+| `IBM_COS_INSTANCE_ID` | COS resource instance CRN | IBM COS → Service credentials → `resource_instance_id` |
+| `IBM_COS_ENDPOINT` | COS public endpoint | IBM COS → Endpoints → select region (e.g. `s3.us-south.cloud-object-storage.appdomain.cloud`) |
+| `IBM_COS_HMAC_ACCESS_KEY` | *(Optional)* HMAC access key — set `USE_HMAC=true` | IBM COS → Service credentials (with `HMAC: true`) → `cos_hmac_keys.access_key_id` |
+| `IBM_COS_HMAC_SECRET_KEY` | *(Optional)* HMAC secret key | IBM COS → Service credentials → `cos_hmac_keys.secret_access_key` |
+| `USE_HMAC` | `true` to use HMAC; omit or `false` to use IAM (default) | Set manually |
 
 ## Required Vite Build-Time Variables (also as GitHub Secrets)
 

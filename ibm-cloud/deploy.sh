@@ -62,7 +62,7 @@ docker push "${FULL_IMAGE}"
 
 # ── 4. Deploy IBM Cloud Functions ──────────────────────────────────────────
 echo "▶ Deploying IBM Cloud Functions..."
-FUNCTIONS=(db-gateway storage-sign)
+FUNCTIONS=(db-gateway storage-sign storage-list storage-delete)
 
 for fn in "${FUNCTIONS[@]}"; do
   FN_DIR="ibm-cloud/functions/${fn}"
@@ -87,14 +87,17 @@ for fn in "${FUNCTIONS[@]}"; do
     --timeout 60000 \
     --memory 512
 
-  # Set environment secrets
+  # Set environment secrets (IAM preferred; set USE_HMAC=true to use HMAC instead)
   ibmcloud fn action update "crm/${fn}" \
     --param IBM_DB_CONNECTION_STRING "${IBM_DB_CONNECTION_STRING:-}" \
-    --param IBM_COS_HMAC_ACCESS_KEY "${IBM_COS_HMAC_ACCESS_KEY:-}" \
-    --param IBM_COS_HMAC_SECRET_KEY "${IBM_COS_HMAC_SECRET_KEY:-}" \
-    --param IBM_COS_ENDPOINT "${IBM_COS_ENDPOINT:-}" \
-    --param IBM_APPID_JWKS_URI "${IBM_APPID_JWKS_URI:-}" \
-    --param IBM_APPID_ISSUER "${IBM_APPID_ISSUER:-}"
+    --param IBM_COS_API_KEY          "${IBM_COS_API_KEY:-}" \
+    --param IBM_COS_INSTANCE_ID      "${IBM_COS_INSTANCE_ID:-}" \
+    --param IBM_COS_ENDPOINT         "${IBM_COS_ENDPOINT:-}" \
+    --param IBM_COS_HMAC_ACCESS_KEY  "${IBM_COS_HMAC_ACCESS_KEY:-}" \
+    --param IBM_COS_HMAC_SECRET_KEY  "${IBM_COS_HMAC_SECRET_KEY:-}" \
+    --param USE_HMAC                 "${USE_HMAC:-false}" \
+    --param IBM_APPID_JWKS_URI       "${IBM_APPID_JWKS_URI:-}" \
+    --param IBM_APPID_ISSUER         "${IBM_APPID_ISSUER:-}"
 
   rm -f "ibm-cloud/functions/${fn}.zip"
 done

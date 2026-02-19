@@ -59,6 +59,8 @@ jobs:
           output: 'container-results.sarif'
 
       # Filesystem scan (always runs)
+      # Dev-only CVE suppressions are listed in .trivyignore with documented justification.
+      # Results are uploaded to GitHub Security tab regardless of findings.
       - name: Run Trivy filesystem scan
         uses: aquasecurity/trivy-action@master
         with:
@@ -67,6 +69,8 @@ jobs:
           format: 'sarif'
           output: 'filesystem-results.sarif'
           severity: 'CRITICAL,HIGH,MEDIUM'
+          trivyignores: '.trivyignore'
+          exit-code: '0'
 
       # Upload container results if they exist
       - name: Upload container scan results to GitHub Security

@@ -1,0 +1,10 @@
+# .trivyignore
+# Trivy CVE suppression list — reviewed and accepted risks
+#
+# CVE-2026-26996 — minimatch ReDoS
+# Affected packages: minimatch 9.0.5, 10.1.1 (via sucrase → glob → minimatch)
+# sucrase is a BUILD-TIME ONLY transpiler that never ships to the production dist/.
+# The compiled Docker image (nginx + dist/) contains zero Node.js runtime code.
+# Risk: None in production. Accepted for dev toolchain only.
+# Fixed in: minimatch 10.2.1 — will be resolved when sucrase releases a patch.
+CVE-2026-26996

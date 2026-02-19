@@ -166,13 +166,15 @@ export default function UserDirectory() {
       if (error || !data?.users) {
         const { data: sessionData } = await supabase.auth.getSession();
         const accessToken = sessionData?.session?.access_token || '';
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://gshxxsniwytjgcnthyfq.supabase.co';
+        const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '';
         const response = await fetch(
-          'https://gshxxsniwytjgcnthyfq.functions.supabase.co/admin-get-users',
+          `${supabaseUrl}/functions/v1/admin-get-users`,
           {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${accessToken}`,
-              'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdzaHh4c25pd3l0amdjbnRoeWZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM1ODYzMDYsImV4cCI6MjA2OTE2MjMwNn0.KZGdh-f2Z5DrNJ54lv3loaC8wrWvNfhQF7tqQ',
+              'apikey': supabaseKey,
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({ action: 'list_users' }),

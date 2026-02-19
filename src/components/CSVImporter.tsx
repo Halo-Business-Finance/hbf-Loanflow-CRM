@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Upload, FileText, Check, X, AlertTriangle, Loader2, FileSpreadsheet, Database } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import * as XLSX from "xlsx";
+import readXlsxFile from "read-excel-file";
 
 interface CSVImporterProps {
   onImportComplete?: () => void;
@@ -173,29 +173,25 @@ export function CSVImporter({ onImportComplete }: CSVImporterProps) {
     return result;
   };
 
-  const parseExcel = (buffer: ArrayBuffer): { headers: string[]; rows: ParsedRow[] } => {
-    const workbook = XLSX.read(buffer, { type: "array" });
-    const firstSheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[firstSheetName];
-    
-    const jsonData = XLSX.utils.sheet_to_json<string[]>(worksheet, { header: 1 });
-    if (jsonData.length === 0) return { headers: [], rows: [] };
+  const parseExcel = async (file: File): Promise<{ headers: string[]; rows: ParsedRow[] }> => {
+    const rows = await readXlsxFile(file);
+    if (rows.length === 0) return { headers: [], rows: [] };
 
-    const parsedHeaders = (jsonData[0] as string[]).map(h => String(h || "").trim());
-    const rows: ParsedRow[] = [];
+    const parsedHeaders = (rows[0] as unknown[]).map(h => String(h ?? "").trim());
+    const parsedRows: ParsedRow[] = [];
 
-    for (let i = 1; i < jsonData.length; i++) {
-      const rowData = jsonData[i] as string[];
+    for (let i = 1; i < rows.length; i++) {
+      const rowData = rows[i] as unknown[];
       if (rowData && rowData.length > 0) {
         const row: ParsedRow = {};
         parsedHeaders.forEach((header, index) => {
           row[header] = String(rowData[index] ?? "").trim();
         });
-        rows.push(row);
+        parsedRows.push(row);
       }
     }
 
-    return { headers: parsedHeaders, rows };
+    return { headers: parsedHeaders, rows: parsedRows };
   };
 
   const processFile = (parsedHeaders: string[], rows: ParsedRow[]) => {
@@ -251,13 +247,16 @@ export function CSVImporter({ onImportComplete }: CSVImporterProps) {
       };
       reader.readAsText(selectedFile);
     } else {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const buffer = e.target?.result as ArrayBuffer;
-        const { headers: parsedHeaders, rows } = parseExcel(buffer);
+      // read-excel-file accepts File directly — no FileReader needed
+      parseExcel(selectedFile).then(({ headers: parsedHeaders, rows }) => {
         processFile(parsedHeaders, rows);
-      };
-      reader.readAsArrayBuffer(selectedFile);
+      }).catch(() => {
+        toast({
+          title: "Parse Error",
+          description: "Could not read the Excel file. Please check the file format.",
+          variant: "destructive",
+        });
+      });
     }
   };
 

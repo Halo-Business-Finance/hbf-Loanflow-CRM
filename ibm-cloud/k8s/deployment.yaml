@@ -1,0 +1,91 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hbf-loanflow-crm
+  namespace: crm-production
+  labels:
+    app: loanflow-crm
+    version: "1.0.0"
+    environment: production
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: loanflow-crm
+  template:
+    metadata:
+      labels:
+        app: loanflow-crm
+    spec:
+      containers:
+        - name: crm-frontend
+          image: us.icr.io/hbf-crm/loanflow-crm:latest
+          ports:
+            - containerPort: 8080
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+            limits:
+              cpu: "1000m"
+              memory: "512Mi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            runAsNonRoot: true
+            runAsUser: 1000
+            capabilities:
+              drop: ["ALL"]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: loanflow-crm-service
+  namespace: crm-production
+spec:
+  selector:
+    app: loanflow-crm
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: loanflow-crm-ingress
+  namespace: crm-production
+  annotations:
+    kubernetes.io/ingress.class: "public-iks-k8s-nginx"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  tls:
+    - hosts:
+        - crm.halo-business-finance.com
+      secretName: crm-tls-cert
+  rules:
+    - host: crm.halo-business-finance.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: loanflow-crm-service
+                port:
+                  number: 80

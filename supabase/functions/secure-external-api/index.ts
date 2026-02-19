@@ -9,6 +9,21 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Allowlist of permitted external proxy targets
+const ALLOWED_PROXY_HOSTS = [
+  'maps.googleapis.com',
+  'api.ringcentral.com',
+];
+
+function isAllowedProxyUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return ALLOWED_PROXY_HOSTS.some(host => parsed.hostname === host || parsed.hostname.endsWith('.' + host));
+  } catch {
+    return false;
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -18,24 +33,36 @@ serve(async (req) => {
   try {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      { auth: { persistSession: false } }
     )
 
-    const { action, url, options, signature } = await req.json();
-
-    // Verify request signature for security
-    if (!signature || !verifySignature(req, signature)) {
-      return new Response(JSON.stringify({ error: 'Invalid signature' }), {
+    // Require valid JWT — no weak signature fallback
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const { action, url, options } = await req.json();
+
     let response;
     
     switch (action) {
       case 'get_google_maps_key':
-        // Return Google Maps API key from environment
+        // Return Google Maps API key from environment (key is restricted by referrer in GCP console)
         const googleMapsKey = Deno.env.get('GOOGLE_MAPS_API_KEY');
         if (!googleMapsKey) {
           return new Response(JSON.stringify({ error: 'Google Maps API key not configured' }), {
@@ -48,7 +75,14 @@ serve(async (req) => {
         });
 
       case 'proxy_request':
-        // Proxy external API requests securely
+        // Validate URL against allowlist before proxying
+        if (!url || !isAllowedProxyUrl(url)) {
+          return new Response(JSON.stringify({ error: 'URL not in allowed list' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
         const requestOptions = {
           method: options?.method || 'GET',
           headers: {
@@ -73,17 +107,10 @@ serve(async (req) => {
         });
     }
   } catch (error: unknown) {
-    logger.error('Error in secure-external-api function', error);
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return new Response(JSON.stringify({ error: message }), {
+    logger.error('Error in secure-external-api function', error instanceof Error ? error : new Error(String(error)));
+    return new Response(JSON.stringify({ error: 'Internal server error' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 });
-
-function verifySignature(req: Request, providedSignature: string): boolean {
-  // Simple signature verification - in production, use HMAC with secret key
-  const expectedSignature = 'secure-api-call-' + new Date().toDateString();
-  return providedSignature === expectedSignature;
-}

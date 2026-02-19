@@ -140,16 +140,18 @@ Deno.serve(async (req) => {
 
     throw new Error('Invalid action')
 
-  } catch (error) {
-    logger.error('Encryption key service error', error)
+  } catch (error: unknown) {
+    logger.error('Encryption key service error', error instanceof Error ? error : new Error(String(error)))
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    const status = message === 'Unauthorized' ? 401 : 400
     
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message
+        error: message
       }),
       {
-        status: error.message === 'Unauthorized' ? 401 : 400,
+        status,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     )

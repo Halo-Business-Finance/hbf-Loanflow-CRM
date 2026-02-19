@@ -55,11 +55,11 @@ serve(async (req) => {
       throw new Error(tableNameValidation.error);
     }
     
-    let recordIdValidation = { valid: true, sanitized: requestBody.record_id };
+    let recordIdValidation: { valid: boolean; sanitized: string; error?: string } = { valid: true, sanitized: requestBody.record_id };
     if (requestBody.record_id) {
       recordIdValidation = validateUUID(requestBody.record_id, 'Record ID');
       if (!recordIdValidation.valid) {
-        throw new Error(recordIdValidation.error);
+        throw new Error(recordIdValidation.error ?? 'Invalid Record ID');
       }
     }
     

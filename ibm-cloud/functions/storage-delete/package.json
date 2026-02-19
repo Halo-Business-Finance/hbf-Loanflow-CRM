@@ -1,0 +1,12 @@
+{
+  "name": "storage-delete",
+  "version": "1.0.0",
+  "description": "IBM Cloud Function — COS object deletion using native ibm-cos-sdk",
+  "main": "index.js",
+  "dependencies": {
+    "ibm-cos-sdk": "^1.14.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

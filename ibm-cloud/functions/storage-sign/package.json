@@ -1,11 +1,10 @@
 {
   "name": "storage-sign",
-  "version": "1.0.0",
-  "description": "IBM Cloud Function — COS pre-signed URL generator for HBF LoanFlow CRM",
+  "version": "1.1.0",
+  "description": "IBM Cloud Function — COS pre-signed URL generator using native ibm-cos-sdk",
   "main": "index.js",
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.600.0",
-    "@aws-sdk/s3-request-presigner": "^3.600.0"
+    "ibm-cos-sdk": "^1.14.0"
   },
   "engines": {
     "node": ">=20"

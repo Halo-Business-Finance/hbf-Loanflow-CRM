@@ -55,9 +55,14 @@ ENV VITE_IBM_APPID_CLIENT_ID=$VITE_IBM_APPID_CLIENT_ID \
     VITE_SUPABASE_PUBLISHABLE_KEY=$VITE_SUPABASE_PUBLISHABLE_KEY \
     VITE_SUPABASE_PROJECT_ID=$VITE_SUPABASE_PROJECT_ID
 
-# Build — skip type errors that would block deployment
-RUN npm run build 2>&1 || (echo "Build with type-check failed, retrying with --skipLibCheck..." && \
-    npx vite build --mode production)
+# Build the frontend — fail loudly if it breaks
+RUN npm run build || \
+    (echo "⚠️  npm run build failed, retrying with npx vite build..." && \
+     npx vite build --mode production)
+
+# Verify the build actually produced output
+RUN test -f /app/dist/index.html || \
+    (echo "❌ Build produced no output — dist/index.html is missing" && exit 1)
 
 # ── Stage 2: Serve ──────────────────────────────────────────────────────────
 FROM nginx:1.27-alpine AS runtime

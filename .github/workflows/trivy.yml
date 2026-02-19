@@ -57,6 +57,8 @@ jobs:
           image-ref: 'loanflow-crm:${{ github.sha }}'
           format: 'sarif'
           output: 'container-results.sarif'
+          trivyignores: '.trivyignore'
+          exit-code: '0'
 
       # Filesystem scan (always runs)
       # Dev-only CVE suppressions are listed in .trivyignore with documented justification.

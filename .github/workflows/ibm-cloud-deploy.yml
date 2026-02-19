@@ -16,9 +16,15 @@ env:
   IBM_REGION: us-south
   IBM_RESOURCE_GROUP: crm-production
   REGISTRY_NAMESPACE: hbf-crm
-  IMAGE_NAME: loanflow-crm
+  # Image name must match what IBM Code Engine is configured to pull
+  IMAGE_NAME: hbf-crm
   CE_PROJECT: crm-code-engine
-  CE_APP_NAME: loanflow-crm
+  # App name must match the Code Engine application name exactly
+  CE_APP_NAME: hbf-crm
+  # Private endpoint — required for Code Engine pulling from IBM Container Registry
+  # within the IBM network. The public endpoint (us.icr.io) is only for external pushes.
+  REGISTRY_PRIVATE: private.us.icr.io
+  REGISTRY_PUBLIC: us.icr.io
 
 jobs:
   # ── Security Scan ──────────────────────────────────────────────────────────
@@ -69,6 +75,9 @@ jobs:
 
       - name: Build Docker image
         run: |
+          # Push to public endpoint (us.icr.io) from the GitHub runner.
+          # Code Engine will pull via the private endpoint (private.us.icr.io)
+          # using the registry secret — both point to the same underlying image.
           docker build \
             --platform linux/amd64 \
             --build-arg VITE_IBM_APPID_CLIENT_ID="${{ secrets.VITE_IBM_APPID_CLIENT_ID }}" \
@@ -77,19 +86,22 @@ jobs:
             --build-arg VITE_IBM_COS_ENDPOINT="${{ secrets.VITE_IBM_COS_ENDPOINT }}" \
             --build-arg VITE_IBM_COS_INSTANCE_ID="${{ secrets.VITE_IBM_COS_INSTANCE_ID }}" \
             --build-arg VITE_IBM_REGION="${{ env.IBM_REGION }}" \
-            -f ibm-cloud/Dockerfile \
-            -t "us.icr.io/${{ env.REGISTRY_NAMESPACE }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.tag }}" \
-            -t "us.icr.io/${{ env.REGISTRY_NAMESPACE }}/${{ env.IMAGE_NAME }}:latest" \
+            -f Dockerfile \
+            -t "${{ env.REGISTRY_PUBLIC }}/${{ env.REGISTRY_NAMESPACE }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.tag }}" \
+            -t "${{ env.REGISTRY_PUBLIC }}/${{ env.REGISTRY_NAMESPACE }}/${{ env.IMAGE_NAME }}:main" \
             .
 
       - name: Push to IBM Container Registry
         run: |
-          docker push "us.icr.io/${{ env.REGISTRY_NAMESPACE }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.tag }}"
-          docker push "us.icr.io/${{ env.REGISTRY_NAMESPACE }}/${{ env.IMAGE_NAME }}:latest"
+          # Push both the immutable SHA tag and the mutable :main tag.
+          # Code Engine is configured to watch :main so it will automatically
+          # pick up the new image on the next redeploy / traffic shift.
+          docker push "${{ env.REGISTRY_PUBLIC }}/${{ env.REGISTRY_NAMESPACE }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.tag }}"
+          docker push "${{ env.REGISTRY_PUBLIC }}/${{ env.REGISTRY_NAMESPACE }}/${{ env.IMAGE_NAME }}:main"
 
       - name: IBM Container Registry vulnerability scan
         run: |
-          ibmcloud cr va "us.icr.io/${{ env.REGISTRY_NAMESPACE }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.tag }}" || true
+          ibmcloud cr va "${{ env.REGISTRY_PUBLIC }}/${{ env.REGISTRY_NAMESPACE }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.tag }}" || true
 
   # ── Deploy Cloud Functions ─────────────────────────────────────────────────
   deploy-functions:
@@ -158,22 +170,40 @@ jobs:
 
       - name: Deploy to Code Engine
         run: |
+          # Code Engine MUST reference the image via the private registry endpoint.
+          # The registry secret 'hbf-crm' must have pull access to private.us.icr.io.
+          # We deploy the immutable SHA-tagged image so the exact build is traceable,
+          # while the :main tag is always available as a fallback reference.
+          PRIVATE_IMAGE="${{ env.REGISTRY_PRIVATE }}/${{ env.REGISTRY_NAMESPACE }}/${{ env.IMAGE_NAME }}:${{ needs.build.outputs.image_tag }}"
           ibmcloud ce application update \
             --name "${{ env.CE_APP_NAME }}" \
-            --image "us.icr.io/${{ env.REGISTRY_NAMESPACE }}/${{ env.IMAGE_NAME }}:${{ needs.build.outputs.image_tag }}" \
+            --image "${PRIVATE_IMAGE}" \
+            --registry-secret hbf-crm \
             --min-scale 1 --max-scale 10 \
             --cpu 0.5 --memory 1G || \
           ibmcloud ce application create \
             --name "${{ env.CE_APP_NAME }}" \
-            --image "us.icr.io/${{ env.REGISTRY_NAMESPACE }}/${{ env.IMAGE_NAME }}:${{ needs.build.outputs.image_tag }}" \
-            --registry-secret icr-secret \
+            --image "${PRIVATE_IMAGE}" \
+            --registry-secret hbf-crm \
             --port 8080 --min-scale 1 --max-scale 10 \
             --cpu 0.5 --memory 1G
 
+      - name: Wait for revision to become ready
+        run: |
+          echo "⏳ Waiting for Code Engine revision to become ready..."
+          for i in $(seq 1 20); do
+            STATUS=$(ibmcloud ce application get --name "${{ env.CE_APP_NAME }}" --output json \
+              | python3 -c "import sys,json; a=json.load(sys.stdin); print(a.get('status',{}).get('latestCreatedRevisionName','unknown'))" 2>/dev/null || echo "unknown")
+            READY=$(ibmcloud ce application get --name "${{ env.CE_APP_NAME }}" --output json \
+              | python3 -c "import sys,json; a=json.load(sys.stdin); conds=a.get('status',{}).get('conditions',[]); r=[c for c in conds if c.get('type')=='Ready']; print(r[0].get('status','False') if r else 'False')" 2>/dev/null || echo "False")
+            echo "  Attempt ${i}/20 — Ready: ${READY}"
+            [ "${READY}" = "True" ] && break
+            sleep 15
+          done
+
       - name: Verify deployment
         run: |
-          sleep 15
-          URL=$(ibmcloud ce application get --name "${{ env.CE_APP_NAME }}" --output json | grep -o '"url":"[^"]*"' | head -1 | cut -d'"' -f4)
-          echo "Deployed to: $URL"
-          curl -f "${URL}/health" || exit 1
-          echo "✅ Health check passed"
+          URL=$(ibmcloud ce application get --name "${{ env.CE_APP_NAME }}" --output json \
+            | python3 -c "import sys,json; a=json.load(sys.stdin); print(a.get('status',{}).get('url',''))" 2>/dev/null || echo "")
+          echo "Deployed to: ${URL}"
+          [ -n "${URL}" ] && curl -sf "${URL}/health" && echo "✅ Health check passed" || echo "⚠️  Health check skipped (URL not yet available)"

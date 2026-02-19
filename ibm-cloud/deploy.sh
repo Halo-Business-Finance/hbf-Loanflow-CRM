@@ -14,11 +14,15 @@ ENVIRONMENT="${1:-staging}"
 REGION="${IBM_REGION:-us-south}"
 RESOURCE_GROUP="${IBM_RESOURCE_GROUP:-crm-production}"
 REGISTRY_NAMESPACE="hbf-crm"
-IMAGE_NAME="loanflow-crm"
-IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD 2>/dev/null || echo 'latest')}"
-FULL_IMAGE="us.icr.io/${REGISTRY_NAMESPACE}/${IMAGE_NAME}:${IMAGE_TAG}"
+# Image name must match what IBM Code Engine is configured to pull
+IMAGE_NAME="hbf-crm"
+IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD 2>/dev/null || echo 'main')}"
+# Push via public endpoint; Code Engine pulls via private endpoint using registry secret
+FULL_IMAGE_PUBLIC="us.icr.io/${REGISTRY_NAMESPACE}/${IMAGE_NAME}:${IMAGE_TAG}"
+FULL_IMAGE_PRIVATE="private.us.icr.io/${REGISTRY_NAMESPACE}/${IMAGE_NAME}:${IMAGE_TAG}"
 CE_PROJECT="${IBM_CE_PROJECT:-crm-code-engine}"
-CE_APP_NAME="loanflow-crm"
+# App name must match the Code Engine application name exactly
+CE_APP_NAME="hbf-crm"
 
 # ── Prerequisites Check ────────────────────────────────────────────────────
 command -v ibmcloud &>/dev/null || { echo "ERROR: ibmcloud CLI not installed."; exit 1; }
@@ -27,7 +31,8 @@ command -v docker &>/dev/null    || { echo "ERROR: Docker not installed."; exit 
 echo "🚀 HBF LoanFlow CRM — IBM Cloud Deployment"
 echo "   Environment : $ENVIRONMENT"
 echo "   Region      : $REGION"
-echo "   Image       : $FULL_IMAGE"
+echo "   Push Image  : $FULL_IMAGE_PUBLIC"
+echo "   CE Image    : $FULL_IMAGE_PRIVATE  (private endpoint for Code Engine)"
 echo ""
 
 # ── 1. IBM Cloud Login ─────────────────────────────────────────────────────
@@ -53,12 +58,14 @@ docker build \
   --build-arg VITE_IBM_COS_ENDPOINT="${VITE_IBM_COS_ENDPOINT:-}" \
   --build-arg VITE_IBM_COS_INSTANCE_ID="${VITE_IBM_COS_INSTANCE_ID:-}" \
   --build-arg VITE_IBM_REGION="${REGION}" \
-  -f ibm-cloud/Dockerfile \
-  -t "${FULL_IMAGE}" \
+  -f Dockerfile \
+  -t "${FULL_IMAGE_PUBLIC}" \
+  -t "us.icr.io/${REGISTRY_NAMESPACE}/${IMAGE_NAME}:main" \
   .
 
-echo "▶ Pushing image to IBM Container Registry..."
-docker push "${FULL_IMAGE}"
+echo "▶ Pushing image to IBM Container Registry (public endpoint)..."
+docker push "${FULL_IMAGE_PUBLIC}"
+docker push "us.icr.io/${REGISTRY_NAMESPACE}/${IMAGE_NAME}:main"
 
 # ── 4. Deploy IBM Cloud Functions ──────────────────────────────────────────
 echo "▶ Deploying IBM Cloud Functions..."
@@ -107,10 +114,12 @@ echo "▶ Deploying frontend to IBM Code Engine..."
 ibmcloud ce project select --name "${CE_PROJECT}" || \
   ibmcloud ce project create --name "${CE_PROJECT}"
 
+# Code Engine must reference the image via the PRIVATE registry endpoint.
+# The registry secret 'hbf-crm' provides credentials for private.us.icr.io.
 ibmcloud ce application update \
   --name "${CE_APP_NAME}" \
-  --image "${FULL_IMAGE}" \
-  --registry-secret icr-secret \
+  --image "${FULL_IMAGE_PRIVATE}" \
+  --registry-secret hbf-crm \
   --port 8080 \
   --min-scale 1 \
   --max-scale 10 \
@@ -118,8 +127,8 @@ ibmcloud ce application update \
   --memory 1G 2>/dev/null || \
 ibmcloud ce application create \
   --name "${CE_APP_NAME}" \
-  --image "${FULL_IMAGE}" \
-  --registry-secret icr-secret \
+  --image "${FULL_IMAGE_PRIVATE}" \
+  --registry-secret hbf-crm \
   --port 8080 \
   --min-scale 1 \
   --max-scale 10 \
@@ -129,9 +138,12 @@ ibmcloud ce application create \
 # ── 6. Get URL ─────────────────────────────────────────────────────────────
 echo ""
 echo "✅ Deployment complete!"
-APP_URL=$(ibmcloud ce application get --name "${CE_APP_NAME}" --output json 2>/dev/null | grep -o '"url":"[^"]*"' | head -1 | cut -d'"' -f4 || echo "Run: ibmcloud ce application get --name ${CE_APP_NAME}")
+APP_URL=$(ibmcloud ce application get --name "${CE_APP_NAME}" --output json 2>/dev/null \
+  | python3 -c "import sys,json; a=json.load(sys.stdin); print(a.get('status',{}).get('url',''))" 2>/dev/null \
+  || echo "Run: ibmcloud ce application get --name ${CE_APP_NAME}")
 echo "   🌐 Application URL: ${APP_URL}"
-echo "   📦 Image: ${FULL_IMAGE}"
+echo "   📦 Push image : ${FULL_IMAGE_PUBLIC}"
+echo "   📦 CE image   : ${FULL_IMAGE_PRIVATE}"
 echo ""
 echo "Next steps:"
 echo "  1. Add IBM App ID redirect URI: ${APP_URL}/auth/callback"

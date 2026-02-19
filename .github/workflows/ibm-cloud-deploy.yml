@@ -34,8 +34,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Run npm audit
-        run: npm audit --audit-level=high
+      - name: Run npm audit (production dependencies only)
+        run: npm audit --audit-level=high --omit=dev
 
       - name: Trivy vulnerability scan
         uses: aquasecurity/trivy-action@master

@@ -1,5 +1,5 @@
 // Rate limiting utilities for Edge Functions
-import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
+// deno-lint-ignore-file no-explicit-any
 import { SecureLogger } from './secure-logger.ts';
 
 const logger = new SecureLogger('rate-limit');
@@ -11,7 +11,7 @@ export interface RateLimitConfig {
 }
 
 export const checkRateLimit = async (
-  supabase: SupabaseClient,
+  supabase: any,
   userId: string,
   config: RateLimitConfig
 ): Promise<{ allowed: boolean; error?: string }> => {

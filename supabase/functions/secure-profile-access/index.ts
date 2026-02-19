@@ -262,8 +262,8 @@ async function migrateExistingData(requestingUserId: string) {
           timestamp: new Date().toISOString()
         }
       });
-    } catch (logError) {
-      logger.warn('Failed to log migration completion', logError);
+    } catch (logError: unknown) {
+      logger.warn('Failed to log migration completion', logError instanceof Error ? logError : new Error(String(logError)));
     }
 
     return new Response(

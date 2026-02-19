@@ -1,8 +1,7 @@
 import React, { useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { applyClientSecurityHeaders } from '@/lib/security-headers';
-import { getCurrentNonce } from '@/security/nonce';
 import { applyClientSecurityHeaders, getEnhancedSecurityHeaders } from '@/lib/security-headers';
+import { getCurrentNonce } from '@/security/nonce';
 
 interface SecurityHeader {
   header_name: string;

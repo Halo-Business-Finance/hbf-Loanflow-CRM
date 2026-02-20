@@ -31,9 +31,10 @@ export interface RouteConfig {
  * Maps CRM table names → hbf-api route config.
  *
  * Tables NOT listed here do not have dedicated hbf-api routes yet
- * and will throw an informative error when accessed.
+ * and will return an informative error when accessed.
  */
 export const ROUTE_MAP: Record<string, RouteConfig> = {
+  // ── Existing hbf-api routes ────────────────────────────────
   leads: {
     basePath: '/api/v1/leads',
     dataKey: 'root',
@@ -41,7 +42,6 @@ export const ROUTE_MAP: Record<string, RouteConfig> = {
     supportsGetById: true,
     supportsDelete: true,
   },
-  // contact_entities in the CRM maps to "borrowers" in hbf-api
   contact_entities: {
     basePath: '/api/v1/borrowers',
     dataKey: 'root',
@@ -77,23 +77,98 @@ export const ROUTE_MAP: Record<string, RouteConfig> = {
     supportsGetById: false,
     supportsDelete: false,
   },
+
+  // ── New routes (added via crud-factory) ────────────────────
+  lenders: {
+    basePath: '/api/v1/lenders',
+    dataKey: 'root',
+    filterParams: ['status', 'lender_type', 'user_id'],
+    supportsGetById: true,
+    supportsDelete: true,
+  },
+  clients: {
+    basePath: '/api/v1/clients',
+    dataKey: 'root',
+    filterParams: ['status', 'user_id'],
+    supportsGetById: true,
+    supportsDelete: false,
+  },
+  service_providers: {
+    basePath: '/api/v1/service-providers',
+    dataKey: 'root',
+    filterParams: ['status', 'provider_type', 'user_id'],
+    supportsGetById: true,
+    supportsDelete: true,
+  },
+  profiles: {
+    basePath: '/api/v1/profiles',
+    dataKey: 'root',
+    filterParams: ['user_id', 'role', 'is_active'],
+    supportsGetById: true,
+    supportsDelete: false,
+  },
+  messages: {
+    basePath: '/api/v1/messages',
+    dataKey: 'root',
+    filterParams: ['user_id', 'recipient_id', 'lead_id', 'is_read', 'message_type'],
+    supportsGetById: true,
+    supportsDelete: true,
+  },
+  tasks: {
+    basePath: '/api/v1/tasks',
+    dataKey: 'root',
+    filterParams: ['user_id', 'assigned_to', 'status', 'priority', 'lead_id'],
+    supportsGetById: true,
+    supportsDelete: true,
+  },
+  lead_documents: {
+    basePath: '/api/v1/lead-documents',
+    dataKey: 'root',
+    filterParams: ['lead_id', 'user_id', 'status', 'document_type'],
+    supportsGetById: true,
+    supportsDelete: true,
+  },
+  document_templates: {
+    basePath: '/api/v1/document-templates',
+    dataKey: 'root',
+    filterParams: ['template_type', 'is_active', 'user_id'],
+    supportsGetById: true,
+    supportsDelete: true,
+  },
+  document_versions: {
+    basePath: '/api/v1/document-versions',
+    dataKey: 'root',
+    filterParams: ['document_id', 'uploaded_by'],
+    supportsGetById: true,
+    supportsDelete: false,
+  },
+  email_accounts: {
+    basePath: '/api/v1/email-accounts',
+    dataKey: 'root',
+    filterParams: ['user_id', 'is_active', 'provider'],
+    supportsGetById: true,
+    supportsDelete: true,
+  },
+  approval_requests: {
+    basePath: '/api/v1/approval-requests',
+    dataKey: 'root',
+    filterParams: ['status', 'submitted_by', 'record_type'],
+    supportsGetById: true,
+    supportsDelete: false,
+  },
+  approval_steps: {
+    basePath: '/api/v1/approval-steps',
+    dataKey: 'root',
+    filterParams: ['request_id', 'approver_id', 'status'],
+    supportsGetById: true,
+    supportsDelete: false,
+  },
 };
 
-/** Tables that need routes added to hbf-api before the CRM can use them via IBM */
-export const UNMAPPED_TABLES = [
-  'lenders',
-  'clients',
-  'service_providers',
-  'profiles',
-  'messages',
-  'tasks',
-  'document_templates',
-  'document_versions',
-  'email_accounts',
+/** Tables that still need routes — currently empty after full mapping */
+export const UNMAPPED_TABLES: readonly string[] = [
+  // email_campaigns — add when email campaign features are built in hbf-api
   'email_campaigns',
-  'approval_requests',
-  'approval_steps',
-  'lead_documents',
 ] as const;
 
 export function getRouteConfig(table: string): RouteConfig | null {

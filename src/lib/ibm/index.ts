@@ -11,8 +11,10 @@ export { ibmAuth } from './ibm-auth';
 export { ibmDb } from './ibm-database';
 export { ibmStorage } from './ibm-storage';
 export { IBM_CONFIG, isIBMConfigured } from './ibm-config';
+export { ROUTE_MAP, UNMAPPED_TABLES, getRouteConfig } from './ibm-route-map';
 export type { IBMUser, IBMSession } from './ibm-auth';
 export type { UploadResult, ListResult } from './ibm-storage';
+export type { RouteConfig } from './ibm-route-map';
 
 import { ibmAuth } from './ibm-auth';
 import { ibmDb } from './ibm-database';

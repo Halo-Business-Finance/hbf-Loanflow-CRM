@@ -1,4 +1,4 @@
-name: IBM Cloud — Deploy LoanFlow CRM
+name: IBM Cloud — Deploy HBF API
 
 on:
   push:
@@ -16,13 +16,9 @@ env:
   IBM_REGION: us-south
   IBM_RESOURCE_GROUP: HBF Resource Group
   REGISTRY_NAMESPACE: hbf-crm
-  # Image name must match what IBM Code Engine is configured to pull
   IMAGE_NAME: hbf-crm
   CE_PROJECT: Halo Business Finance
-  # App name must match the Code Engine application name exactly
   CE_APP_NAME: hbf-crm
-  # Private endpoint — required for Code Engine pulling from IBM Container Registry
-  # within the IBM network. The public endpoint (us.icr.io) is only for external pushes.
   REGISTRY_PRIVATE: private.us.icr.io
   REGISTRY_PUBLIC: us.icr.io
 
@@ -78,17 +74,8 @@ jobs:
 
       - name: Build Docker image
         run: |
-          # Push to public endpoint (us.icr.io) from the GitHub runner.
-          # Code Engine will pull via the private endpoint (private.us.icr.io)
-          # using the registry secret — both point to the same underlying image.
           docker build \
             --platform linux/amd64 \
-            --build-arg VITE_IBM_APPID_CLIENT_ID="${{ secrets.VITE_IBM_APPID_CLIENT_ID }}" \
-            --build-arg VITE_IBM_APPID_DISCOVERY_ENDPOINT="${{ secrets.VITE_IBM_APPID_DISCOVERY_ENDPOINT }}" \
-            --build-arg VITE_IBM_FUNCTIONS_BASE_URL="${{ secrets.VITE_IBM_FUNCTIONS_BASE_URL }}" \
-            --build-arg VITE_IBM_COS_ENDPOINT="${{ secrets.VITE_IBM_COS_ENDPOINT }}" \
-            --build-arg VITE_IBM_COS_INSTANCE_ID="${{ secrets.VITE_IBM_COS_INSTANCE_ID }}" \
-            --build-arg VITE_IBM_REGION="${{ env.IBM_REGION }}" \
             -f Dockerfile \
             -t "${{ env.REGISTRY_PUBLIC }}/${{ env.REGISTRY_NAMESPACE }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.tag }}" \
             -t "${{ env.REGISTRY_PUBLIC }}/${{ env.REGISTRY_NAMESPACE }}/${{ env.IMAGE_NAME }}:main" \
@@ -96,9 +83,6 @@ jobs:
 
       - name: Push to IBM Container Registry
         run: |
-          # Push both the immutable SHA tag and the mutable :main tag.
-          # Code Engine is configured to watch :main so it will automatically
-          # pick up the new image on the next redeploy / traffic shift.
           docker push "${{ env.REGISTRY_PUBLIC }}/${{ env.REGISTRY_NAMESPACE }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.tag }}"
           docker push "${{ env.REGISTRY_PUBLIC }}/${{ env.REGISTRY_NAMESPACE }}/${{ env.IMAGE_NAME }}:main"
 
@@ -106,12 +90,9 @@ jobs:
         run: |
           ibmcloud cr va "${{ env.REGISTRY_PUBLIC }}/${{ env.REGISTRY_NAMESPACE }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.tag }}" || true
 
-  # ── Deploy Frontend to Code Engine ────────────────────────────────────────
-  # NOTE: IBM Cloud Functions was deprecated (Dec 2023) — the 'cloud-functions'
-  # CLI plugin no longer exists. Backend functions (db-gateway, storage-sign)
-  # must be migrated to IBM Code Engine Jobs separately.
-  deploy-frontend:
-    name: Deploy Frontend to IBM Code Engine
+  # ── Deploy API to Code Engine ─────────────────────────────────────────────
+  deploy-api:
+    name: Deploy API to IBM Code Engine
     runs-on: ubuntu-latest
     needs: build
     environment: ${{ github.event.inputs.environment || 'production' }}
@@ -132,30 +113,29 @@ jobs:
 
       - name: Deploy to Code Engine
         run: |
-          # Code Engine MUST reference the image via the private registry endpoint.
-          # The registry secret 'hbf-crm' must have pull access to private.us.icr.io.
-          # We deploy the immutable SHA-tagged image so the exact build is traceable,
-          # while the :main tag is always available as a fallback reference.
           PRIVATE_IMAGE="${{ env.REGISTRY_PRIVATE }}/${{ env.REGISTRY_NAMESPACE }}/${{ env.IMAGE_NAME }}:${{ needs.build.outputs.image_tag }}"
           ibmcloud ce application update \
             --name "${{ env.CE_APP_NAME }}" \
             --image "${PRIVATE_IMAGE}" \
             --registry-secret hbf-crm \
+            --env DATABASE_URL="${{ secrets.IBM_DB_CONNECTION_STRING }}" \
+            --env NODE_ENV=production \
             --min-scale 1 --max-scale 10 \
             --cpu 0.5 --memory 1G || \
           ibmcloud ce application create \
             --name "${{ env.CE_APP_NAME }}" \
             --image "${PRIVATE_IMAGE}" \
             --registry-secret hbf-crm \
-            --port 8080 --min-scale 1 --max-scale 10 \
+            --port 8080 \
+            --env DATABASE_URL="${{ secrets.IBM_DB_CONNECTION_STRING }}" \
+            --env NODE_ENV=production \
+            --min-scale 1 --max-scale 10 \
             --cpu 0.5 --memory 1G
 
       - name: Wait for revision to become ready
         run: |
           echo "⏳ Waiting for Code Engine revision to become ready..."
           for i in $(seq 1 20); do
-            STATUS=$(ibmcloud ce application get --name "${{ env.CE_APP_NAME }}" --output json \
-              | python3 -c "import sys,json; a=json.load(sys.stdin); print(a.get('status',{}).get('latestCreatedRevisionName','unknown'))" 2>/dev/null || echo "unknown")
             READY=$(ibmcloud ce application get --name "${{ env.CE_APP_NAME }}" --output json \
               | python3 -c "import sys,json; a=json.load(sys.stdin); conds=a.get('status',{}).get('conditions',[]); r=[c for c in conds if c.get('type')=='Ready']; print(r[0].get('status','False') if r else 'False')" 2>/dev/null || echo "False")
             echo "  Attempt ${i}/20 — Ready: ${READY}"

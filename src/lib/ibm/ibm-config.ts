@@ -16,7 +16,7 @@ export const IBM_CONFIG = {
   database: {
     // These are consumed by IBM Cloud Functions / Code Engine (server-side only)
     // The frontend communicates with IBM Cloud Functions endpoints
-    functionsBaseUrl: import.meta.env.VITE_IBM_FUNCTIONS_BASE_URL || '',
+    functionsBaseUrl: import.meta.env.VITE_IBM_FUNCTIONS_BASE_URL || 'https://hbf-api.23oqh4gja5d5.us-south.codeengine.appdomain.cloud',
     apiKey: import.meta.env.VITE_IBM_FUNCTIONS_API_KEY || '',
   },
 

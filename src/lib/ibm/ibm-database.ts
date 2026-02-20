@@ -169,16 +169,17 @@ class IBMQueryBuilder<T = Record<string, unknown>> implements QueryBuilder<T> {
       const session = await ibmAuth.getSession();
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
-        'x-ibm-crm-table': this.state.table,
-        'x-ibm-crm-operation': this.state.operation,
       };
 
       if (session?.accessToken) {
         headers['Authorization'] = `Bearer ${session.accessToken}`;
       }
+      if (IBM_CONFIG.database.apiKey) {
+        headers['x-api-key'] = IBM_CONFIG.database.apiKey;
+      }
 
       const baseUrl = IBM_CONFIG.database.functionsBaseUrl;
-      const response = await fetch(`${baseUrl}/db-gateway`, {
+      const response = await fetch(`${baseUrl}/api/v1/db-gateway`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -231,8 +232,11 @@ class IBMDatabaseClient {
       if (session?.accessToken) {
         headers['Authorization'] = `Bearer ${session.accessToken}`;
       }
+      if (IBM_CONFIG.database.apiKey) {
+        headers['x-api-key'] = IBM_CONFIG.database.apiKey;
+      }
 
-      const response = await fetch(`${IBM_CONFIG.database.functionsBaseUrl}/rpc/${fn}`, {
+      const response = await fetch(`${IBM_CONFIG.database.functionsBaseUrl}/api/v1/rpc/${fn}`, {
         method: 'POST',
         headers,
         body: JSON.stringify(params ?? {}),

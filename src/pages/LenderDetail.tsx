@@ -20,7 +20,7 @@ import {
   TrendingUp
 } from 'lucide-react';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 import { useToast } from '@/hooks/use-toast';
 import { IBMPageHeader } from '@/components/ui/IBMPageHeader';
 import { LoadingSkeleton } from '@/components/LoadingSkeleton';
@@ -123,17 +123,17 @@ export default function LenderDetail() {
       setLoading(true);
       
       // Fetch lender details
-      const { data: lenderData, error: lenderError } = await supabase
+      const { data: lenderData, error: lenderError } = await ibmDb
         .from('lenders')
         .select('*')
         .eq('id', id)
         .single();
 
       if (lenderError) throw lenderError;
-      setLender(lenderData);
+      setLender(lenderData as unknown as Lender);
 
       // Fetch lender contacts
-      const { data: contactsData, error: contactsError } = await supabase
+      const { data: contactsData, error: contactsError } = await ibmDb
         .from('lender_contacts')
         .select('*')
         .eq('lender_id', id)
@@ -142,10 +142,10 @@ export default function LenderDetail() {
         .order('name');
 
       if (contactsError) throw contactsError;
-      setContacts(contactsData || []);
+      setContacts((contactsData || []) as unknown as LenderContact[]);
 
       // Fetch lender performance metrics
-      const { data: performanceData, error: performanceError } = await supabase
+      const { data: performanceData, error: performanceError } = await ibmDb
         .from('contact_entities')
         .select('stage, id, loan_amount, created_at, updated_at')
         .eq('lender_id', id);
@@ -158,16 +158,14 @@ export default function LenderDetail() {
       let fundedLoans = 0;
       let totalDaysToFunding = 0;
       
-      performanceData?.forEach((contact) => {
+      (performanceData as any[])?.forEach((contact: any) => {
         const stage = contact.stage || 'No Stage';
         stageCount[stage] = (stageCount[stage] || 0) + 1;
         
-        // Sum up loan amounts
         if (contact.loan_amount) {
           totalFunded += Number(contact.loan_amount);
         }
 
-        // Calculate days to funding for funded loans
         if (stage.toLowerCase().includes('funded') || stage.toLowerCase().includes('closed')) {
           fundedLoans++;
           const createdDate = new Date(contact.created_at);
@@ -204,7 +202,7 @@ export default function LenderDetail() {
 
     try {
       if (editingContact) {
-        const { error } = await supabase
+        const { error } = await ibmDb
           .from('lender_contacts')
           .update(contactFormData)
           .eq('id', editingContact.id);
@@ -216,7 +214,7 @@ export default function LenderDetail() {
           description: "Contact updated successfully"
         });
       } else {
-        const { error } = await supabase
+        const { error } = await ibmDb
           .from('lender_contacts')
           .insert([{ 
             ...contactFormData, 
@@ -250,7 +248,7 @@ export default function LenderDetail() {
     if (!confirm(`Are you sure you want to delete ${contactName}?`)) return;
 
     try {
-      const { error } = await supabase
+      const { error } = await ibmDb
         .from('lender_contacts')
         .delete()
         .eq('id', contactId);

@@ -18,7 +18,7 @@ import {
   CheckCircle
 } from 'lucide-react';
 import { useReportsData } from '@/hooks/useReportsData';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 
 interface ReportsOverview {
   totalReports: number;
@@ -48,7 +48,7 @@ export default function Reports() {
     const fetchMetrics = async () => {
       try {
         // Fetch all leads
-        const { data: leads } = await supabase
+        const { data: leads } = await ibmDb
           .from('leads')
           .select(`
             id,
@@ -61,19 +61,18 @@ export default function Reports() {
             )
           `);
 
-        const totalReports = leads?.length || 0;
+        const totalReports = (leads as any[])?.length || 0;
         
         // Calculate leads created today
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        const generatedToday = leads?.filter(l => {
+        const generatedToday = (leads as any[])?.filter((l: any) => {
           const created = new Date(l.created_at);
           created.setHours(0, 0, 0, 0);
           return created.getTime() === today.getTime();
         }).length || 0;
-
         // Calculate data quality metrics
-        const leadsWithCompleteData = leads?.filter(l => {
+        const leadsWithCompleteData = (leads as any[])?.filter((l: any) => {
           const contact = l.contact_entities as any;
           return contact?.stage && contact?.loan_amount && contact?.credit_score;
         }).length || 0;
@@ -81,23 +80,21 @@ export default function Reports() {
         const dataAccuracy = totalReports > 0 ? 
           Math.round((leadsWithCompleteData / totalReports) * 100) : 0;
 
-        // Calculate average update time (as processing metric)
-        const avgUpdateTime = leads?.length > 0 ?
-          leads.reduce((sum, l) => {
+        const avgUpdateTime = (leads as any[])?.length > 0 ?
+          (leads as any[]).reduce((sum: number, l: any) => {
             const created = new Date(l.created_at).getTime();
             const updated = new Date(l.updated_at).getTime();
             return sum + ((updated - created) / (1000 * 60 * 60)); // hours
-          }, 0) / leads.length : 0;
+          }, 0) / (leads as any[]).length : 0;
 
         // Calculate compliance based on complete stages
-        const closedLeads = leads?.filter(l => 
+        const closedLeads = (leads as any[])?.filter((l: any) => 
           (l.contact_entities as any)?.stage === 'Closed Won'
         ).length || 0;
         const complianceScore = totalReports > 0 ?
           Math.round((closedLeads / totalReports) * 100) : 0;
 
-        // Active alerts - leads needing attention
-        const alertsActive = leads?.filter(l => {
+        const alertsActive = (leads as any[])?.filter((l: any) => {
           const stage = (l.contact_entities as any)?.stage;
           return stage === 'Initial Contact' || stage === 'Waiting for Documentation';
         }).length || 0;

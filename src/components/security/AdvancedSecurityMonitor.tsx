@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -33,13 +33,11 @@ export const AdvancedSecurityMonitor: React.FC = () => {
   });
   const [isMonitoring, setIsMonitoring] = useState(true);
 
-  // Real-time security monitoring
   const monitorSecurity = useCallback(async () => {
     if (!user || !isMonitoring) return;
 
     try {
-      // Get recent security events
-      const { data: recentAlerts } = await supabase
+      const { data: recentAlerts } = await ibmDb
         .from('security_events')
         .select('*')
         .eq('user_id', user.id)
@@ -48,10 +46,9 @@ export const AdvancedSecurityMonitor: React.FC = () => {
         .limit(10);
 
       if (recentAlerts) {
-        setAlerts(recentAlerts);
+        setAlerts(recentAlerts as unknown as SecurityAlert[]);
         
-        // Check for critical events
-        const criticalEvents = recentAlerts.filter(alert => alert.severity === 'critical');
+        const criticalEvents = (recentAlerts as any[]).filter(alert => alert.severity === 'critical');
         if (criticalEvents.length > 0) {
           toast.error('Critical security events detected', {
             description: `${criticalEvents.length} critical security events in the last 24 hours`
@@ -59,23 +56,21 @@ export const AdvancedSecurityMonitor: React.FC = () => {
         }
       }
 
-      // Get security metrics
-      const { data: sessionsData } = await supabase
+      const { data: sessionsData } = await ibmDb
         .from('active_sessions')
         .select('count')
         .eq('user_id', user.id)
         .eq('is_active', true);
 
-      const { data: suspiciousData } = await supabase
+      const { data: suspiciousData } = await ibmDb
         .from('security_events')
         .select('count')
         .eq('user_id', user.id)
         .in('event_type', ['suspicious_login', 'rapid_user_actions', 'ip_change'])
         .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
 
-      // Calculate risk score based on recent events
       let riskScore = 0;
-      recentAlerts?.forEach(alert => {
+      (recentAlerts as any[])?.forEach(alert => {
         switch (alert.severity) {
           case 'critical': riskScore += 50; break;
           case 'high': riskScore += 25; break;
@@ -86,9 +81,9 @@ export const AdvancedSecurityMonitor: React.FC = () => {
 
       setMetrics({
         risk_score: Math.min(riskScore, 100),
-        active_sessions: sessionsData?.[0]?.count || 0,
-        failed_login_attempts: recentAlerts?.filter(a => a.event_type === 'login_failure').length || 0,
-        suspicious_activities: suspiciousData?.[0]?.count || 0
+        active_sessions: (sessionsData as any)?.[0]?.count || 0,
+        failed_login_attempts: (recentAlerts as any[])?.filter(a => a.event_type === 'login_failure').length || 0,
+        suspicious_activities: (suspiciousData as any)?.[0]?.count || 0
       });
 
     } catch (error) {
@@ -96,19 +91,11 @@ export const AdvancedSecurityMonitor: React.FC = () => {
     }
   }, [user, isMonitoring]);
 
-  // Set up real-time monitoring
   useEffect(() => {
     if (!user) return;
-
-    // Initial load
     monitorSecurity();
-
-    // Set up periodic monitoring
-    const interval = setInterval(monitorSecurity, 30000); // Every 30 seconds
-
-    return () => {
-      clearInterval(interval);
-    };
+    const interval = setInterval(monitorSecurity, 30000);
+    return () => clearInterval(interval);
   }, [user, monitorSecurity]);
 
   // Anomaly detection for user behavior
@@ -122,9 +109,9 @@ export const AdvancedSecurityMonitor: React.FC = () => {
       clickCount++;
       
       const now = Date.now();
-      if (now - lastResetTime > 60000) { // Reset every minute
-        if (clickCount > 100) { // More than 100 clicks per minute
-          supabase.rpc('log_enhanced_security_event', {
+      if (now - lastResetTime > 60000) {
+        if (clickCount > 100) {
+          ibmDb.rpc('log_enhanced_security_event', {
             p_user_id: user?.id,
             p_event_type: 'excessive_clicking',
             p_severity: 'medium',

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '@/integrations/supabase/client'
+import { ibmDb } from '@/lib/ibm'
 import { useAuth } from '@/components/auth/AuthProvider'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -54,13 +54,12 @@ export function SecurityMonitor() {
   const loadDashboard = async () => {
     try {
       setLoading(true)
-      const { data, error } = await supabase.functions.invoke('security-monitor', {
-        body: { action: 'dashboard' }
+      const { data, error } = await ibmDb.rpc('security-monitor', {
+        action: 'dashboard'
       })
 
       if (error) throw error
-
-      setDashboardData(data)
+      setDashboardData(data as unknown as DashboardData)
     } catch (error) {
       console.error('Error loading security dashboard:', error)
       toast({
@@ -76,18 +75,19 @@ export function SecurityMonitor() {
   const runSecurityMonitor = async () => {
     try {
       setMonitoring(true)
-      const { data, error } = await supabase.functions.invoke('security-monitor', {
-        body: { action: 'monitor' }
+      const { data, error } = await ibmDb.rpc('security-monitor', {
+        action: 'monitor'
       })
 
       if (error) throw error
 
-      setAlerts(data.alerts || [])
+      const result = data as any
+      setAlerts(result.alerts || [])
       
-      if (data.alerts_generated > 0) {
+      if (result.alerts_generated > 0) {
         toast({
           title: "Security Alerts Generated",
-          description: `${data.alerts_generated} new security alerts detected`,
+          description: `${result.alerts_generated} new security alerts detected`,
           variant: "destructive"
         })
       } else {
@@ -97,7 +97,6 @@ export function SecurityMonitor() {
         })
       }
 
-      // Reload dashboard after monitoring
       await loadDashboard()
     } catch (error) {
       console.error('Error running security monitor:', error)
@@ -113,11 +112,9 @@ export function SecurityMonitor() {
 
   const acknowledgeAlert = async (alertId: string) => {
     try {
-      const { error } = await supabase.functions.invoke('security-monitor', {
-        body: { 
-          action: 'acknowledge',
-          alert_ids: [alertId]
-        }
+      const { error } = await ibmDb.rpc('security-monitor', {
+        action: 'acknowledge',
+        alert_ids: [alertId]
       })
 
       if (error) throw error

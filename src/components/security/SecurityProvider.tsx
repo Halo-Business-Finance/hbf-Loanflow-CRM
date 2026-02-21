@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useSessionSecurity } from '@/hooks/useSessionSecurity';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 import { toast } from 'sonner';
 
 interface SecurityContextType {
@@ -83,7 +83,7 @@ export const SecurityProvider: React.FC<SecurityProviderProps> = ({ children }) 
 
   const reportSecurityEvent = async (eventType: string, severity: string, details?: any) => {
     try {
-      await supabase.rpc('log_security_event', {
+      await ibmDb.rpc('log_security_event', {
         p_user_id: user?.id,
         p_event_type: eventType,
         p_severity: severity,

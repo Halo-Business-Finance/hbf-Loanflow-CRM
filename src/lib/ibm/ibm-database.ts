@@ -17,6 +17,7 @@
 import { IBM_CONFIG } from './ibm-config';
 import { ibmAuth } from './ibm-auth';
 import { getRouteConfig, type RouteConfig } from './ibm-route-map';
+import { getRpcRouteConfig } from './ibm-rpc-routes';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -339,6 +340,38 @@ class IBMDatabaseClient {
     try {
       const headers = await buildHeaders();
       const baseUrl = IBM_CONFIG.database.functionsBaseUrl;
+
+      const routeConfig = getRpcRouteConfig(fn);
+
+      if (routeConfig) {
+        // Use individual REST endpoint
+        let url = `${baseUrl}${routeConfig.path}`;
+
+        if (routeConfig.method === 'GET' && params && routeConfig.paramsIn === 'query') {
+          const qp = new URLSearchParams();
+          for (const [k, v] of Object.entries(params)) {
+            if (v != null) qp.set(k, String(v));
+          }
+          const qs = qp.toString();
+          if (qs) url += `?${qs}`;
+        }
+
+        const fetchOpts: RequestInit = { method: routeConfig.method, headers };
+        if (routeConfig.method !== 'GET' && params) {
+          fetchOpts.body = JSON.stringify(params);
+        }
+
+        const response = await fetch(url, fetchOpts);
+        if (!response.ok) {
+          const errBody = await response.json().catch(() => ({}));
+          return { data: null, error: new Error(errBody.message || errBody.error || response.statusText) };
+        }
+        const result = await response.json();
+        return { data: result as T, error: null };
+      }
+
+      // Fallback: generic /rpc/:name for unmapped functions
+      console.warn(`[ibmDb.rpc] No dedicated route for "${fn}", using generic /rpc/${fn}`);
       const response = await fetch(`${baseUrl}/api/v1/rpc/${fn}`, {
         method: 'POST',
         headers,

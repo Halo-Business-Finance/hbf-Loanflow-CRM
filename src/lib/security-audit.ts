@@ -3,7 +3,7 @@
  * Implements automated security checks and compliance verification
  */
 
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 import { logger } from '@/lib/logger';
 
 export interface SecurityAuditResult {

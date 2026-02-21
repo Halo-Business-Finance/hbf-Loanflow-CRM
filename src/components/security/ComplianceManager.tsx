@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -46,18 +46,16 @@ export const ComplianceManager: React.FC = () => {
 
   const loadComplianceData = async () => {
     try {
-      // Load compliance reports
-      const { data: reportsData } = await supabase
+      const { data: reportsData } = await ibmDb
         .from('compliance_reports')
         .select('*')
         .eq('generated_by', user?.id)
         .order('created_at', { ascending: false });
 
       if (reportsData) {
-        setReports(reportsData);
+        setReports(reportsData as unknown as ComplianceReport[]);
       }
 
-      // Calculate compliance metrics
       await calculateComplianceMetrics();
     } catch (error) {
       console.error('Failed to load compliance data:', error);
@@ -66,38 +64,34 @@ export const ComplianceManager: React.FC = () => {
 
   const calculateComplianceMetrics = async () => {
     try {
-      // Check encryption compliance
-      const { data: encryptedFields } = await supabase
+      const { data: encryptedFields } = await ibmDb
         .from('contact_encrypted_fields')
-        .select('count')
+        .select('contact_id')
         .eq('contact_id', user?.id);
 
-      const encryptionCompliance = (encryptedFields?.[0]?.count || 0) > 0;
+      const encryptionCompliance = (encryptedFields?.length || 0) > 0;
 
-      // Check audit trail compliance
-      const { data: auditLogs } = await supabase
+      const { data: auditLogs } = await ibmDb
         .from('audit_logs')
-        .select('count')
+        .select('id')
         .eq('user_id', user?.id)
         .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
 
-      const auditCompliance = (auditLogs?.[0]?.count || 0) > 0;
+      const auditCompliance = (auditLogs?.length || 0) > 0;
 
-      // Check access control compliance
-      const { data: userRoles } = await supabase
+      const { data: userRoles } = await ibmDb
         .from('user_roles')
-        .select('count')
+        .select('id')
         .eq('user_id', user?.id)
         .eq('is_active', true);
 
-      const accessControlCompliance = (userRoles?.[0]?.count || 0) > 0;
+      const accessControlCompliance = (userRoles?.length || 0) > 0;
 
-      // Calculate overall GDPR compliance score
       const complianceFactors = [
         encryptionCompliance,
         auditCompliance,
         accessControlCompliance,
-        true // Data retention (assumed compliant if using the system)
+        true
       ];
 
       const complianceScore = Math.round(
@@ -129,7 +123,7 @@ export const ComplianceManager: React.FC = () => {
         include_data_encryption: true
       };
 
-      const { data, error } = await supabase
+      const { data, error } = await ibmDb
         .from('compliance_reports')
         .insert({
           report_type: reportType,
@@ -145,9 +139,8 @@ export const ComplianceManager: React.FC = () => {
 
       if (error) throw error;
 
-      // Simulate report generation (in a real implementation, this would be handled by a background job)
       setTimeout(async () => {
-      const { error: updateError } = await supabase
+      const { error: updateError } = await ibmDb
         .from('compliance_reports')
         .update({
           status: 'completed',
@@ -161,7 +154,7 @@ export const ComplianceManager: React.FC = () => {
             generated_at: new Date().toISOString()
           }
         })
-        .eq('id', data.id);
+        .eq('id', (data as any).id);
 
         if (!updateError) {
           toast.success(`${reportType} compliance report generated successfully`);
@@ -169,8 +162,7 @@ export const ComplianceManager: React.FC = () => {
         }
       }, 3000);
 
-      // Log compliance report generation
-      await supabase.rpc('log_enhanced_security_event', {
+      await ibmDb.rpc('log_enhanced_security_event', {
         p_user_id: user?.id,
         p_event_type: 'compliance_report_generated',
         p_severity: 'low',
@@ -221,8 +213,7 @@ export const ComplianceManager: React.FC = () => {
       setIsLoading(true);
       toast.info('Initiating GDPR-compliant data deletion...');
 
-      // This would typically trigger a comprehensive data deletion process
-      const { error } = await supabase.rpc('initiate_gdpr_data_deletion', {
+      const { error } = await ibmDb.rpc('initiate_gdpr_data_deletion', {
         p_user_id: user?.id
       });
 
@@ -230,8 +221,7 @@ export const ComplianceManager: React.FC = () => {
       
       toast.success('Data deletion process initiated');
       
-      // Log data deletion request
-      await supabase.rpc('log_enhanced_security_event', {
+      await ibmDb.rpc('log_enhanced_security_event', {
         p_user_id: user?.id,
         p_event_type: 'gdpr_data_deletion_requested',
         p_severity: 'high',

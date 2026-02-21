@@ -4,7 +4,7 @@
  */
 
 import { logger } from '@/lib/logger';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 
 export interface SecurityIncident {
   id: string;

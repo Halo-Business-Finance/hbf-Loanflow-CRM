@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 import { useToast } from '@/hooks/use-toast';
 
 interface ValidationResult {
@@ -18,15 +18,13 @@ export const useServerSideValidation = () => {
     setIsValidating(true);
     
     try {
-      // Server-side validation with security checks
-      const { data, error } = await supabase.functions.invoke('validate-form-data', {
-        body: {
-          formData,
-          securityLevel: 'high',
-          includeXSSCheck: true,
-          includeSQLInjectionCheck: true,
-          logSecurityEvents: true
-        }
+      // Server-side validation via ibmDb.rpc (maps to hbf-api endpoint)
+      const { data, error } = await ibmDb.rpc('validate-form-data', {
+        formData,
+        securityLevel: 'high',
+        includeXSSCheck: true,
+        includeSQLInjectionCheck: true,
+        logSecurityEvents: true
       });
 
       if (error) {
@@ -46,11 +44,9 @@ export const useServerSideValidation = () => {
 
       const result = data as ValidationResult;
       
-      // Log high-risk security flags
       if (result.securityFlags && result.securityFlags.length > 0) {
         console.warn('Security flags detected:', result.securityFlags);
         
-        // Show user-friendly message for security issues
         if (result.securityFlags.includes('xss_attempt') || 
             result.securityFlags.includes('sql_injection_attempt')) {
           toast({
@@ -86,14 +82,12 @@ export const useServerSideValidation = () => {
     fieldType: 'email' | 'phone' | 'financial' | 'pii'
   ) => {
     try {
-      const { data, error } = await supabase.functions.invoke('validate-sensitive-field', {
-        body: {
-          fieldName,
-          fieldValue,
-          fieldType,
-          applyDataMasking: true,
-          requireEncryption: true
-        }
+      const { data, error } = await ibmDb.rpc('validate-sensitive-field', {
+        fieldName,
+        fieldValue,
+        fieldType,
+        applyDataMasking: true,
+        requireEncryption: true
       });
 
       if (error) {
@@ -115,77 +109,8 @@ export const useServerSideValidation = () => {
   };
 };
 
-// Edge function for form validation - create this next
+// Edge function template (for reference only — runs on hbf-api, not in browser)
 export const createFormValidationFunction = `
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
-
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
-
-  try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-
-    const { formData, securityLevel = 'medium' } = await req.json();
-    
-    // Enhanced security validation
-    const securityFlags: string[] = [];
-    const sanitizedData: Record<string, any> = {};
-    
-    for (const [key, value] of Object.entries(formData)) {
-      if (typeof value === 'string') {
-        // XSS detection
-        if (/<script|javascript:|vbscript:|onload|onerror/i.test(value)) {
-          securityFlags.push('xss_attempt');
-        }
-        
-        // SQL injection detection
-        if (/('|(\\-\\-)|(;|\\||\\*|%))/.test(value)) {
-          securityFlags.push('sql_injection_attempt');
-        }
-        
-        // Sanitize the value
-        sanitizedData[key] = value
-          .replace(/<[^>]*>/g, '') // Remove HTML tags
-          .replace(/[<>&"']/g, '') // Remove dangerous characters
-          .trim();
-      } else {
-        sanitizedData[key] = value;
-      }
-    }
-    
-    // Log security events
-    if (securityFlags.length > 0) {
-      await supabase.rpc('log_enhanced_security_event', {
-        p_event_type: 'form_validation_security_flag',
-        p_severity: 'high',
-        p_details: { securityFlags, formData: Object.keys(formData) }
-      });
-    }
-    
-    return new Response(
-      JSON.stringify({
-        isValid: securityFlags.length === 0,
-        sanitizedData,
-        securityFlags
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-  } catch (error) {
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
-    );
-  }
-});
+// This validation logic now runs on the hbf-api backend
+// See: POST /api/v1/security/validate-form-data
 `;

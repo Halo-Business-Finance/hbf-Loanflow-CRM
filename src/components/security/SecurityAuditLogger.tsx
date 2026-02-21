@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 import { useAuth } from '@/components/auth/AuthProvider';
 
 export interface SecurityAuditEvent {
@@ -16,7 +16,7 @@ export const useSecurityAuditLogger = () => {
   const logSecurityEvent = useCallback(async (event: SecurityAuditEvent) => {
     try {
       // Log to security_events table
-      const { error: securityError } = await supabase.rpc('log_enhanced_security_event', {
+      const { error: securityError } = await ibmDb.rpc('log_enhanced_security_event', {
         p_user_id: user?.id || null,
         p_event_type: event.eventType,
         p_severity: event.severity,
@@ -32,7 +32,7 @@ export const useSecurityAuditLogger = () => {
       }
 
       // Also log to audit_logs for compliance
-      const { error: auditError } = await supabase.rpc('create_audit_log', {
+      const { error: auditError } = await ibmDb.rpc('create_audit_log', {
         p_action: `security_${event.eventType}`,
         p_table_name: event.tableName || 'security_events',
         p_record_id: event.recordId,

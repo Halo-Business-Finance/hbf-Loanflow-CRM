@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { supabase } from "@/integrations/supabase/client";
+import { ibmDb } from "@/lib/ibm";
 import { StandardPageLayout } from "@/components/StandardPageLayout";
 import { IBMPageHeader } from "@/components/ui/IBMPageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -59,8 +59,8 @@ export default function SLAManagement() {
   const fetchData = async () => {
     setIsLoading(true);
     const [policiesRes, trackingRes] = await Promise.all([
-      supabase.from("sla_policies").select("*").order("created_at", { ascending: false }),
-      supabase.from("sla_tracking").select("*").order("created_at", { ascending: false }).limit(50),
+      ibmDb.from<SLAPolicy>("sla_policies").select("*").order("created_at", { ascending: false }),
+      ibmDb.from<SLATracking>("sla_tracking").select("*").order("created_at", { ascending: false }).limit(50),
     ]);
 
     if (policiesRes.data) setPolicies(policiesRes.data);
@@ -70,7 +70,7 @@ export default function SLAManagement() {
 
   const createPolicy = async () => {
     if (!user) return;
-    const { error } = await supabase.from("sla_policies").insert([{
+    const { error } = await ibmDb.from("sla_policies").insert([{
       ...newPolicy,
       created_by: user.id,
       escalation_rules: [],

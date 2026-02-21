@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { supabase } from "@/integrations/supabase/client";
+import { ibmDb } from "@/lib/ibm";
 import { StandardPageLayout } from "@/components/StandardPageLayout";
 import { IBMPageHeader } from "@/components/ui/IBMPageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -47,21 +47,26 @@ export default function AILeadScoring() {
 
   const fetchData = async () => {
     setIsLoading(true);
-    const [scoresRes, leadsRes] = await Promise.all([
-      supabase.from("ai_lead_scores").select("*").order("score", { ascending: false }).limit(50),
-      supabase.from("leads").select(`
-        id,
-        contact_entity_id,
-        contact_entities!leads_contact_entity_id_fkey (
-          name,
-          business_name,
-          loan_amount
-        )
-      `).limit(20),
-    ]);
+    const scoresRes = await ibmDb.from<LeadScore>("ai_lead_scores").select("*").order("score", { ascending: false }).limit(50);
+    
+    // Fetch leads and manually join contact entities
+    const leadsRes = await ibmDb.from<Lead>("leads").select("*").limit(20);
+    const leadData = leadsRes.data as Lead[] || [];
+    const contactIds = leadData.map(l => l.contact_entity_id).filter(Boolean);
+    
+    let contactsMap = new Map();
+    if (contactIds.length > 0) {
+      const contactsRes = await ibmDb.from("contact_entities").select("*").in("id", contactIds);
+      (contactsRes.data || []).forEach((c: any) => contactsMap.set(c.id, c));
+    }
+
+    const joinedLeads = leadData.map(l => ({
+      ...l,
+      contact_entities: contactsMap.get(l.contact_entity_id)
+    }));
 
     if (scoresRes.data) setScores(scoresRes.data);
-    if (leadsRes.data) setLeads(leadsRes.data as Lead[]);
+    if (leadsRes.data) setLeads(joinedLeads as Lead[]);
     setIsLoading(false);
   };
 
@@ -86,7 +91,7 @@ export default function AILeadScoring() {
         { action: "Request financials", priority: "medium", reason: "Complete underwriting prep" },
       ];
 
-      await supabase.from("ai_lead_scores").upsert([{
+      await ibmDb.from("ai_lead_scores").upsert([{
         lead_id: lead.id,
         score,
         confidence: Math.random() * 0.3 + 0.7,
@@ -96,7 +101,7 @@ export default function AILeadScoring() {
         predicted_value: lead.contact_entities?.loan_amount || Math.floor(Math.random() * 500000) + 100000,
         model_version: "v1",
         scored_at: new Date().toISOString(),
-      }], { onConflict: 'lead_id' });
+      }]);
     }
 
     toast.success("AI scoring complete!");

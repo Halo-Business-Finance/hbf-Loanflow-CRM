@@ -95,8 +95,8 @@ export default function Lenders() {
       
       // Fetch lenders and contact counts in parallel
       const [lendersResult, contactCountsResult] = await Promise.all([
-        supabase.from('lenders').select('*').order('name'),
-        supabase.from('lender_contacts').select('lender_id')
+        ibmDb.from('lenders').select('*').order('name'),
+        ibmDb.from('lender_contacts').select('lender_id')
       ]);
 
       if (lendersResult.error) throw lendersResult.error;

@@ -9,7 +9,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { Shield, Lock, AlertTriangle, Eye, Users, Key, Activity, Trash2, Database } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { ibmDb } from "@/lib/ibm";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { AdvancedThreatDetection } from "./AdvancedThreatDetection";
 import { SecurityMonitor } from "./SecurityMonitor";
@@ -108,7 +108,7 @@ export function SecurityManager() {
     setLoading(true);
     try {
       // Fetch security notifications
-      const { data: notifications } = await supabase
+      const { data: notifications } = await ibmDb
         .from('security_notifications')
         .select('*')
         .order('created_at', { ascending: false })
@@ -119,7 +119,7 @@ export function SecurityManager() {
       }
 
       // Fetch MFA settings
-      const { data: mfa } = await supabase
+      const { data: mfa } = await ibmDb
         .from('mfa_settings')
         .select('*')
         .eq('user_id', user?.id)
@@ -142,7 +142,7 @@ export function SecurityManager() {
 
       // Fetch password policy (admins only)
       if (hasRole('admin')) {
-        const { data: policy } = await supabase
+        const { data: policy } = await ibmDb
           .from('password_policies')
           .select('*')
           .eq('is_active', true)
@@ -154,9 +154,9 @@ export function SecurityManager() {
 
         // Fetch admin dashboard data
         const [auditResponse, rolesResponse, sessionsResponse] = await Promise.all([
-          supabase.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(50),
-          supabase.from('user_roles').select('*').order('assigned_at', { ascending: false }),
-          supabase.from('user_sessions').select('*').order('last_activity', { ascending: false })
+          ibmDb.from<AuditLog>('audit_logs').select('*').order('created_at', { ascending: false }).limit(50),
+          ibmDb.from<UserRole>('user_roles').select('*').order('assigned_at', { ascending: false }),
+          ibmDb.from<UserSession>('active_sessions').select('*').order('last_activity', { ascending: false })
         ])
 
         if (auditResponse.data) setAuditLogs(auditResponse.data)
@@ -172,7 +172,7 @@ export function SecurityManager() {
 
   const enableMFA = async () => {
     try {
-      const { error } = await supabase
+      const { error } = await ibmDb
         .from('mfa_settings')
         .upsert({
           user_id: user?.id,
@@ -204,7 +204,7 @@ export function SecurityManager() {
 
   const disableMFA = async () => {
     try {
-      const { error } = await supabase
+      const { error } = await ibmDb
         .from('mfa_settings')
         .update({ is_enabled: false })
         .eq('user_id', user?.id);
@@ -231,7 +231,7 @@ export function SecurityManager() {
     if (!hasRole('admin')) return;
 
     try {
-      const { error } = await supabase
+      const { error } = await ibmDb
         .from('password_policies')
         .update(passwordPolicy)
         .eq('is_active', true);
@@ -253,7 +253,7 @@ export function SecurityManager() {
 
   const markNotificationAsRead = async (notificationId: string) => {
     try {
-      const { error } = await supabase
+      const { error } = await ibmDb
         .from('security_notifications')
         .update({ is_read: true })
         .eq('id', notificationId);
@@ -270,7 +270,7 @@ export function SecurityManager() {
 
   const cleanupExpiredSessions = async () => {
     try {
-      const { data, error } = await supabase.rpc('cleanup_expired_sessions')
+      const { data, error } = await ibmDb.rpc('cleanup_expired_sessions')
       
       if (error) throw error
 

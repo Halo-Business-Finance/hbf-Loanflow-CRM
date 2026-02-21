@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react"
 import { useParams, useNavigate } from "react-router-dom"
-import { supabase } from "@/integrations/supabase/client"
+import { ibmDb } from "@/lib/ibm"
+const supabase = ibmDb; // IBM migration shim
 import { useAuth } from "@/components/auth/AuthProvider"
 
 import { Button } from "@/components/ui/button"

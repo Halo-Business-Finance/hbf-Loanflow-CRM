@@ -1,4 +1,5 @@
-import { supabase } from "@/integrations/supabase/client"
+import { ibmDb } from "@/lib/ibm"
+const supabase = ibmDb; // IBM migration shim
 import { getAuthUser } from '@/lib/auth-utils'
 
 export class DataIntegrityFixer {

@@ -14,7 +14,7 @@ import {
   RefreshCw
 } from "lucide-react";
 import { ibmDb } from "@/lib/ibm";
-import { supabase } from "@/integrations/supabase/client";
+// IBM migration: supabase import removed - using ibmDb already imported above
 import { useToast } from "@/hooks/use-toast";
 
 interface SessionData {
@@ -55,19 +55,11 @@ export function AdvancedSessionManager() {
   useEffect(() => {
     loadSessionData();
     
-    // Set up real-time subscription for session changes
-    const sessionsSubscription = supabase
-      .channel('sessions_changes')
-      .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'active_sessions' },
-        () => {
-          loadSessionData();
-        }
-      )
-      .subscribe();
+    // Poll for session changes (replaces Supabase realtime)
+    const interval = setInterval(loadSessionData, 30000);
 
     return () => {
-      supabase.removeChannel(sessionsSubscription);
+      clearInterval(interval);
     };
   }, []);
 

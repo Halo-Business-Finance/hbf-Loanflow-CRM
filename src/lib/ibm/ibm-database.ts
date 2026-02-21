@@ -21,7 +21,7 @@ import { getRpcRouteConfig } from './ibm-rpc-routes';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
-type FilterValue = string | number | boolean | null;
+type FilterValue = string | number | boolean | null | unknown;
 
 interface Filter {
   type: string;
@@ -58,7 +58,7 @@ async function buildHeaders(): Promise<Record<string, string>> {
 
 // ── Query Builder ──────────────────────────────────────────────────────────
 
-class IBMQueryBuilder<T = Record<string, unknown>> {
+class IBMQueryBuilder<T = any> {
   private state: QueryState;
 
   constructor(state: QueryState) {
@@ -340,7 +340,7 @@ class IBMQueryBuilder<T = Record<string, unknown>> {
 // ── Client ─────────────────────────────────────────────────────────────────
 
 class IBMDatabaseClient {
-  from<T = Record<string, unknown>>(table: string): IBMQueryBuilder<T> {
+  from<T = any>(table: string): IBMQueryBuilder<T> {
     return new IBMQueryBuilder<T>({
       table,
       route: getRouteConfig(table),

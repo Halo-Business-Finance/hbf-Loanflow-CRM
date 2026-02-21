@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
 import { useToast } from "@/hooks/use-toast"
-import { supabase } from "@/integrations/supabase/client"
+import { ibmDb } from "@/lib/ibm"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { Plus, DollarSign, Calendar, Percent, Trash2 } from "lucide-react"
 import { formatNumber, formatCurrency } from "@/lib/utils"
@@ -75,7 +75,7 @@ export function LoanManager({ clientId, clientName, loans, onLoansUpdate }: Loan
         maturityDate = maturity.toISOString().split('T')[0]
       }
 
-      const { error } = await supabase
+      const { error } = await ibmDb
         .from('loans')
         .insert({
           user_id: user?.id,
@@ -123,7 +123,7 @@ export function LoanManager({ clientId, clientName, loans, onLoansUpdate }: Loan
 
   const deleteLoan = async (loanId: string) => {
     try {
-      const { error } = await supabase
+      const { error } = await ibmDb
         .from('loans')
         .delete()
         .eq('id', loanId)

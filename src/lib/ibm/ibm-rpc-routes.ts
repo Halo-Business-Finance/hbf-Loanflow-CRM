@@ -50,6 +50,54 @@ export const RPC_ROUTE_MAP: Record<string, RpcRouteConfig> = {
     path: '/api/v1/auth/check-mfa-requirement',
     paramsIn: 'body',
   },
+  mark_mfa_completed: {
+    method: 'POST',
+    path: '/api/v1/auth/mark-mfa-completed',
+    paramsIn: 'body',
+  },
+
+  // ── Contact Data ─────────────────────────────────────────────
+  get_masked_contact_data_enhanced: {
+    method: 'POST',
+    path: '/api/v1/data/get-masked-contact',
+    paramsIn: 'body',
+  },
+  encrypt_contact_field_enhanced: {
+    method: 'POST',
+    path: '/api/v1/data/encrypt-contact-field',
+    paramsIn: 'body',
+  },
+  grant_sensitive_data_permission: {
+    method: 'POST',
+    path: '/api/v1/data/grant-sensitive-permission',
+    paramsIn: 'body',
+  },
+
+  // ── Document Manager ─────────────────────────────────────────
+  secure_document_manager: {
+    method: 'POST',
+    path: '/api/v1/documents/secure-manager',
+    paramsIn: 'body',
+  },
+  create_document_version: {
+    method: 'POST',
+    path: '/api/v1/documents/create-version',
+    paramsIn: 'body',
+  },
+
+  // ── System ───────────────────────────────────────────────────
+  is_system_shutdown: {
+    method: 'POST',
+    path: '/api/v1/security/is-system-shutdown',
+    paramsIn: 'body',
+  },
+  validate_critical_operation_access: {
+    method: 'POST',
+    path: '/api/v1/security/validate-critical-operation',
+    paramsIn: 'body',
+  },
+
+
 
   // ── Security Events ──────────────────────────────────────────
   log_security_event: {

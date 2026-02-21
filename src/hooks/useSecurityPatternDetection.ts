@@ -158,34 +158,12 @@ export const useSecurityPatternDetection = () => {
     if (!isAdmin || !user) return;
 
     // Realtime channels not supported on ibmDb - using polling instead
-    const pollingInterval = setInterval(() => { scanForPatterns(); }, 30000);
-    // @ts-ignore - channel method placeholder
-      .channel('security_pattern_alerts_channel')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'security_pattern_alerts',
-        },
-        (payload) => {
-          const newAlert = payload.new as PatternAlert;
-          setAlerts((prev) => [newAlert, ...prev]);
-
-          if (newAlert.severity === 'critical') {
-            toast({
-              title: "🚨 Critical Security Pattern Detected",
-              description: newAlert.description,
-              variant: "destructive",
-              duration: 10000,
-            });
-          }
-        }
-      )
-      .subscribe();
+    const pollingInterval = setInterval(() => {
+      loadAlerts();
+    }, 30000);
 
     return () => {
-      channel.unsubscribe();
+      clearInterval(pollingInterval);
     };
   }, [isAdmin, user, toast]);
 

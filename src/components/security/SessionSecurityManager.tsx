@@ -45,7 +45,7 @@ export const SessionSecurityManager: React.FC = () => {
         return;
       }
 
-      setSessions((data || []) as SessionData[]);
+      setSessions((data || []) as unknown as SessionData[]);
     } catch (err) {
       setError('Failed to load sessions');
       console.error('Error fetching sessions:', err);

@@ -189,23 +189,6 @@ export const EnhancedSecurityMonitor: React.FC = () => {
     }
   }, [autoMonitoring, fetchSecurityMetrics, fetchSecurityAlerts]);
 
-    // Realtime security events - using polling instead of channels
-    const securityPollInterval = setInterval(async () => {
-      try {
-        const { data: events } = await ibmDb
-          .from('security_events')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(5);
-        // Process new events if needed
-      } catch (e) {
-        // ignore polling errors
-      }
-    }, 15000);
-
-    return () => {
-      clearInterval(securityPollInterval);
-    };
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {

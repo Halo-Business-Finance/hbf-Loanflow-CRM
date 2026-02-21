@@ -22,38 +22,26 @@ export const useSecureForm = () => {
     options: SecureFormOptions = {}
   ): Promise<ValidationResult> => {
     if (!input || input.trim() === '') {
-      return { valid: true, sanitized: '', errors: [] }; // Allow empty fields
+      return { valid: true, sanitized: '', errors: [] };
     }
 
     setIsValidating(true);
     
     try {
-      // For basic text fields like name and business_name, use simple validation
       if (fieldType === 'text') {
         const sanitized = input.trim().replace(/[<>&"']/g, (char) => {
-          const entityMap: Record<string, string> = {
-            '<': '&lt;',
-            '>': '&gt;',
-            '&': '&amp;',
-            '"': '&quot;',
-            "'": '&#x27;'
-          };
+          const entityMap: Record<string, string> = { '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#x27;' };
           return entityMap[char] || char;
         });
-
-        // Basic validation - just check for obviously malicious content
         const hasScript = /<script|javascript:|vbscript:/i.test(input);
         const hasSqlInjection = /(union\s+select|drop\s+table|delete\s+from)/i.test(input);
-        
         if (hasScript || hasSqlInjection) {
           return { valid: false, sanitized: input, errors: ['Invalid characters detected'] };
         }
-
         return { valid: true, sanitized, errors: [] };
       }
 
-      // For email and phone, use the RPC function for more strict validation
-      const { data, error } = await supabase.rpc('validate_and_sanitize_input_enhanced', {
+      const { data, error } = await ibmDb.rpc('validate_and_sanitize_input_enhanced', {
         p_input: input,
         p_field_type: fieldType,
         p_max_length: options.maxLength || 255,
@@ -62,25 +50,17 @@ export const useSecureForm = () => {
 
       if (error) {
         console.error('Validation error:', error);
-        // Fallback to basic sanitization
         const sanitized = input.trim();
         return { valid: true, sanitized, errors: [] };
       }
 
       const result = data as { valid: boolean; sanitized: string; errors: string[] };
-      return {
-        valid: result.valid,
-        sanitized: result.sanitized,
-        errors: result.errors || []
-      };
+      return { valid: result.valid, sanitized: result.sanitized, errors: result.errors || [] };
     } catch (error) {
       console.error('Validation error:', error);
-      // Fallback to basic sanitization
       const sanitized = input.trim();
       return { valid: true, sanitized, errors: [] };
-    } finally {
-      setIsValidating(false);
-    }
+    } finally { setIsValidating(false); }
   }, []);
 
   const sanitizeEmail = useCallback(async (email: string): Promise<ValidationResult> => {
@@ -100,21 +80,13 @@ export const useSecureForm = () => {
   }, [validateAndSanitize]);
 
   const validateFormData = useCallback(async (formData: Record<string, any>): Promise<{
-    isValid: boolean;
-    sanitizedData: Record<string, any>;
-    errors: Record<string, string[]>;
+    isValid: boolean; sanitizedData: Record<string, any>; errors: Record<string, string[]>;
   }> => {
     const sanitizedData: Record<string, any> = {};
     const errors: Record<string, string[]> = {};
     let isValid = true;
 
-    // Define field validation rules
-    const fieldRules: Record<string, { 
-      type: 'text' | 'email' | 'phone' | 'numeric'; 
-      maxLength?: number; 
-      required?: boolean;
-      validation?: { min?: number; max?: number };
-    }> = {
+    const fieldRules: Record<string, { type: 'text' | 'email' | 'phone' | 'numeric'; maxLength?: number; required?: boolean; validation?: { min?: number; max?: number }; }> = {
       email: { type: 'email', maxLength: 254, required: true },
       phone: { type: 'phone', maxLength: 15 },
       name: { type: 'text', maxLength: 100, required: true },
@@ -129,76 +101,33 @@ export const useSecureForm = () => {
     };
 
     for (const [field, value] of Object.entries(formData)) {
-      if (value === null || value === undefined) {
-        sanitizedData[field] = value;
-        continue;
-      }
-
+      if (value === null || value === undefined) { sanitizedData[field] = value; continue; }
       const rule = fieldRules[field];
       if (!rule) {
-        // No specific rule, treat as text
         const result = await sanitizeText(String(value));
         sanitizedData[field] = result.sanitized;
-        if (!result.valid) {
-          errors[field] = result.errors;
-          isValid = false;
-        }
+        if (!result.valid) { errors[field] = result.errors; isValid = false; }
         continue;
       }
-
       if (rule.required && (!value || String(value).trim() === '')) {
-        errors[field] = ['This field is required'];
-        isValid = false;
-        sanitizedData[field] = '';
-        continue;
+        errors[field] = ['This field is required']; isValid = false; sanitizedData[field] = ''; continue;
       }
-
       if (value && String(value).trim() !== '') {
-        // Check numeric validation ranges
         if (rule.type === 'numeric' && rule.validation) {
           const numValue = Number(value);
           if (!isNaN(numValue)) {
-            if (rule.validation.min !== undefined && numValue < rule.validation.min) {
-              errors[field] = [`Value must be at least ${rule.validation.min}`];
-              isValid = false;
-              sanitizedData[field] = value;
-              continue;
-            }
-            if (rule.validation.max !== undefined && numValue > rule.validation.max) {
-              errors[field] = [`Value must not exceed ${rule.validation.max}`];
-              isValid = false;
-              sanitizedData[field] = value;
-              continue;
-            }
+            if (rule.validation.min !== undefined && numValue < rule.validation.min) { errors[field] = [`Value must be at least ${rule.validation.min}`]; isValid = false; sanitizedData[field] = value; continue; }
+            if (rule.validation.max !== undefined && numValue > rule.validation.max) { errors[field] = [`Value must not exceed ${rule.validation.max}`]; isValid = false; sanitizedData[field] = value; continue; }
           }
         }
-
-        const result = await validateAndSanitize(
-          String(value), 
-          rule.type, 
-          { maxLength: rule.maxLength }
-        );
-        
+        const result = await validateAndSanitize(String(value), rule.type, { maxLength: rule.maxLength });
         sanitizedData[field] = result.sanitized;
-        if (!result.valid) {
-          errors[field] = result.errors;
-          isValid = false;
-        }
-      } else {
-        sanitizedData[field] = value;
-      }
+        if (!result.valid) { errors[field] = result.errors; isValid = false; }
+      } else { sanitizedData[field] = value; }
     }
 
     return { isValid, sanitizedData, errors };
   }, [validateAndSanitize, sanitizeText]);
 
-  return {
-    isValidating,
-    validateAndSanitize,
-    sanitizeEmail,
-    sanitizePhone,
-    sanitizeText,
-    sanitizeNumeric,
-    validateFormData
-  };
+  return { isValidating, validateAndSanitize, sanitizeEmail, sanitizePhone, sanitizeText, sanitizeNumeric, validateFormData };
 };

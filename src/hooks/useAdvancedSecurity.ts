@@ -19,21 +19,19 @@ interface SecurityEventParams {
 export const useAdvancedSecurity = () => {
   const { user } = useAuth();
 
-  // Enhanced rate limiting with secure database tracking
   const checkRateLimit = useCallback(async (
     action: string, 
     maxAttempts: number = 5, 
     windowMinutes: number = 15
   ): Promise<RateLimitResult> => {
     try {
-      const { data, error } = await supabase.rpc('check_user_rate_limit_secure', {
+      const { data, error } = await ibmDb.rpc('check_user_rate_limit_secure', {
         p_action_type: action,
         p_max_attempts: maxAttempts,
         p_window_minutes: windowMinutes
       });
 
       if (error) throw error;
-
       return data as unknown as RateLimitResult;
     } catch (error) {
       console.error('Rate limit check failed:', error);
@@ -41,7 +39,6 @@ export const useAdvancedSecurity = () => {
     }
   }, []);
 
-  // Create security alerts
   const createSecurityAlert = useCallback(async (
     alertType: string,
     severity: 'low' | 'medium' | 'high' | 'critical',
@@ -50,7 +47,7 @@ export const useAdvancedSecurity = () => {
     metadata: any = {}
   ) => {
     try {
-      const { error } = await supabase
+      const { error } = await ibmDb
         .from('security_alerts')
         .insert({
           alert_type: alertType,
@@ -60,21 +57,19 @@ export const useAdvancedSecurity = () => {
           user_id: user?.id,
           metadata
         });
-
       if (error) throw error;
     } catch (error) {
       console.error('Failed to create security alert:', error);
     }
   }, [user?.id]);
 
-  // Log session anomalies
   const logSessionAnomaly = useCallback(async (
     anomalyType: string,
     riskScore: number,
     details: any = {}
   ) => {
     try {
-      const { error } = await supabase
+      const { error } = await ibmDb
         .from('session_anomalies')
         .insert({
           user_id: user?.id,
@@ -83,10 +78,8 @@ export const useAdvancedSecurity = () => {
           risk_score: riskScore,
           details
         });
-
       if (error) throw error;
 
-      // Auto-create alert for high-risk anomalies
       if (riskScore > 70) {
         await createSecurityAlert(
           'session_anomaly',
@@ -101,7 +94,6 @@ export const useAdvancedSecurity = () => {
     }
   }, [user?.id, createSecurityAlert]);
 
-  // Enhanced input validation with XSS protection
   const validateInput = useCallback(async (
     input: string,
     fieldType: 'text' | 'email' | 'phone' | 'numeric' | 'url' = 'text',
@@ -109,7 +101,7 @@ export const useAdvancedSecurity = () => {
     allowHtml: boolean = false
   ) => {
     try {
-      const { data, error } = await supabase.rpc('validate_and_sanitize_input_enhanced', {
+      const { data, error } = await ibmDb.rpc('validate_and_sanitize_input_enhanced', {
         p_input: input,
         p_field_type: fieldType,
         p_max_length: maxLength,
@@ -118,7 +110,6 @@ export const useAdvancedSecurity = () => {
 
       if (error) throw error;
 
-      // Log suspicious input attempts
       const validationResult = data as any;
       if (!validationResult.valid && validationResult.errors?.some((err: string) => 
         err.includes('malicious') || err.includes('injection')
@@ -139,7 +130,6 @@ export const useAdvancedSecurity = () => {
     }
   }, [createSecurityAlert]);
 
-  // Monitor for suspicious patterns
   useEffect(() => {
     if (!user) return;
 
@@ -148,34 +138,24 @@ export const useAdvancedSecurity = () => {
 
     const monitorRapidClicks = () => {
       rapidClickCount++;
-      
       if (rapidClickCount === 1) {
-        rapidClickTimer = setTimeout(() => {
-          rapidClickCount = 0;
-        }, 5000);
+        rapidClickTimer = setTimeout(() => { rapidClickCount = 0; }, 5000);
       }
-      
       if (rapidClickCount > 20) {
-        logSessionAnomaly('rapid_clicking', 60, {
-          click_count: rapidClickCount,
-          timeframe: '5_seconds'
-        });
+        logSessionAnomaly('rapid_clicking', 60, { click_count: rapidClickCount, timeframe: '5_seconds' });
         rapidClickCount = 0;
       }
     };
 
     const monitorTabVisibility = () => {
       if (document.hidden) {
-        logSessionAnomaly('tab_hidden_during_session', 20, {
-          timestamp: new Date().toISOString()
-        });
+        logSessionAnomaly('tab_hidden_during_session', 20, { timestamp: new Date().toISOString() });
       }
     };
 
     const monitorDevTools = () => {
       const threshold = 160;
-      if (window.outerHeight - window.innerHeight > threshold ||
-          window.outerWidth - window.innerWidth > threshold) {
+      if (window.outerHeight - window.innerHeight > threshold || window.outerWidth - window.innerWidth > threshold) {
         logSessionAnomaly('devtools_detected', 40, {
           window_dimensions: {
             outer: { width: window.outerWidth, height: window.outerHeight },
@@ -187,7 +167,6 @@ export const useAdvancedSecurity = () => {
 
     document.addEventListener('click', monitorRapidClicks);
     document.addEventListener('visibilitychange', monitorTabVisibility);
-    
     const devToolsInterval = setInterval(monitorDevTools, 10000);
 
     return () => {
@@ -198,10 +177,5 @@ export const useAdvancedSecurity = () => {
     };
   }, [user, logSessionAnomaly]);
 
-  return {
-    checkRateLimit,
-    createSecurityAlert,
-    logSessionAnomaly,
-    validateInput
-  };
+  return { checkRateLimit, createSecurityAlert, logSessionAnomaly, validateInput };
 };

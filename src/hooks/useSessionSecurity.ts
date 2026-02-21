@@ -1,5 +1,5 @@
 import { useEffect, useCallback, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { toast } from 'sonner';
 import { useZeroLocalStorage } from '@/lib/zero-localStorage-security';
@@ -20,13 +20,12 @@ export const useSessionSecurity = () => {
   const cleanupSession = useCallback(async () => {
     if (sessionToken && user) {
       try {
-        await supabase
+        await ibmDb
           .from('active_sessions')
           .update({ is_active: false })
           .eq('session_token', sessionToken)
           .eq('user_id', user.id);
       } catch (error) {
-        // Silently handle cleanup errors - don't prevent signout
         console.warn('Session cleanup warning:', error);
       }
     }
@@ -40,14 +39,11 @@ export const useSessionSecurity = () => {
       await signOut();
     } catch (error) {
       console.error('Sign out error:', error);
-      // Force cleanup even if there's an error
       setSessionToken(null);
-      // Still attempt to sign out from Supabase auth
       try {
         await signOut();
       } catch (authError) {
         console.error('Auth sign out error:', authError);
-        // Even if auth signout fails, we've cleaned up our session
       }
     }
   }, [cleanupSession, signOut]);
@@ -55,22 +51,20 @@ export const useSessionSecurity = () => {
   // Generate session token on login with localStorage audit
   useEffect(() => {
     if (user && !sessionToken) {
-      // Audit and clean localStorage on session start
       auditLocalStorage();
       
       const token = crypto.randomUUID();
       setSessionToken(token);
       
-      // Create session record with enhanced security
-      supabase
+      ibmDb
         .from('active_sessions')
         .insert({
           user_id: user.id,
           session_token: token,
           device_fingerprint: generateDeviceFingerprint(),
           user_agent: navigator.userAgent,
-          expires_at: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString(), // 8 hours
-          ip_address: null, // Will be updated on first validation
+          expires_at: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString(),
+          ip_address: null,
           browser_fingerprint: generateDeviceFingerprint(),
           screen_resolution: `${screen.width}x${screen.height}`,
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -79,8 +73,7 @@ export const useSessionSecurity = () => {
           if (error) {
             console.error('Session creation error:', error);
           } else {
-            // Log session start with security audit
-            supabase
+            ibmDb
               .from('security_events')
               .insert({
                 event_type: 'secure_session_started',
@@ -137,30 +130,26 @@ export const useSessionSecurity = () => {
     if (!user || !sessionToken) return false;
 
     try {
-      // Use simplified validation approach without external IP lookup
-      const { data, error } = await supabase
+      const { data, error } = await ibmDb
         .from('active_sessions')
         .select('*')
         .eq('user_id', user.id)
         .eq('session_token', sessionToken)
         .eq('is_active', true)
-        .gt('expires_at', new Date().toISOString())
+        .gt('expires_at', new Date().toISOString() as any)
         .maybeSingle();
 
       if (error) {
         console.warn('Session validation error:', error);
-        // Don't show toast for validation errors during periodic checks
         return false;
       }
 
       if (!data) {
-        // Session not found or expired - only show toast for user-initiated actions
         console.warn('Session not found or expired');
         return false;
       }
 
-      // Update last activity with comprehensive monitoring
-      await supabase
+      await ibmDb
         .from('active_sessions')
         .update({ 
           last_activity: new Date().toISOString(),
@@ -169,17 +158,15 @@ export const useSessionSecurity = () => {
           referrer: document.referrer || null,
           last_security_check: new Date().toISOString()
         })
-        .eq('id', data.id);
+        .eq('id', (data as any).id);
 
-      // Periodic localStorage audit during session
-      if (Math.random() < 0.1) { // 10% chance to audit
+      if (Math.random() < 0.1) {
         auditLocalStorage();
       }
 
       return true;
     } catch (error) {
       console.warn('Session validation error:', error);
-      // Don't show error toasts for periodic validation failures
       return false;
     }
   }, [user, sessionToken]);
@@ -196,7 +183,7 @@ export const useSessionSecurity = () => {
     
     const throttledActivity = () => {
       clearTimeout(activityTimeout);
-      activityTimeout = setTimeout(trackActivity, 1000); // Throttle to once per second
+      activityTimeout = setTimeout(trackActivity, 1000);
     };
     
     events.forEach(event => {
@@ -217,7 +204,7 @@ export const useSessionSecurity = () => {
 
     const interval = setInterval(() => {
       validateSession();
-    }, 5 * 60 * 1000); // Every 5 minutes
+    }, 5 * 60 * 1000);
 
     return () => clearInterval(interval);
   }, [user, sessionToken, validateSession]);
@@ -234,7 +221,7 @@ export const useSessionSecurity = () => {
           onClick: () => trackActivity()
         }
       });
-    }, 25 * 60 * 1000); // Warn 5 minutes before 30-minute timeout
+    }, 25 * 60 * 1000);
 
     return () => clearTimeout(timeoutWarning);
   }, [lastActivity, user, trackActivity]);

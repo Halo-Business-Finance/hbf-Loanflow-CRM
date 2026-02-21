@@ -4,7 +4,6 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { ibmDb } from '@/lib/ibm';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { logger } from '@/lib/logger';
 
@@ -32,7 +31,6 @@ export const useSecurityMonitoring = () => {
   const [isMonitoring, setIsMonitoring] = useState(false);
   const { toast } = useToast();
 
-  // Log security event with enhanced context
   const logSecurityEvent = useCallback(async (
     eventType: string,
     severity: 'low' | 'medium' | 'high' | 'critical' = 'medium',
@@ -54,7 +52,6 @@ export const useSecurityMonitoring = () => {
         p_details: enhancedDetails
       });
 
-      // Show immediate notification for high/critical events
       if (severity === 'high' || severity === 'critical') {
         toast({
           title: `${severity.toUpperCase()} Security Alert`,
@@ -67,7 +64,6 @@ export const useSecurityMonitoring = () => {
     }
   }, [toast]);
 
-  // Fetch current security metrics
   const fetchSecurityMetrics = useCallback(async () => {
     try {
       const [sessionsResult, eventsResult] = await Promise.all([
@@ -76,71 +72,52 @@ export const useSecurityMonitoring = () => {
       ]);
 
       const activeSessions = sessionsResult.data?.length || 0;
-      const recentEvents = eventsResult.data || [];
-      const criticalEvents = recentEvents.filter(e => e.severity === 'critical').length;
-      const highEvents = recentEvents.filter(e => e.severity === 'high').length;
-      const suspiciousActivities = recentEvents.filter(e => 
+      const recentEventsData = eventsResult.data || [];
+      const criticalEvents = recentEventsData.filter(e => e.severity === 'critical').length;
+      const highEvents = recentEventsData.filter(e => e.severity === 'high').length;
+      const suspiciousActivities = recentEventsData.filter(e => 
         (e as any).event_type?.includes('suspicious') || (e as any).event_type?.includes('anomaly')
       ).length;
-      const automatedResponses = recentEvents.filter(e => 
+      const automatedResponses = recentEventsData.filter(e => 
         e.details && typeof e.details === 'object' && (e.details as any).autoResolved
       ).length;
 
-      // Calculate threat level based on recent events
       let threatLevel: 'low' | 'medium' | 'high' | 'critical' = 'low';
       if (criticalEvents > 0) threatLevel = 'critical';
       else if (highEvents > 3) threatLevel = 'high';
       else if (highEvents > 0 || suspiciousActivities > 2) threatLevel = 'medium';
 
-      // Calculate security score (100 - penalty for each event type)
       const securityScore = Math.max(0, 100 - (criticalEvents * 20) - (highEvents * 10) - (suspiciousActivities * 5));
 
       setMetrics({
-        threatLevel,
-        securityScore,
-        activeSessions,
-        suspiciousActivities,
-        automatedResponses,
+        threatLevel, securityScore, activeSessions, suspiciousActivities, automatedResponses,
         lastScanTime: new Date().toISOString()
       });
 
-      return {
-        threatLevel,
-        securityScore,
-        activeSessions,
-        suspiciousActivities,
-        automatedResponses,
-        eventsCount: recentEvents.length
-      };
+      return { threatLevel, securityScore, activeSessions, suspiciousActivities, automatedResponses, eventsCount: recentEventsData.length };
     } catch (error) {
       logger.error('Error fetching security metrics:', error);
       return null;
     }
   }, []);
 
-  // Automated security health check
   const runSecurityHealthCheck = useCallback(async () => {
     try {
-      const metrics = await fetchSecurityMetrics();
-      if (!metrics) return false;
+      const metricsData = await fetchSecurityMetrics();
+      if (!metricsData) return false;
 
-      // Log health check event
       await logSecurityEvent('automated_security_health_check', 'low', {
-        securityScore: metrics.securityScore,
-        threatLevel: metrics.threatLevel,
-        activeSessions: metrics.activeSessions,
-        checkType: 'automated'
+        securityScore: metricsData.securityScore, threatLevel: metricsData.threatLevel,
+        activeSessions: metricsData.activeSessions, checkType: 'automated'
       });
 
-      // Trigger alerts based on health check results
-      if (metrics.threatLevel === 'critical') {
+      if (metricsData.threatLevel === 'critical') {
         await logSecurityEvent('critical_threat_level_detected', 'critical', {
-          securityScore: metrics.securityScore,
-          suspiciousActivities: metrics.suspiciousActivities
+          securityScore: metricsData.securityScore, suspiciousActivities: metricsData.suspiciousActivities
         });
-      } else if (metrics.securityScore < 70) {
+      } else if (metricsData.securityScore < 70) {
         await logSecurityEvent('low_security_score_detected', 'high', {
-          securityScore: metrics.securityScore,
+          securityScore: metricsData.securityScore,
           recommendation: 'Review recent security events and strengthen security measures'
         });
       }
@@ -148,43 +125,34 @@ export const useSecurityMonitoring = () => {
       return true;
     } catch (error) {
       logger.error('Security health check failed:', error);
-      await logSecurityEvent('security_health_check_failed', 'medium', {
-        error: String(error)
-      });
+      await logSecurityEvent('security_health_check_failed', 'medium', { error: String(error) });
       return false;
     }
   }, [fetchSecurityMetrics, logSecurityEvent]);
 
-  // Monitor for suspicious activity patterns
   const detectSuspiciousPatterns = useCallback(async () => {
     try {
-      // Check for multiple failed login attempts
-      const { data: failedLogins } = await supabase
+      const { data: failedLogins } = await ibmDb
         .from('security_events')
         .select('*')
         .eq('event_type', 'login_failed')
-        .gte('created_at', new Date(Date.now() - 30 * 60 * 1000).toISOString()); // Last 30 minutes
+        .gte('created_at', new Date(Date.now() - 30 * 60 * 1000).toISOString());
 
       if (failedLogins && failedLogins.length >= 5) {
         await logSecurityEvent('multiple_failed_login_attempts', 'high', {
-          attemptCount: failedLogins.length,
-          timeWindow: '30 minutes',
-          autoResponse: 'Account lockout initiated'
+          attemptCount: failedLogins.length, timeWindow: '30 minutes', autoResponse: 'Account lockout initiated'
         }, true);
       }
 
-      // Check for unusual access patterns
-      const { data: accessEvents } = await supabase
+      const { data: accessEvents } = await ibmDb
         .from('security_events')
         .select('*')
         .in('event_type', ['profile_data_access', 'sensitive_data_access'])
-        .gte('created_at', new Date(Date.now() - 60 * 60 * 1000).toISOString()); // Last hour
+        .gte('created_at', new Date(Date.now() - 60 * 60 * 1000).toISOString());
 
       if (accessEvents && accessEvents.length >= 20) {
         await logSecurityEvent('unusual_access_pattern_detected', 'medium', {
-          accessCount: accessEvents.length,
-          timeWindow: '1 hour',
-          autoResponse: 'Enhanced monitoring activated'
+          accessCount: accessEvents.length, timeWindow: '1 hour', autoResponse: 'Enhanced monitoring activated'
         }, true);
       }
     } catch (error) {
@@ -192,17 +160,12 @@ export const useSecurityMonitoring = () => {
     }
   }, [logSecurityEvent]);
 
-  // Start automated monitoring
   const startMonitoring = useCallback(() => {
     setIsMonitoring(true);
-    
-    // Initial health check
     runSecurityHealthCheck();
-    
-    // Set up periodic monitoring
-    const healthCheckInterval = setInterval(runSecurityHealthCheck, 5 * 60 * 1000); // Every 5 minutes
-    const patternCheckInterval = setInterval(detectSuspiciousPatterns, 2 * 60 * 1000); // Every 2 minutes
-    const metricsInterval = setInterval(fetchSecurityMetrics, 30 * 1000); // Every 30 seconds
+    const healthCheckInterval = setInterval(runSecurityHealthCheck, 5 * 60 * 1000);
+    const patternCheckInterval = setInterval(detectSuspiciousPatterns, 2 * 60 * 1000);
+    const metricsInterval = setInterval(fetchSecurityMetrics, 30 * 1000);
 
     return () => {
       clearInterval(healthCheckInterval);
@@ -211,60 +174,50 @@ export const useSecurityMonitoring = () => {
     };
   }, [runSecurityHealthCheck, detectSuspiciousPatterns, fetchSecurityMetrics]);
 
-  // Stop monitoring
   const stopMonitoring = useCallback(() => {
     setIsMonitoring(false);
   }, []);
 
-  // Real-time security event subscription
+  // Poll for new security events instead of realtime subscription
   useEffect(() => {
-    const channel = supabase
-      .channel('security-monitoring')
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'security_events'
-      }, (payload) => {
-        const newEvent: SecurityEvent = {
-          id: payload.new.id,
-          eventType: payload.new.event_type || 'unknown',
-          severity: payload.new.severity as 'low' | 'medium' | 'high' | 'critical',
-          details: payload.new.details,
-          createdAt: payload.new.created_at,
-          autoResolved: payload.new.details?.autoResolved || false
-        };
+    const pollEvents = async () => {
+      try {
+        const { data } = await ibmDb
+          .from('security_events')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(10);
 
-        setRecentEvents(prev => [newEvent, ...prev.slice(0, 9)]);
-
-        // Auto-refresh metrics when new events arrive
-        if (newEvent.severity === 'high' || newEvent.severity === 'critical') {
-          fetchSecurityMetrics();
+        if (data) {
+          const mapped: SecurityEvent[] = data.map((e: any) => ({
+            id: e.id,
+            eventType: e.event_type || 'unknown',
+            severity: e.severity,
+            details: e.details,
+            createdAt: e.created_at,
+            autoResolved: e.details?.autoResolved || false
+          }));
+          setRecentEvents(mapped);
         }
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
+      } catch {
+        // silent
+      }
     };
-  }, [fetchSecurityMetrics]);
 
-  // Initialize monitoring on mount
+    pollEvents();
+    const interval = setInterval(pollEvents, 15000);
+    return () => clearInterval(interval);
+  }, []);
+
   useEffect(() => {
     fetchSecurityMetrics();
     const cleanup = startMonitoring();
-
     return cleanup;
   }, [fetchSecurityMetrics, startMonitoring]);
 
   return {
-    metrics,
-    recentEvents,
-    isMonitoring,
-    logSecurityEvent,
-    fetchSecurityMetrics,
-    runSecurityHealthCheck,
-    detectSuspiciousPatterns,
-    startMonitoring,
-    stopMonitoring
+    metrics, recentEvents, isMonitoring, logSecurityEvent,
+    fetchSecurityMetrics, runSecurityHealthCheck, detectSuspiciousPatterns,
+    startMonitoring, stopMonitoring
   };
 };

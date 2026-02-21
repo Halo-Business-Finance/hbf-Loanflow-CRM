@@ -3,7 +3,7 @@
  * Provides robust session validation and security checks
  */
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useSessionSecurity } from '@/hooks/useSessionSecurity';
 import { useToast } from '@/hooks/use-toast';

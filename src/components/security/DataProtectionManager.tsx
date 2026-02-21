@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -42,7 +42,6 @@ export const DataProtectionManager: React.FC = () => {
   });
   const [isLoading, setIsLoading] = useState(false);
 
-  // Load current settings
   useEffect(() => {
     if (!user) return;
     loadDataProtectionSettings();
@@ -51,8 +50,7 @@ export const DataProtectionManager: React.FC = () => {
 
   const loadDataProtectionSettings = async () => {
     try {
-      // Load settings from server-side storage (using any to bypass type checking until types regenerate)
-      const { data, error } = await (supabase as any)
+      const { data, error } = await (ibmDb as any)
         .from('user_settings')
         .select('*')
         .eq('user_id', user?.id)
@@ -76,8 +74,7 @@ export const DataProtectionManager: React.FC = () => {
     try {
       setIsLoading(true);
       
-      // Save settings to server-side storage with upsert (using any to bypass type checking)
-      const { error } = await (supabase as any)
+      const { error } = await (ibmDb as any)
         .from('user_settings')
         .upsert({
           user_id: user?.id,
@@ -93,8 +90,7 @@ export const DataProtectionManager: React.FC = () => {
       setSettings(newSettings);
       toast.success('Data protection settings saved');
       
-      // Log security event for settings change
-      await (supabase as any).from('security_events').insert({
+      await ibmDb.from('security_events').insert({
         user_id: user?.id,
         event_type: 'data_protection_settings_changed',
         severity: 'low',
@@ -110,13 +106,11 @@ export const DataProtectionManager: React.FC = () => {
 
   const checkEncryptionStatus = async () => {
     try {
-      // Check profile encryption status
-      const { data: profileFields } = await supabase
+      const { data: profileFields } = await ibmDb
         .from('contact_encrypted_fields')
         .select('contact_id')
         .eq('contact_id', user?.id);
 
-      // Count total sensitive fields that should be encrypted
       const sensitiveFields = ['email', 'phone', 'income', 'credit_score'];
       const totalFields = sensitiveFields.length;
       const encryptedFields = profileFields?.length || 0;
@@ -137,15 +131,14 @@ export const DataProtectionManager: React.FC = () => {
       setIsLoading(true);
       toast.info('Starting data encryption process...');
 
-      const { data, error } = await supabase.rpc('encrypt_existing_contact_data');
+      const { data, error } = await ibmDb.rpc('encrypt_existing_contact_data');
       
       if (error) throw error;
       
       await checkEncryptionStatus();
       toast.success('Data encryption completed');
       
-      // Log security event
-      await supabase.rpc('log_enhanced_security_event', {
+      await ibmDb.rpc('log_enhanced_security_event', {
         p_user_id: user?.id,
         p_event_type: 'data_encryption_completed',
         p_severity: 'low',
@@ -164,12 +157,10 @@ export const DataProtectionManager: React.FC = () => {
       setIsLoading(true);
       toast.info('Preparing secure data export...');
 
-      // Get encrypted contact data
-      const { data: contactData } = await supabase.rpc('get_masked_contact_data_enhanced', {
+      const { data: contactData } = await ibmDb.rpc('get_masked_contact_data_enhanced', {
         p_contact_id: user?.id
       });
 
-      // Create secure export
       const exportData = {
         user_id: user?.id,
         export_date: new Date().toISOString(),
@@ -192,8 +183,7 @@ export const DataProtectionManager: React.FC = () => {
 
       toast.success('Secure data export completed');
       
-      // Log export event
-      await supabase.rpc('log_enhanced_security_event', {
+      await ibmDb.rpc('log_enhanced_security_event', {
         p_user_id: user?.id,
         p_event_type: 'secure_data_export',
         p_severity: 'medium',
@@ -212,8 +202,7 @@ export const DataProtectionManager: React.FC = () => {
       setIsLoading(true);
       toast.info('Starting data anonymization...');
 
-      // This would typically call a function to anonymize sensitive data
-      const { error } = await supabase.rpc('anonymize_user_data', {
+      const { error } = await ibmDb.rpc('anonymize_user_data', {
         p_user_id: user?.id
       });
 
@@ -221,8 +210,7 @@ export const DataProtectionManager: React.FC = () => {
       
       toast.success('Data anonymization completed');
       
-      // Log anonymization event
-      await supabase.rpc('log_enhanced_security_event', {
+      await ibmDb.rpc('log_enhanced_security_event', {
         p_user_id: user?.id,
         p_event_type: 'data_anonymization',
         p_severity: 'medium',

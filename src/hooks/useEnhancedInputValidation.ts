@@ -3,7 +3,7 @@
  * Implements XSS protection, length limits, and security monitoring
  */
 import { useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 
 export interface ValidationResult {
   isValid: boolean;

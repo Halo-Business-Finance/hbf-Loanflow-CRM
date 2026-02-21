@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
+import { ibmDb } from '@/lib/ibm';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Shield, AlertTriangle, CheckCircle, Activity, Zap, Eye } from 'lucide-react';
@@ -49,24 +50,20 @@ export const EnhancedSecurityMonitor: React.FC = () => {
   const [autoMonitoring, setAutoMonitoring] = useState(true);
   const { toast } = useToast();
 
-  // Fetch security metrics
   const fetchSecurityMetrics = useCallback(async () => {
     try {
-      // Use existing database queries to get metrics
       const [userSessionsResult, eventsResult] = await Promise.all([
-        supabase
+        ibmDb
           .from('active_sessions')
           .select('user_id')
-          .eq('is_active', true)
-          .gt('expires_at', new Date().toISOString()),
-        supabase
+          .eq('is_active', true),
+        ibmDb
           .from('security_events')
           .select('*')
-          .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
       ]);
 
-      const uniqueUsers = new Set(userSessionsResult.data?.map(s => s.user_id) || []).size;
-      const recentEvents = eventsResult.data || [];
+      const uniqueUsers = new Set((userSessionsResult.data as any[])?.map(s => s.user_id) || []).size;
+      const recentEvents = (eventsResult.data as any[]) || [];
       const criticalEvents = recentEvents.filter(e => e.severity === 'critical' || e.severity === 'high').length;
       
       setMetrics({
@@ -80,7 +77,6 @@ export const EnhancedSecurityMonitor: React.FC = () => {
       });
     } catch (error) {
       console.error('Error fetching security metrics:', error);
-      // Set default metrics on error
       setMetrics({
         threat_level: 'low',
         active_sessions: 0,
@@ -93,10 +89,9 @@ export const EnhancedSecurityMonitor: React.FC = () => {
     }
   }, []);
 
-  // Fetch recent security alerts
   const fetchSecurityAlerts = useCallback(async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await ibmDb
         .from('security_events')
         .select('*')
         .order('created_at', { ascending: false })
@@ -104,7 +99,7 @@ export const EnhancedSecurityMonitor: React.FC = () => {
       
       if (error) throw error;
       
-      const formattedAlerts: SecurityAlert[] = (data || []).map(event => ({
+      const formattedAlerts: SecurityAlert[] = ((data as any[]) || []).map(event => ({
         id: event.id,
         event_type: event.event_type || 'unknown',
         severity: (event.severity as 'low' | 'medium' | 'high' | 'critical') || 'low',
@@ -120,12 +115,10 @@ export const EnhancedSecurityMonitor: React.FC = () => {
     }
   }, []);
 
-  // Automated security scan
   const runAutomatedScan = useCallback(async () => {
     setIsScanning(true);
     try {
-      // Log security scan event
-      await supabase.rpc('log_security_event', {
+      await ibmDb.rpc('log_security_event', {
         p_event_type: 'automated_security_scan_initiated',
         p_severity: 'low',
         p_details: { scan_type: 'comprehensive', timestamp: new Date().toISOString() }
@@ -136,7 +129,6 @@ export const EnhancedSecurityMonitor: React.FC = () => {
         description: "Automated security scan is running...",
       });
 
-      // Update scans list
       const newScan: AutomatedScan = {
         id: Date.now().toString(),
         scan_type: 'comprehensive',
@@ -146,9 +138,8 @@ export const EnhancedSecurityMonitor: React.FC = () => {
       };
       setScans(prev => [newScan, ...prev.slice(0, 4)]);
 
-      // Simulate scan completion with realistic findings
       setTimeout(async () => {
-        const findings = Math.floor(Math.random() * 5); // 0-4 findings
+        const findings = Math.floor(Math.random() * 5);
         
         setScans(prev => prev.map(scan => 
           scan.id === newScan.id 
@@ -157,8 +148,7 @@ export const EnhancedSecurityMonitor: React.FC = () => {
         ));
         setIsScanning(false);
         
-        // Log scan completion
-        await supabase.rpc('log_security_event', {
+        await ibmDb.rpc('log_security_event', {
           p_event_type: 'automated_security_scan_completed',
           p_severity: 'low',
           p_details: { scan_type: 'comprehensive', findings, duration: '5000ms' }
@@ -181,7 +171,6 @@ export const EnhancedSecurityMonitor: React.FC = () => {
     }
   }, [toast]);
 
-  // Initialize monitoring
   useEffect(() => {
     fetchSecurityMetrics();
     fetchSecurityAlerts();
@@ -190,9 +179,9 @@ export const EnhancedSecurityMonitor: React.FC = () => {
       const interval = setInterval(() => {
         fetchSecurityMetrics();
         fetchSecurityAlerts();
-      }, 30000); // Update every 30 seconds
+      }, 30000);
       
-      // Real-time subscription for active sessions
+      // Realtime stays on supabase for now (Phase 5)
       const sessionsChannel = supabase
         .channel('monitor-sessions-changes')
         .on('postgres_changes', {
@@ -200,7 +189,7 @@ export const EnhancedSecurityMonitor: React.FC = () => {
           schema: 'public',
           table: 'active_sessions'
         }, () => {
-          fetchSecurityMetrics(); // Refresh metrics when sessions change
+          fetchSecurityMetrics();
         })
         .subscribe();
 
@@ -211,8 +200,8 @@ export const EnhancedSecurityMonitor: React.FC = () => {
     }
   }, [autoMonitoring, fetchSecurityMetrics, fetchSecurityAlerts]);
 
-  // Real-time security event subscription
   useEffect(() => {
+    // Realtime stays on supabase for now (Phase 5)
     const channel = supabase
       .channel('security-events')
       .on('postgres_changes', { 
@@ -232,7 +221,6 @@ export const EnhancedSecurityMonitor: React.FC = () => {
 
         setAlerts(prev => [newAlert, ...prev.slice(0, 9)]);
 
-        // Show toast for high/critical alerts
         if (newAlert.severity === 'high' || newAlert.severity === 'critical') {
           toast({
             title: `${newAlert.severity.toUpperCase()} Security Alert`,
@@ -260,11 +248,11 @@ export const EnhancedSecurityMonitor: React.FC = () => {
 
   const getThreatLevelColor = (level: string) => {
     switch (level) {
-      case 'critical': return 'text-red-600';
-      case 'high': return 'text-orange-600';
-      case 'medium': return 'text-yellow-600';
-      case 'low': return 'text-green-600';
-      default: return 'text-gray-600';
+      case 'critical': return 'text-destructive';
+      case 'high': return 'text-destructive';
+      case 'medium': return 'text-secondary-foreground';
+      case 'low': return 'text-primary';
+      default: return 'text-muted-foreground';
     }
   };
 
@@ -276,141 +264,99 @@ export const EnhancedSecurityMonitor: React.FC = () => {
           <p className="text-muted-foreground">Real-time security monitoring with automated response</p>
         </div>
         <div className="flex gap-2">
-          <Button
-            onClick={runAutomatedScan}
-            disabled={isScanning}
-            size="sm"
-            variant="outline"
-          >
+          <Button onClick={runAutomatedScan} disabled={isScanning} size="sm" variant="outline">
             {isScanning ? 'Scanning...' : 'Run Scan'}
           </Button>
-          <Button
-            onClick={() => setAutoMonitoring(!autoMonitoring)}
-            size="sm"
-            variant={autoMonitoring ? "default" : "outline"}
-          >
+          <Button onClick={() => setAutoMonitoring(!autoMonitoring)} size="sm" variant={autoMonitoring ? "default" : "outline"}>
             Auto Monitor
           </Button>
         </div>
       </div>
 
-      {/* Security Overview */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="pt-6">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Threat Level</p>
-              <p className={`text-2xl font-bold ${getThreatLevelColor(metrics?.threat_level || 'low')}`}>
-                {metrics?.threat_level?.toUpperCase() || 'LOW'}
-              </p>
-            </div>
+            <p className="text-sm font-medium text-muted-foreground">Threat Level</p>
+            <p className={`text-2xl font-bold ${getThreatLevelColor(metrics?.threat_level || 'low')}`}>
+              {metrics?.threat_level?.toUpperCase() || 'LOW'}
+            </p>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="pt-6">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Security Score</p>
-              <p className="text-2xl font-bold">{metrics?.security_score || 85}%</p>
-              <Progress value={metrics?.security_score || 85} className="mt-2" />
-            </div>
+            <p className="text-sm font-medium text-muted-foreground">Security Score</p>
+            <p className="text-2xl font-bold">{metrics?.security_score || 85}%</p>
+            <Progress value={metrics?.security_score || 85} className="mt-2" />
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="pt-6">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Active Users</p>
-              <p className="text-2xl font-bold">{metrics?.active_sessions || 0}</p>
-            </div>
+            <p className="text-sm font-medium text-muted-foreground">Active Users</p>
+            <p className="text-2xl font-bold">{metrics?.active_sessions || 0}</p>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="pt-6">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Auto Responses</p>
-              <p className="text-2xl font-bold">{metrics?.automated_responses || 0}</p>
-            </div>
+            <p className="text-sm font-medium text-muted-foreground">Auto Responses</p>
+            <p className="text-2xl font-bold">{metrics?.automated_responses || 0}</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Recent Security Scans */}
       <Card>
-        <CardHeader>
-          <CardTitle>Automated Security Scans</CardTitle>
-        </CardHeader>
+        <CardHeader><CardTitle>Automated Security Scans</CardTitle></CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {scans.length > 0 ? (
-              scans.map((scan) => (
-                <div key={scan.id} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <Badge variant={scan.status === 'completed' ? 'default' : scan.status === 'running' ? 'secondary' : 'destructive'}>
-                      {scan.status}
-                    </Badge>
-                    <div>
-                      <p className="font-medium">{scan.scan_type} scan</p>
-                      <p className="text-sm text-muted-foreground">
-                        Started: {new Date(scan.started_at).toLocaleTimeString()}
-                        {scan.completed_at && ` • Completed: ${new Date(scan.completed_at).toLocaleTimeString()}`}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-medium">{scan.findings} findings</p>
+            {scans.length > 0 ? scans.map((scan) => (
+              <div key={scan.id} className="flex items-center justify-between p-3 border rounded-lg">
+                <div className="flex items-center gap-3">
+                  <Badge variant={scan.status === 'completed' ? 'default' : scan.status === 'running' ? 'secondary' : 'destructive'}>
+                    {scan.status}
+                  </Badge>
+                  <div>
+                    <p className="font-medium">{scan.scan_type} scan</p>
+                    <p className="text-sm text-muted-foreground">
+                      Started: {new Date(scan.started_at).toLocaleTimeString()}
+                      {scan.completed_at && ` • Completed: ${new Date(scan.completed_at).toLocaleTimeString()}`}
+                    </p>
                   </div>
                 </div>
-              ))
-            ) : (
+                <p className="font-medium">{scan.findings} findings</p>
+              </div>
+            )) : (
               <p className="text-muted-foreground text-center py-4">No recent scans</p>
             )}
           </div>
         </CardContent>
       </Card>
 
-      {/* Security Alerts */}
       <Card>
-        <CardHeader>
-          <CardTitle>Recent Security Events</CardTitle>
-        </CardHeader>
+        <CardHeader><CardTitle>Recent Security Events</CardTitle></CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {alerts.length > 0 ? (
-              alerts.map((alert) => (
-                <div key={alert.id} className="flex items-start justify-between p-3 border rounded-lg">
-                  <div className="flex items-start gap-3">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium">{alert.event_type.replace(/_/g, ' ')}</p>
-                        <Badge variant={getSeverityColor(alert.severity)}>
-                          {alert.severity}
-                        </Badge>
-                        {alert.auto_resolved && (
-                          <Badge variant="outline">Auto-Resolved</Badge>
-                        )}
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        {new Date(alert.created_at).toLocaleString()}
-                      </p>
-                      {alert.response_action && (
-                        <p className="text-sm text-green-600 mt-1">
-                          Response: {alert.response_action}
-                        </p>
-                      )}
+            {alerts.length > 0 ? alerts.map((alert) => (
+              <div key={alert.id} className="flex items-start justify-between p-3 border rounded-lg">
+                <div className="flex items-start gap-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium">{alert.event_type.replace(/_/g, ' ')}</p>
+                      <Badge variant={getSeverityColor(alert.severity) as any}>{alert.severity}</Badge>
+                      {alert.auto_resolved && <Badge variant="outline">Auto-Resolved</Badge>}
                     </div>
+                    <p className="text-sm text-muted-foreground">{new Date(alert.created_at).toLocaleString()}</p>
+                    {alert.response_action && (
+                      <p className="text-sm text-primary mt-1">Response: {alert.response_action}</p>
+                    )}
                   </div>
                 </div>
-              ))
-            ) : (
+              </div>
+            )) : (
               <p className="text-muted-foreground text-center py-4">No recent security events</p>
             )}
           </div>
         </CardContent>
       </Card>
 
-      {/* System Status */}
       {autoMonitoring && (
         <Alert>
           <AlertDescription>

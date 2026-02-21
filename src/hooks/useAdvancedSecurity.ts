@@ -1,5 +1,5 @@
 import { useCallback, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 import { useAuth } from '@/components/auth/AuthProvider';
 
 interface RateLimitResult {

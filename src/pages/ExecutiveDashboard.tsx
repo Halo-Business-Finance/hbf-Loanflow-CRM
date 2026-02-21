@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { ibmDb } from "@/lib/ibm";
-import { supabase } from "@/integrations/supabase/client";
+// IBM migration: supabase import removed - using ibmDb already imported above
 import { StandardPageLayout } from "@/components/StandardPageLayout";
 import { IBMPageHeader } from "@/components/ui/IBMPageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

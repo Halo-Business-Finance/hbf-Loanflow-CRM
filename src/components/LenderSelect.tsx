@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react"
-import { supabase } from "@/integrations/supabase/client"
+import { ibmDb } from "@/lib/ibm"
+const supabase = ibmDb; // IBM migration shim
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Building2 } from "lucide-react"
 

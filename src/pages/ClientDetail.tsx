@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { useParams, useNavigate } from "react-router-dom"
-import { supabase } from "@/integrations/supabase/client"
+import { ibmDb } from "@/lib/ibm"
 import { useAuth } from "@/components/auth/AuthProvider"
 // import HybridLayout from "@/components/HybridLayout"
 import { Button } from "@/components/ui/button"
@@ -180,7 +180,7 @@ export default function ClientDetail() {
 
   const fetchUserProfile = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await ibmDb
         .from('profiles')
         .select('first_name, last_name')
         .eq('id', user?.id)
@@ -195,7 +195,7 @@ export default function ClientDetail() {
 
   const fetchClient = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await ibmDb
         .from('clients')
         .select(`
           *,
@@ -206,10 +206,11 @@ export default function ClientDetail() {
 
       if (error) throw error
       
+      const raw = data as any
       // Merge contact entity data with client data
       const mergedClient = {
-        ...data,
-        ...data.contact_entity
+        ...raw,
+        ...(raw.contact_entity || {})
       }
       setClient(mergedClient)
       setCallNotes(mergedClient.call_notes || "")
@@ -231,7 +232,7 @@ export default function ClientDetail() {
         owns_property: mergedClient.owns_property || false,
         property_payment_amount: mergedClient.property_payment_amount?.toString() || "",
         year_established: mergedClient.year_established?.toString() || "",
-        status: data.status || "",
+        status: (raw as any).status || "",
         priority: mergedClient.priority || "",
         credit_score: mergedClient.credit_score?.toString() || "",
         net_operating_income: mergedClient.net_operating_income?.toString() || "",
@@ -269,7 +270,7 @@ export default function ClientDetail() {
 
   const fetchLoanRequests = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await ibmDb
         .from('loan_requests')
         .select('*')
         .eq('client_id', id)
@@ -285,7 +286,7 @@ export default function ClientDetail() {
 
   const fetchClientLoans = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await ibmDb
         .from('loans')
         .select('*')
         .eq('client_id', id)
@@ -293,7 +294,7 @@ export default function ClientDetail() {
 
       if (error) throw error
       
-      setLoans(data || [])
+      setLoans((data as unknown as Loan[]) || [])
     } catch (error) {
       console.error('Error fetching loans:', error)
     }
@@ -312,7 +313,7 @@ export default function ClientDetail() {
       }
       
       // Insert into history
-      const { error: historyError } = await supabase
+      const { error: historyError } = await ibmDb
         .from('notes_history')
         .insert({
           contact_id: client.contact_entity_id,
@@ -328,7 +329,7 @@ export default function ClientDetail() {
       }
       
       // Update client's last_activity
-      await supabase
+      await ibmDb
         .from('clients')
         .update({ last_activity: new Date().toISOString() })
         .eq('id', client.id)
@@ -354,7 +355,7 @@ export default function ClientDetail() {
       const trimmed = generalNotes.trim()
       
       // Update the contact_entities notes field
-      const { error } = await supabase
+      const { error } = await ibmDb
         .from('contact_entities')
         .update({ notes: trimmed })
         .eq('id', client.contact_entity_id)
@@ -380,7 +381,7 @@ export default function ClientDetail() {
   // Fetch notes history
   const fetchNotesHistory = async () => {
     if (!client?.contact_entity_id) return
-    const { data, error } = await supabase
+    const { data, error } = await ibmDb
       .from('notes_history')
       .select(`
         id,
@@ -398,15 +399,15 @@ export default function ClientDetail() {
     }
 
     // Fetch user names
-    const userIds = [...new Set(data.map(n => n.user_id))]
-    const { data: profiles } = await supabase
+    const userIds = [...new Set((data as any[]).map(n => n.user_id))]
+    const { data: profiles } = await ibmDb
       .from('profiles')
       .select('id, first_name, last_name')
       .in('id', userIds)
     
-    const profileMap = new Map(profiles?.map(p => [p.id, `${p.first_name || ''} ${p.last_name || ''}`.trim()]) || [])
+    const profileMap = new Map((profiles as any[])?.map(p => [p.id, `${p.first_name || ''} ${p.last_name || ''}`.trim()]) || [])
     
-    setNotesHistory(data.map(note => ({
+    setNotesHistory((data as any[]).map(note => ({
       id: note.id,
       note_type: note.note_type as 'general' | 'call',
       content: note.content,
@@ -460,7 +461,7 @@ export default function ClientDetail() {
       }
 
       // Update contact_entities table (where core data lives)
-      const { error: contactError } = await supabase
+      const { error: contactError } = await ibmDb
         .from('contact_entities')
         .update({
           name: updateData.name,
@@ -503,7 +504,7 @@ export default function ClientDetail() {
       if (contactError) throw contactError
 
       // Also update client-specific fields in clients table
-      const { error: clientError } = await supabase
+      const { error: clientError } = await ibmDb
         .from('clients')
         .update({
           status: updateData.status,

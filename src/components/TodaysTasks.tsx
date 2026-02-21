@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
 import { Button } from "@/components/ui/button"
 import { Clock, Phone, Mail, Calendar, AlertCircle, LucideIcon } from "lucide-react"
-import { supabase } from "@/integrations/supabase/client"
+import { ibmDb } from "@/lib/ibm"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { format, isToday, isBefore, startOfDay } from "date-fns"
 import { useNavigate } from "react-router-dom"
@@ -31,7 +31,7 @@ export function TodaysTasks() {
 
     try {
       console.log('Fetching tasks for user:', user.id)
-      const { data: notifications, error } = await supabase
+      const { data: notifications, error } = await ibmDb
         .from('notifications')
         .select('*')
         .eq('user_id', user.id)
@@ -42,7 +42,7 @@ export function TodaysTasks() {
       console.log('Notifications query result:', { notifications, error })
 
       if (notifications) {
-        const tasksData: Task[] = notifications.map(notification => ({
+        const tasksData: Task[] = (notifications as any[]).map(notification => ({
           id: notification.id,
           title: notification.title,
           message: notification.message,

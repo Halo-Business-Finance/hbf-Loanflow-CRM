@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Shield, AlertTriangle, X, Eye, EyeOff } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { toast } from '@/hooks/use-toast';
 
@@ -62,14 +62,12 @@ export const SecurityAlert: React.FC<SecurityAlertProps> = ({
 
   const handleAcknowledge = async () => {
     try {
-      await supabase.functions.invoke('security-monitor', {
-        body: {
-          action: 'acknowledge_alert',
-          alert_type: type,
-          severity,
-          message,
-          details
-        }
+      await ibmDb.rpc('security_monitor', {
+        action: 'acknowledge_alert',
+        alert_type: type,
+        severity,
+        message,
+        details
       });
       
       toast({
@@ -188,7 +186,7 @@ export const SecurityMonitor: React.FC = () => {
     try {
       setIsLoading(true);
       
-      const { data, error } = await supabase
+      const { data, error } = await ibmDb
         .from('security_events')
         .select('*')
         .eq('user_id', user?.id)
@@ -198,7 +196,7 @@ export const SecurityMonitor: React.FC = () => {
 
       if (error) throw error;
       
-      setAlerts(data || []);
+      setAlerts((data as unknown as SecurityEvent[]) || []);
     } catch (error) {
       console.error('Error fetching security alerts:', error);
     } finally {

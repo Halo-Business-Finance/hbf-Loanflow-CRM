@@ -4,7 +4,7 @@ import { StandardKPICard } from "@/components/StandardKPICard"
 import { AlertTriangle, Shield, Activity, TrendingUp, Bell, Lock, Key, Ban, RefreshCw, Clock } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { supabase } from "@/integrations/supabase/client"
+import { ibmDb } from "@/lib/ibm"
 import { useToast } from "@/hooks/use-toast"
 import { formatDistanceToNow } from "date-fns"
 import { IBMPageHeader } from "@/components/ui/IBMPageHeader"
@@ -44,7 +44,7 @@ export default function SecurityThreats() {
       setLoading(true)
       
       // Fetch recent security events
-      const { data: events, error } = await supabase
+      const { data: events, error } = await ibmDb
         .from('security_events')
         .select('*')
         .order('created_at', { ascending: false })
@@ -52,11 +52,12 @@ export default function SecurityThreats() {
       
       if (error) throw error
       
-      setSecurityEvents(events || [])
+      const typedEvents = (events as unknown as SecurityEvent[]) || []
+      setSecurityEvents(typedEvents)
       
       // Calculate stats from the events
       const last24Hours = new Date(Date.now() - 24 * 60 * 60 * 1000)
-      const recentEvents = events?.filter(event => new Date(event.created_at) > last24Hours) || []
+      const recentEvents = typedEvents.filter(event => new Date(event.created_at) > last24Hours)
       
       // Active threats (high severity, recent events)
       const activeThreats = recentEvents.filter(event => 
@@ -134,24 +135,11 @@ export default function SecurityThreats() {
   useEffect(() => {
     fetchSecurityEvents()
     
-    // Set up realtime subscription
-    const channel = supabase
-      .channel('security_events_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'security_events'
-        },
-        () => {
-          fetchSecurityEvents()
-        }
-      )
-      .subscribe()
+    // Poll for updates (replaces Supabase realtime)
+    const interval = setInterval(fetchSecurityEvents, 30000)
     
     return () => {
-      supabase.removeChannel(channel)
+      clearInterval(interval)
     }
   }, [])
 

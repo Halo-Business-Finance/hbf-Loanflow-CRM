@@ -14,11 +14,11 @@ const defaultSecurityHeaders: SecurityHeadersConfig = {
   // Note: frame-ancestors and report-uri removed - only work via HTTP headers, not meta tags
   contentSecurityPolicy: [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://gshxxsniwytjgcnthyfq.supabase.co https://maps.googleapis.com",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://hbf-api.23oqh4gja5d5.us-south.codeengine.appdomain.cloud https://maps.googleapis.com",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
     "img-src 'self' data: blob: https:",
-    "connect-src 'self' https://gshxxsniwytjgcnthyfq.supabase.co wss://gshxxsniwytjgcnthyfq.supabase.co https://maps.googleapis.com https://ipapi.co",
+    "connect-src 'self' https://hbf-api.23oqh4gja5d5.us-south.codeengine.appdomain.cloud https://maps.googleapis.com https://ipapi.co",
     "frame-src 'none'",
     "object-src 'none'",
     "base-uri 'self'",

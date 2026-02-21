@@ -141,15 +141,15 @@ export const useAdvancedBehaviorAnalysis = () => {
       if (error) throw error;
 
       // Transform security events to behavior patterns
-      const transformedPatterns: BehaviorPattern[] = (data || []).map(record => ({
-        id: record.id,
+      const transformedPatterns: BehaviorPattern[] = ((data || []) as unknown as any[]).map(record => ({
+        id: String(record.id),
         pattern_type: 'behavioral_anomaly',
         baseline_metrics: (record.details as any)?.baseline_metrics || {},
         current_metrics: (record.details as any)?.current_session || {},
         anomaly_score: (record.details as any)?.anomaly_score || 0,
         is_anomalous: true,
         deviation_factors: (record.details as any)?.deviation_factors || [],
-        last_analysis: record.created_at || ''
+        last_analysis: String(record.created_at || '')
       }));
 
       setBehaviorPatterns(transformedPatterns);

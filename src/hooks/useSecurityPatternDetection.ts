@@ -88,7 +88,7 @@ export const useSecurityPatternDetection = () => {
         .limit(20);
 
       if (error) throw error;
-      if (data) setAlerts(data);
+      if (data) setAlerts(data as unknown as PatternAlert[]);
     } catch (error: any) {
       console.error('Error loading security alerts:', error);
     }

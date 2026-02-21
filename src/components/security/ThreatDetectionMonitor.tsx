@@ -172,17 +172,18 @@ export function ThreatDetectionMonitor() {
         .limit(10);
 
       if (incidents) {
-        const formattedAttempts: SecurityThreatAttempt[] = incidents.map(incident => {
+        const typedIncidents = incidents as unknown as any[];
+        const formattedAttempts: SecurityThreatAttempt[] = typedIncidents.map(incident => {
           const data = incident.incident_data as any;
           return {
-            id: incident.id,
-            type: incident.incident_type,
+            id: String(incident.id),
+            type: String(incident.incident_type),
             severity: incident.severity as "low" | "medium" | "high" | "critical",
             source_ip: incident.ip_address || data?.source_ip || 'Unknown',
             description: data?.description || 'Hacker attack detected',
             blocked: true,
-            timestamp: incident.created_at,
-            attack_vector: incident.threat_vector,
+            timestamp: String(incident.created_at),
+            attack_vector: String(incident.threat_vector),
             metadata: data?.metadata || {}
           };
         });
@@ -190,9 +191,10 @@ export function ThreatDetectionMonitor() {
       }
 
       // Generate metrics
-      const sqlCount = incidents?.filter(i => i.incident_type.includes('sql')).length || 0;
-      const bruteCount = incidents?.filter(i => i.incident_type.includes('brute')).length || 0;
-      const scanCount = incidents?.filter(i => i.incident_type.includes('scan')).length || 0;
+      const typedAll = (incidents || []) as unknown as any[];
+      const sqlCount = typedAll.filter(i => String(i.incident_type).includes('sql')).length;
+      const bruteCount = typedAll.filter(i => String(i.incident_type).includes('brute')).length;
+      const scanCount = typedAll.filter(i => String(i.incident_type).includes('scan')).length;
 
       setMetrics({
         threats_blocked: incidents?.length || 0,

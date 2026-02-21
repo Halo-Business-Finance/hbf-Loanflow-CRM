@@ -1,6 +1,6 @@
 import { StandardContentCard } from "@/components/StandardContentCard"
 import { useEffect, useState } from "react"
-import { supabase } from "@/integrations/supabase/client"
+import { ibmDb } from "@/lib/ibm"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription"
 import { useRoleBasedAccess } from "@/hooks/useRoleBasedAccess"
@@ -20,7 +20,7 @@ export default function PipelineAnalytics() {
     // Role-aware visibility: managers/admins see all, others see own
     const isManagerOrAdmin = hasRole('manager') || hasRole('admin') || hasRole('super_admin')
 
-    let query = supabase
+    let query = ibmDb
       .from('leads')
       .select(`
         *,

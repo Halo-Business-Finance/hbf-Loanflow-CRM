@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { ibmDb } from "@/lib/ibm";
-import { supabase } from "@/integrations/supabase/client";
+// IBM migration: supabase import removed - using ibmDb already imported above
 import { getAuthUser } from '@/lib/auth-utils';
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
@@ -74,7 +74,7 @@ export function EmergencyShutdown() {
   const initializeShutdownSystem = useCallback(async () => {
     try {
       // Check current shutdown status using the database function
-      const { data: statusData } = await supabase.rpc('is_system_shutdown');
+      const { data: statusData } = await ibmDb.rpc('is_system_shutdown');
       
       const status = statusData as any;
       if (status?.is_shutdown) {

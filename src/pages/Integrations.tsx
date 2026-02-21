@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/hooks/use-toast"
-import { supabase } from "@/integrations/supabase/client"
+import { ibmDb } from "@/lib/ibm"
 import { StandardPageLayout } from "@/components/StandardPageLayout"
 import { IBMPageHeader } from "@/components/ui/IBMPageHeader"
 import { StandardContentCard } from "@/components/StandardContentCard"
@@ -177,10 +177,10 @@ export default function Integrations() {
 
   const fetchAdobeConfig = async () => {
     try {
-      const { data, error } = await supabase.functions.invoke('get-adobe-config')
+      const { data, error } = await ibmDb.rpc('get-adobe-config')
       if (error) throw error
       if (data) {
-        setAdobeConfig(data)
+        setAdobeConfig(data as any)
       }
     } catch (error) {
       console.error('Error fetching Adobe config:', error)

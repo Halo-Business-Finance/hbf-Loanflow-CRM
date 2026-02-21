@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { ibmDb } from "@/lib/ibm";
 import { getAuthUser } from '@/lib/auth-utils';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -94,13 +94,13 @@ export function WorkflowBuilder() {
 
   const fetchWorkflows = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await ibmDb
         .from('workflows')
         .select('*')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setWorkflows(data || []);
+      setWorkflows((data as unknown as WorkflowData[]) || []);
     } catch (error) {
       console.error('Error fetching workflows:', error);
       toast({
@@ -115,7 +115,7 @@ export function WorkflowBuilder() {
 
   const fetchExecutions = async (workflowId: string) => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await ibmDb
         .from('workflow_executions')
         .select('*')
         .eq('workflow_id', workflowId)
@@ -123,7 +123,7 @@ export function WorkflowBuilder() {
         .limit(20);
 
       if (error) throw error;
-      setExecutions(data || []);
+      setExecutions((data as unknown as WorkflowExecution[]) || []);
     } catch (error) {
       console.error('Error fetching executions:', error);
       toast({
@@ -149,7 +149,7 @@ export function WorkflowBuilder() {
         throw new Error('Invalid JSON in trigger conditions or flow definition');
       }
 
-      const { error } = await supabase
+      const { error } = await ibmDb
         .from('workflows')
         .insert({
           name: workflowForm.name,
@@ -183,7 +183,7 @@ export function WorkflowBuilder() {
 
   const toggleWorkflowStatus = async (workflowId: string, isActive: boolean) => {
     try {
-      const { error } = await supabase
+      const { error } = await ibmDb
         .from('workflows')
         .update({ is_active: !isActive })
         .eq('id', workflowId);

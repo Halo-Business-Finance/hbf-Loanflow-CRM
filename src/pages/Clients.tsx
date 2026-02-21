@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react"
 import { mapClientFields, CLIENT_WITH_CONTACT_QUERY } from "@/lib/field-mapping"
 import { Client } from "@/types/lead"
-import { supabase } from "@/integrations/supabase/client"
+import { ibmDb } from "@/lib/ibm"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { useNavigate } from "react-router-dom"
 import { IBMPageHeader } from "@/components/ui/IBMPageHeader"
@@ -84,7 +84,7 @@ export default function Clients() {
 
   const fetchClients = async () => {
     try {
-      const { data: clientsData, error } = await supabase
+      const { data: clientsData, error } = await ibmDb
         .from('clients')
         .select(CLIENT_WITH_CONTACT_QUERY)
         .order('created_at', { ascending: false })
@@ -97,7 +97,7 @@ export default function Clients() {
       
       // Fetch loans for all clients
       if (clientsData && clientsData.length > 0) {
-        await fetchAllClientLoans(clientsData.map(c => c.id))
+        await fetchAllClientLoans((clientsData as any[]).map(c => c.id))
       }
     } catch (error) {
       console.error('Error fetching clients:', error)
@@ -108,7 +108,7 @@ export default function Clients() {
 
   const fetchAllClientLoans = async (clientIds: string[]) => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await ibmDb
         .from('loans')
         .select('*')
         .in('client_id', clientIds)
@@ -117,7 +117,7 @@ export default function Clients() {
 
       // Group loans by client_id
       const loansByClient: { [key: string]: Loan[] } = {}
-      data?.forEach(loan => {
+      data?.forEach((loan: any) => {
         if (!loansByClient[loan.client_id]) {
           loansByClient[loan.client_id] = []
         }
@@ -139,7 +139,7 @@ export default function Clients() {
       // Delete all related records in the correct order to avoid foreign key constraints
       
       // Delete cases associated with this client
-      const { error: casesError } = await supabase
+      const { error: casesError } = await ibmDb
         .from('cases')
         .delete()
         .eq('client_id', clientId)
@@ -150,7 +150,7 @@ export default function Clients() {
       }
 
       // Delete loans associated with this client
-      const { error: loansError } = await supabase
+      const { error: loansError } = await ibmDb
         .from('loans')
         .delete()
         .eq('client_id', clientId)
@@ -161,7 +161,7 @@ export default function Clients() {
       }
 
       // Delete pipeline entries
-      const { error: pipelineError } = await supabase
+      const { error: pipelineError } = await ibmDb
         .from('pipeline_entries')
         .delete()
         .eq('client_id', clientId)
@@ -172,7 +172,7 @@ export default function Clients() {
       }
 
       // Delete community members where this client is referenced
-      const { error: communityMembersError } = await supabase
+      const { error: communityMembersError } = await ibmDb
         .from('community_members')
         .delete()
         .eq('client_id', clientId)
@@ -183,7 +183,7 @@ export default function Clients() {
       }
 
       // Finally delete the client
-      const { error: clientError } = await supabase
+      const { error: clientError } = await ibmDb
         .from('clients')
         .delete()
         .eq('id', clientId)
@@ -390,7 +390,7 @@ export default function Clients() {
     setIsSubmitting(true)
     try {
       // First create contact entity
-      const { data: contactEntity, error: contactError } = await supabase
+      const { data: contactEntity, error: contactError } = await ibmDb
         .from('contact_entities')
         .insert({
           user_id: user?.id,
@@ -407,7 +407,7 @@ export default function Clients() {
       if (contactError) throw contactError
 
       // Then create client record
-      const { error: clientError } = await supabase
+      const { error: clientError } = await ibmDb
         .from('clients')
         .insert({
           user_id: user?.id,

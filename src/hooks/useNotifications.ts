@@ -1,4 +1,4 @@
-import { supabase } from "@/integrations/supabase/client"
+import { ibmDb } from "@/lib/ibm"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { toast } from "@/hooks/use-toast"
 
@@ -17,7 +17,7 @@ export function useNotifications() {
     if (!user) return
 
     try {
-      const { error } = await supabase
+      const { error } = await ibmDb
         .from('notifications')
         .insert({
           user_id: user.id,
@@ -30,7 +30,6 @@ export function useNotifications() {
 
       if (error) throw error
 
-      // Show a toast notification as well
       toast({
         title: params.title,
         description: params.message,

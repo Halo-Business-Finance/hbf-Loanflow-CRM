@@ -21,7 +21,7 @@ import {
   CheckCircle
 } from "lucide-react"
 import { AdvancedEncryption, type EncryptedData } from "@/lib/advanced-encryption"
-import { supabase } from "@/integrations/supabase/client"
+import { ibmDb } from "@/lib/ibm"
 import { useToast } from "@/hooks/use-toast"
 
 export function EncryptionManager() {
@@ -56,7 +56,7 @@ export function EncryptionManager() {
 
   const loadEncryptionKeys = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await ibmDb
         .from('encryption_keys')
         .select('*')
         .order('created_at', { ascending: false })
@@ -76,7 +76,7 @@ export function EncryptionManager() {
   const loadEncryptedFields = async () => {
     try {
       setIsLoading(true)
-      const { data, error } = await supabase
+      const { data, error } = await ibmDb
         .from('encrypted_fields')
         .select(`
           *,
@@ -106,7 +106,7 @@ export function EncryptionManager() {
     try {
       const keyName = `encryption_key_${Date.now()}`
       
-      const { error } = await supabase
+      const { error } = await ibmDb
         .from('encryption_keys')
         .insert({
           key_name: keyName,

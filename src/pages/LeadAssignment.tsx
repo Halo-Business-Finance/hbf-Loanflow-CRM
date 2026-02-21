@@ -210,7 +210,7 @@ export default function LeadAssignmentPage() {
       if (countsError) throw countsError
 
       // Combine profiles with lead counts
-      const countsMap = new Map((leadCounts || []).map((lc: any) => [lc.user_id, lc.lead_count]))
+      const countsMap = new Map(((leadCounts as any[]) || []).map((lc: any) => [lc.user_id, lc.lead_count]))
       
       const membersWithCounts = (profiles || []).map((profile) => ({
         ...(profile as any),

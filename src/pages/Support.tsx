@@ -32,7 +32,7 @@ import {
   MessageCircle
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 import { getAuthUser } from '@/lib/auth-utils';
 import { IBMPageHeader } from "@/components/ui/IBMPageHeader";
 import {
@@ -95,7 +95,7 @@ export default function Support() {
         return;
       }
 
-      const { data, error } = await supabase
+      const { data, error } = await ibmDb
         .from('support_tickets')
         .select('*')
         .eq('user_id', user.id)
@@ -103,7 +103,7 @@ export default function Support() {
 
       if (error) throw error;
 
-      setTickets((data || []) as SupportTicket[]);
+      setTickets(((data as any[]) || []) as SupportTicket[]);
     } catch (error) {
       console.error('Error fetching tickets:', error);
       toast({
@@ -130,7 +130,7 @@ export default function Support() {
       const user = await getAuthUser();
       if (!user) throw new Error('Not authenticated');
 
-      const { error } = await supabase
+      const { error } = await ibmDb
         .from('support_tickets')
         .insert({
           user_id: user.id,

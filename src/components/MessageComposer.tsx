@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ibmDb } from '@/lib/ibm';
-import { supabase } from '@/integrations/supabase/client';
+// supabase import removed - using ibmDb
 import { getAuthUser } from '@/lib/auth-utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -59,7 +59,7 @@ export function MessageComposer({ replyTo, onClose, onSent }: MessageComposerPro
       const currentUser = await getAuthUser();
       
       // Fetch users excluding current user
-      let query = supabase
+      let query = ibmDb
         .from('profiles')
         .select('id, email')
         .order('email');
@@ -74,9 +74,9 @@ export function MessageComposer({ replyTo, onClose, onSent }: MessageComposerPro
       if (error) throw error;
       
       // Format users - filter out those without email
-      const formattedUsers = (data || [])
-        .filter(u => u.email)
-        .map(u => ({
+      const formattedUsers = ((data as any[]) || [])
+        .filter((u: any) => u.email)
+        .map((u: any) => ({
           id: u.id,
           email: u.email,
           full_name: null

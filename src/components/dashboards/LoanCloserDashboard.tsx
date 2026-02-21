@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -80,23 +80,21 @@ export const LoanCloserDashboard = () => {
       // Run all queries in parallel for better performance
       const [closingResult, fundedResult, pendingResult] = await Promise.all([
         // Fetch scheduled closings
-        supabase
+        ibmDb
           .from('contact_entities')
           .select('id, name, business_name, loan_amount, loan_type, stage, priority, updated_at, created_at')
           .eq('stage', 'Closing')
           .order('created_at', { ascending: false })
           .limit(50),
         
-        // Fetch funded loans
-        supabase
+        ibmDb
           .from('contact_entities')
           .select('id, name, business_name, loan_amount, loan_type, stage, updated_at, created_at')
           .eq('stage', 'Loan Funded')
           .order('updated_at', { ascending: false })
           .limit(50),
         
-        // Fetch pending approvals
-        supabase
+        ibmDb
           .from('contact_entities')
           .select('id, name, business_name, loan_amount, loan_type, stage, priority, created_at')
           .in('stage', ['Approval', 'Underwriting'])
@@ -109,9 +107,9 @@ export const LoanCloserDashboard = () => {
       if (fundedResult.error) throw fundedResult.error;
       if (pendingResult.error) throw pendingResult.error;
 
-      const closingLoans = closingResult.data || [];
-      const fundedLoans = fundedResult.data || [];
-      const pendingLoans = pendingResult.data || [];
+      const closingLoans = (closingResult.data as any[]) || [];
+      const fundedLoans = (fundedResult.data as any[]) || [];
+      const pendingLoans = (pendingResult.data as any[]) || [];
 
       // Calculate metrics
       const totalFunded = fundedLoans.reduce((sum, loan) => sum + (loan.loan_amount || 0), 0);
@@ -164,7 +162,7 @@ export const LoanCloserDashboard = () => {
 
   const handleCloseLoan = async (loanId: string) => {
     try {
-      const { error } = await supabase
+      const { error } = await ibmDb
         .from('contact_entities')
         .update({ stage: 'Loan Funded', updated_at: new Date().toISOString() })
         .eq('id', loanId);
@@ -193,7 +191,7 @@ export const LoanCloserDashboard = () => {
       const scheduledDate = new Date();
       scheduledDate.setDate(scheduledDate.getDate() + 7);
       
-      const { error } = await supabase
+      const { error } = await ibmDb
         .from('contact_entities')
         .update({ 
           next_follow_up: scheduledDate.toISOString(),
@@ -220,7 +218,7 @@ export const LoanCloserDashboard = () => {
 
   const handleApproveFunding = async (loanId: string) => {
     try {
-      const { error } = await supabase
+      const { error } = await ibmDb
         .from('contact_entities')
         .update({ stage: 'Closing', updated_at: new Date().toISOString() })
         .eq('id', loanId);

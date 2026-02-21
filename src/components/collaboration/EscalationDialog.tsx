@@ -17,7 +17,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useCollaboration } from '@/hooks/useCollaboration';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 import { AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -58,14 +58,14 @@ export function EscalationDialog({
   const fetchUsers = async () => {
     try {
       // Fetch profiles with manager/admin roles
-      const { data, error } = await supabase
+      const { data, error } = await ibmDb
         .from('profiles')
         .select('id, email')
         .order('email');
 
       if (error) throw error;
       
-      setUsers(data || []);
+      setUsers((data as unknown as User[]) || []);
     } catch (error) {
       console.error('Error fetching users:', error);
     }

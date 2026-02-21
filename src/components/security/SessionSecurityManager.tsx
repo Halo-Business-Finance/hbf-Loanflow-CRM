@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Shield, AlertTriangle, Monitor, Clock, MapPin, Smartphone } from 'lucide-react';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 import { getAuthSession, getAccessToken } from '@/lib/auth-utils';
 import { useToast } from '@/hooks/use-toast';
 
@@ -33,7 +33,7 @@ export const SessionSecurityManager: React.FC = () => {
 
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      const { data, error } = await ibmDb
         .from('active_sessions')
         .select('*')
         .eq('user_id', user.id)
@@ -57,7 +57,7 @@ export const SessionSecurityManager: React.FC = () => {
   // Terminate a specific session
   const terminateSession = async (sessionId: string) => {
     try {
-      const { error } = await supabase
+      const { error } = await ibmDb
         .from('active_sessions')
         .update({ is_active: false })
         .eq('id', sessionId)
@@ -95,7 +95,7 @@ export const SessionSecurityManager: React.FC = () => {
       // Get current session to avoid terminating it
       const currentSessionToken = getAccessToken();
 
-      const { error } = await supabase
+      const { error } = await ibmDb
         .from('active_sessions')
         .update({ is_active: false })
         .eq('user_id', user?.id)

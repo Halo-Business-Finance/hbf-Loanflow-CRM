@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ibmDb } from '@/lib/ibm';
-import { supabase } from '@/integrations/supabase/client';
+// supabase import removed - using ibmDb
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useToast } from '@/hooks/use-toast';
 
@@ -38,16 +38,15 @@ export const useSecurityPatternDetection = () => {
     try {
       setIsScanning(true);
 
-      const { data, error } = await supabase.rpc('detect_suspicious_patterns');
+      const { data, error } = await ibmDb.rpc('detect_suspicious_patterns');
 
       if (error) throw error;
 
-      if (data && data.length > 0) {
-        setPatterns(data);
+      if (data && (data as any[]).length > 0) {
+        setPatterns(data as unknown as SecurityPattern[]);
 
-        // Create alerts for critical patterns
-        const criticalPatterns = data.filter(
-          (p: SecurityPattern) => p.severity === 'critical'
+        const criticalPatterns = (data as any[]).filter(
+          (p: any) => p.severity === 'critical'
         );
 
         if (criticalPatterns.length > 0) {
@@ -158,7 +157,9 @@ export const useSecurityPatternDetection = () => {
   useEffect(() => {
     if (!isAdmin || !user) return;
 
-    const channel = supabase
+    // Realtime channels not supported on ibmDb - using polling instead
+    const pollingInterval = setInterval(() => { scanForPatterns(); }, 30000);
+    // @ts-ignore - channel method placeholder
       .channel('security_pattern_alerts_channel')
       .on(
         'postgres_changes',

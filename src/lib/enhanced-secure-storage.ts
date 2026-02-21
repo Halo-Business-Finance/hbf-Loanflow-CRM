@@ -4,7 +4,7 @@
  * NOW WITH PROPER AES-GCM ENCRYPTION (replaces weak XOR cipher)
  */
 
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 import { getAuthUser } from '@/lib/auth-utils';
 
 export interface SecureStorageOptions {
@@ -168,7 +168,7 @@ class EnhancedSecureStorage {
         const user = await getAuthUser();
         if (!user) return false;
 
-        const { error } = await supabase.rpc('store_secure_session_data', {
+        const { error } = await ibmDb.rpc('store_secure_session_data', {
           p_key: key,
           p_value: JSON.stringify(value)
         });
@@ -203,11 +203,11 @@ class EnhancedSecureStorage {
         const user = await getAuthUser();
         if (!user) return null;
 
-        const result = await supabase.rpc('get_secure_session_data', {
+        const result = await ibmDb.rpc('get_secure_session_data', {
           p_key: key
         });
 
-        return result.data ? JSON.parse(result.data) : null;
+        return result.data ? JSON.parse(result.data as string) : null;
       } else {
         // Retrieve from localStorage with expiry check
         const stored = localStorage.getItem(`_enhanced_${key}`);
@@ -237,7 +237,7 @@ class EnhancedSecureStorage {
       // Remove from server
       const user = await getAuthUser();
       if (user) {
-        await supabase.rpc('remove_secure_session_data', { p_key: key });
+        await ibmDb.rpc('remove_secure_session_data', { p_key: key });
       }
 
       // Remove from localStorage
@@ -300,7 +300,7 @@ class EnhancedSecureStorage {
       // Clear server-side data
       const user = await getAuthUser();
       if (user) {
-        await supabase.rpc('clear_secure_session_data');
+        await ibmDb.rpc('clear_secure_session_data');
       }
 
       // Clear client-side data

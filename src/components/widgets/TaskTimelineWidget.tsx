@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { CheckCircle, Circle, Clock, AlertCircle, UserPlus } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 import { TaskAssignmentDialog } from '@/components/collaboration/TaskAssignmentDialog';
 import { EscalationDialog } from '@/components/collaboration/EscalationDialog';
 
@@ -32,7 +32,7 @@ export function TaskTimelineWidget() {
 
   const fetchTasks = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await ibmDb
         .from('contact_entities')
         .select('id, name, business_name, stage, created_at, updated_at')
         .in('stage', ['Application', 'Pre-approval', 'Documentation'])
@@ -42,7 +42,7 @@ export function TaskTimelineWidget() {
       if (error) throw error;
 
       const now = new Date();
-      const tasksWithStatus = (data || []).map((item) => {
+      const tasksWithStatus = ((data as any[]) || []).map((item: any) => {
         const updatedDate = new Date(item.updated_at);
         const daysInStage = Math.floor((now.getTime() - updatedDate.getTime()) / (1000 * 60 * 60 * 24));
         
@@ -57,7 +57,7 @@ export function TaskTimelineWidget() {
         };
       });
 
-      setTasks(tasksWithStatus);
+      setTasks(tasksWithStatus as TimelineTask[]);
     } catch (error) {
       console.error('Error fetching timeline tasks:', error);
     } finally {

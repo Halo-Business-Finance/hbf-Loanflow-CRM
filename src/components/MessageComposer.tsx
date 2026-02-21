@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { ibmDb } from '@/lib/ibm';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -124,7 +125,7 @@ export function MessageComposer({ replyTo, onClose, onSent }: MessageComposerPro
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const { error } = await supabase.from('user_messages').insert({
+      const { error } = await ibmDb.from('user_messages').insert({
         sender_id: user.id,
         recipient_id: selectedRecipient,
         subject: subject.trim(),
@@ -136,7 +137,7 @@ export function MessageComposer({ replyTo, onClose, onSent }: MessageComposerPro
 
       // Best-effort notification
       try {
-        await supabase.from('notifications').insert({
+        await ibmDb.from('notifications').insert({
           user_id: selectedRecipient,
           title: 'New Message',
           message: `${user.email} sent you a message: ${subject}`,

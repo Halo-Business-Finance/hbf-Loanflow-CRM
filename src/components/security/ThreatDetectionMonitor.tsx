@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Shield, AlertTriangle, Bug, Target, Zap, Activity } from "lucide-react";
+import { ibmDb } from "@/lib/ibm";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
@@ -102,7 +103,7 @@ export function ThreatDetectionMonitor() {
 
     // Log to threat incidents table
     try {
-      await supabase.from('threat_incidents').insert({
+      await ibmDb.from('threat_incidents').insert({
         incident_type: 'hacker_attack',
         severity: mockAttempt.severity,
         threat_vector: mockAttempt.attack_vector,
@@ -163,7 +164,7 @@ export function ThreatDetectionMonitor() {
       if (!isAdmin) { setLoading(false); return; }
       
       // Fetch recent hacker attempts
-      const { data: incidents } = await supabase
+      const { data: incidents } = await ibmDb
         .from('threat_incidents')
         .select('*')
         .in('threat_vector', ['web_application', 'api_endpoint', 'authentication', 'database'])

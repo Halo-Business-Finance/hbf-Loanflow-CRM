@@ -3,6 +3,7 @@
  * Provides real-time security monitoring and automated response capabilities
  */
 import { useCallback, useEffect, useState } from 'react';
+import { ibmDb } from '@/lib/ibm';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { logger } from '@/lib/logger';
@@ -47,7 +48,7 @@ export const useSecurityMonitoring = () => {
         autoResolved: autoResolve
       };
 
-      await supabase.rpc('log_security_event', {
+      await ibmDb.rpc('log_security_event', {
         p_event_type: eventType,
         p_severity: severity,
         p_details: enhancedDetails
@@ -70,8 +71,8 @@ export const useSecurityMonitoring = () => {
   const fetchSecurityMetrics = useCallback(async () => {
     try {
       const [sessionsResult, eventsResult] = await Promise.all([
-        supabase.from('active_sessions').select('*').eq('is_active', true),
-        supabase.from('security_events').select('*').gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+        ibmDb.from('active_sessions').select('*').eq('is_active', true),
+        ibmDb.from('security_events').select('*').gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
       ]);
 
       const activeSessions = sessionsResult.data?.length || 0;
@@ -79,7 +80,7 @@ export const useSecurityMonitoring = () => {
       const criticalEvents = recentEvents.filter(e => e.severity === 'critical').length;
       const highEvents = recentEvents.filter(e => e.severity === 'high').length;
       const suspiciousActivities = recentEvents.filter(e => 
-        e.event_type?.includes('suspicious') || e.event_type?.includes('anomaly')
+        (e as any).event_type?.includes('suspicious') || (e as any).event_type?.includes('anomaly')
       ).length;
       const automatedResponses = recentEvents.filter(e => 
         e.details && typeof e.details === 'object' && (e.details as any).autoResolved

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { ibmDb } from "@/lib/ibm";
 import { supabase } from "@/integrations/supabase/client";
 import { StandardPageLayout } from "@/components/StandardPageLayout";
 import { IBMPageHeader } from "@/components/ui/IBMPageHeader";
@@ -34,8 +35,8 @@ export default function ExecutiveDashboard() {
   const fetchDashboardData = async () => {
     setIsLoading(true);
     const [leadsRes, clientsRes] = await Promise.all([
-      supabase.from("leads").select("*, contact_entities(loan_amount, stage)"),
-      supabase.from("clients").select("*, contact_entities(loan_amount)"),
+      ibmDb.from("leads").select("*"),
+      ibmDb.from("clients").select("*"),
     ]);
 
     const leads = leadsRes.data || [];

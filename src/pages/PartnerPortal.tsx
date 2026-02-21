@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { supabase } from "@/integrations/supabase/client";
+import { ibmDb } from "@/lib/ibm";
 import { StandardPageLayout } from "@/components/StandardPageLayout";
 import { IBMPageHeader } from "@/components/ui/IBMPageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -68,17 +68,17 @@ export default function PartnerPortal() {
   const fetchData = async () => {
     setIsLoading(true);
     const [orgsRes, subsRes] = await Promise.all([
-      supabase.from("partner_organizations").select("*").order("created_at", { ascending: false }),
-      supabase.from("partner_submissions").select("*").order("created_at", { ascending: false }),
+      ibmDb.from("partner_organizations").select("*").order("created_at", { ascending: false }),
+      ibmDb.from("partner_submissions").select("*").order("created_at", { ascending: false }),
     ]);
 
-    if (orgsRes.data) setOrganizations(orgsRes.data);
-    if (subsRes.data) setSubmissions(subsRes.data);
+    if (orgsRes.data) setOrganizations(orgsRes.data as unknown as PartnerOrganization[]);
+    if (subsRes.data) setSubmissions(subsRes.data as unknown as PartnerSubmission[]);
     setIsLoading(false);
   };
 
   const createOrganization = async () => {
-    const { error } = await supabase.from("partner_organizations").insert([newOrg]);
+    const { error } = await ibmDb.from("partner_organizations").insert([newOrg as Record<string, unknown>]);
     if (error) {
       toast.error("Failed to create partner organization");
     } else {
@@ -90,10 +90,10 @@ export default function PartnerPortal() {
 
   const createSubmission = async () => {
     if (!user) return;
-    const { error } = await supabase.from("partner_submissions").insert([{
+    const { error } = await ibmDb.from("partner_submissions").insert([{
       ...newSubmission,
       submitted_by: user.id,
-    }]);
+    } as Record<string, unknown>]);
     if (error) {
       toast.error("Failed to submit deal");
     } else {

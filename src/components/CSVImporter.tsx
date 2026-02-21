@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Upload, FileText, Check, X, AlertTriangle, Loader2, FileSpreadsheet, Database } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { ibmDb } from "@/lib/ibm";
 import { supabase } from "@/integrations/supabase/client";
 import readXlsxFile from "read-excel-file";
 
@@ -340,13 +341,13 @@ export function CSVImporter({ onImportComplete }: CSVImporterProps) {
         let error: Error | null = null;
         
         if (destination === "leads") {
-          const { error: err } = await supabase.from("contact_entities").insert(insertData as any);
+          const { error: err } = await ibmDb.from("contact_entities").insert(insertData as any);
           error = err;
         } else if (destination === "lenders") {
-          const { error: err } = await supabase.from("lenders").insert(insertData as any);
+          const { error: err } = await ibmDb.from("lenders").insert(insertData as any);
           error = err;
         } else if (destination === "service_providers") {
-          const { error: err } = await supabase.from("service_providers").insert(insertData as any);
+          const { error: err } = await ibmDb.from("service_providers").insert(insertData as any);
           error = err;
         }
 

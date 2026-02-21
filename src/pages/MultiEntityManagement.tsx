@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { supabase } from "@/integrations/supabase/client";
+import { ibmDb } from "@/lib/ibm";
 import { StandardPageLayout } from "@/components/StandardPageLayout";
 import { IBMPageHeader } from "@/components/ui/IBMPageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -52,17 +52,17 @@ export default function MultiEntityManagement() {
   const fetchData = async () => {
     setIsLoading(true);
     const [entitiesRes, membershipsRes] = await Promise.all([
-      supabase.from("business_entities").select("*").order("name"),
-      supabase.from("entity_memberships").select("*"),
+      ibmDb.from("business_entities").select("*").order("name"),
+      ibmDb.from("entity_memberships").select("*"),
     ]);
 
-    if (entitiesRes.data) setEntities(entitiesRes.data);
-    if (membershipsRes.data) setMemberships(membershipsRes.data);
+    if (entitiesRes.data) setEntities(entitiesRes.data as unknown as BusinessEntity[]);
+    if (membershipsRes.data) setMemberships(membershipsRes.data as unknown as EntityMembership[]);
     setIsLoading(false);
   };
 
   const createEntity = async () => {
-    const { error } = await supabase.from("business_entities").insert([{
+    const { error } = await ibmDb.from("business_entities").insert([{
       name: newEntity.name,
       entity_type: newEntity.entity_type,
       parent_entity_id: newEntity.parent_entity_id || null,

@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { ibmDb } from "@/lib/ibm";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
@@ -51,11 +52,10 @@ export function EmergencyShutdown() {
       const { data: user } = await supabase.auth.getUser();
       if (!user.user) return false;
 
-      const { data: roles } = await supabase
+      const { data: roles } = await ibmDb
         .from('user_roles')
         .select('role')
-        .eq('user_id', user.user.id)
-        .eq('is_active', true);
+        .eq('user_id', user.user.id);
 
       const hasAdminRole = roles?.some(r => 
         ['admin', 'super_admin', 'security_admin'].includes(r.role)
@@ -87,7 +87,7 @@ export function EmergencyShutdown() {
       }
 
       // Fetch recent emergency events
-      const { data: events } = await supabase
+      const { data: events } = await ibmDb
         .from('emergency_events')
         .select('*')
         .order('created_at', { ascending: false })
@@ -136,7 +136,7 @@ export function EmergencyShutdown() {
       const { data: user } = await supabase.auth.getUser();
       
       // Log emergency event
-      await supabase.from('emergency_events').insert({
+      await ibmDb.from('emergency_events').insert({
         threat_type: 'manual_shutdown',
         severity: 'critical',
         trigger_source: 'security_admin',
@@ -146,7 +146,7 @@ export function EmergencyShutdown() {
       });
 
       // Activate shutdown
-      await supabase.from('emergency_shutdown').insert({
+      await ibmDb.from('emergency_shutdown').insert({
         reason,
         shutdown_level: level,
         triggered_by: user.user?.email || 'security_admin',
@@ -200,12 +200,12 @@ export function EmergencyShutdown() {
 
     try {
       // Deactivate shutdown
-      await supabase
+      await ibmDb
         .from('emergency_shutdown')
         .update({ 
           is_active: false, 
           resolved_at: new Date().toISOString() 
-        })
+        } as Record<string, unknown>)
         .eq('is_active', true);
 
       setShutdownStatus(null);
@@ -238,7 +238,7 @@ export function EmergencyShutdown() {
 
     try {
       // Log emergency event
-      await supabase.from('emergency_events').insert({
+      await ibmDb.from('emergency_events').insert({
         threat_type: threatType,
         severity,
         trigger_source: triggerSource,
@@ -257,7 +257,7 @@ export function EmergencyShutdown() {
       ].includes(threatType);
 
       if (autoShutdownEnabled) {
-        await supabase.from('emergency_shutdown').insert({
+        await ibmDb.from('emergency_shutdown').insert({
           reason: `Auto-shutdown: ${threatType} detected`,
           shutdown_level: 'partial',
           triggered_by: `AI_Bot_${triggerSource}`,

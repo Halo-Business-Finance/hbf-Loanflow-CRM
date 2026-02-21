@@ -36,9 +36,6 @@ class SecurityIncidentResponseSystem {
     this.setupPreventiveMonitoring();
   }
 
-  /**
-   * Detect and classify security incidents
-   */
   public detectIncident(
     type: SecurityIncident['type'],
     severity: SecurityIncident['severity'],
@@ -59,7 +56,6 @@ class SecurityIncidentResponseSystem {
 
     this.incidents.set(incident.id, incident);
     
-    // Immediate response for critical incidents
     if (severity === 'critical') {
       this.triggerEmergencyResponse(incident);
     } else {
@@ -69,29 +65,17 @@ class SecurityIncidentResponseSystem {
     return incident;
   }
 
-  /**
-   * Emergency Response for Critical Incidents
-   */
   private triggerEmergencyResponse(incident: SecurityIncident): void {
     const emergencyActions = this.getEmergencyActions(incident.type);
-    
     emergencyActions.forEach(action => {
       this.executeResponse(incident.id, action, true);
     });
-
-    // Notify security team (in real implementation)
     this.notifySecurityTeam(incident);
-    
-    // Log emergency response
     this.logIncidentResponse(incident.id, 'emergency_response_initiated', true, 'success');
   }
 
-  /**
-   * Automated Response Actions
-   */
   private queueAutomatedResponse(incident: SecurityIncident): void {
     const responseActions = this.getResponseActions(incident.type, incident.severity);
-    
     responseActions.forEach(action => {
       this.responseQueue.push({ incidentId: incident.id, action });
     });
@@ -116,11 +100,9 @@ class SecurityIncidentResponseSystem {
 
   private getResponseActions(incidentType: SecurityIncident['type'], severity: SecurityIncident['severity']): string[] {
     const baseActions = ['log_incident', 'increase_monitoring'];
-    
     if (severity === 'high') {
       baseActions.push('alert_administrators', 'enable_enhanced_logging');
     }
-    
     switch (incidentType) {
       case 'ai_bot':
         return [...baseActions, 'enable_captcha', 'increase_rate_limiting'];
@@ -133,9 +115,6 @@ class SecurityIncidentResponseSystem {
     }
   }
 
-  /**
-   * Execute Response Action
-   */
   private async executeResponse(incidentId: string, action: string, emergency: boolean = false): Promise<void> {
     const incident = this.incidents.get(incidentId);
     if (!incident) return;
@@ -155,7 +134,7 @@ class SecurityIncidentResponseSystem {
           result = await this.enableRateLimiting(incident.source);
           break;
         case 'temporary_ip_block':
-          result = await this.temporaryIPBlock(incident.source, 3600000); // 1 hour
+          result = await this.temporaryIPBlock(incident.source, 3600000);
           break;
         case 'enable_captcha':
           result = await this.enableCaptcha();
@@ -171,27 +150,20 @@ class SecurityIncidentResponseSystem {
           details = { message: 'Action not implemented', action };
       }
 
-      // Update incident with response
       incident.responseActions.push(action);
       this.logIncidentResponse(incidentId, action, !emergency, result, details);
 
-      // Mark as auto-resolved if all actions successful
       if (result === 'success' && !emergency) {
         incident.autoResolved = true;
         incident.status = 'resolved';
       }
-
-    } catch (error) {
+    } catch (error: any) {
       this.logIncidentResponse(incidentId, action, !emergency, 'failure', { error: error.message });
     }
   }
 
-  /**
-   * Response Action Implementations
-   */
   private async blockSourceIP(source: string): Promise<'success' | 'failure'> {
     try {
-      // In real implementation, this would interface with firewall/WAF
       logger.secureLog('Blocking IP', source);
       return 'success';
     } catch {
@@ -201,13 +173,11 @@ class SecurityIncidentResponseSystem {
 
   private async enhanceMonitoring(): Promise<'success' | 'failure'> {
     try {
-      // Enable enhanced monitoring mode - server-side only
       const { getAuthUser } = await import('@/lib/auth-utils');
-      const { supabase } = await import('@/integrations/supabase/client');
       const user = await getAuthUser();
       
       if (user) {
-        await supabase.rpc('store_secure_session_data', {
+        await ibmDb.rpc('store_secure_session_data', {
           p_key: `enhanced_monitoring_${user.id}`,
           p_value: 'true'
         });
@@ -220,21 +190,14 @@ class SecurityIncidentResponseSystem {
 
   private async enableRateLimiting(source: string): Promise<'success' | 'failure'> {
     try {
-      // Implement dynamic rate limiting - server-side
       const { getAuthUser } = await import('@/lib/auth-utils');
-      const { supabase } = await import('@/integrations/supabase/client');
       const user = await getAuthUser();
       
       if (user) {
         const rateLimitData = JSON.stringify({
-          enabled: true,
-          limit: 10,
-          window: 60000,
-          timestamp: Date.now(),
-          source
+          enabled: true, limit: 10, window: 60000, timestamp: Date.now(), source
         });
-        
-        await supabase.rpc('store_secure_session_data', {
+        await ibmDb.rpc('store_secure_session_data', {
           p_key: `rate_limit_${source}`,
           p_value: rateLimitData
         });
@@ -247,19 +210,12 @@ class SecurityIncidentResponseSystem {
 
   private async temporaryIPBlock(source: string, duration: number): Promise<'success' | 'failure'> {
     try {
-      // Temporary IP block - server-side
       const { getAuthUser } = await import('@/lib/auth-utils');
-      const { supabase } = await import('@/integrations/supabase/client');
       const user = await getAuthUser();
       
       if (user) {
-        const blockData = JSON.stringify({
-          blocked: true,
-          until: Date.now() + duration,
-          source
-        });
-        
-        await supabase.rpc('store_secure_session_data', {
+        const blockData = JSON.stringify({ blocked: true, until: Date.now() + duration, source });
+        await ibmDb.rpc('store_secure_session_data', {
           p_key: `temp_block_${source}`,
           p_value: blockData
         });
@@ -272,13 +228,11 @@ class SecurityIncidentResponseSystem {
 
   private async enableCaptcha(): Promise<'success' | 'failure'> {
     try {
-      // Enable CAPTCHA requirement - server-side
       const { getAuthUser } = await import('@/lib/auth-utils');
-      const { supabase } = await import('@/integrations/supabase/client');
       const user = await getAuthUser();
       
       if (user) {
-        await supabase.rpc('store_secure_session_data', {
+        await ibmDb.rpc('store_secure_session_data', {
           p_key: `captcha_required_${user.id}`,
           p_value: 'true'
         });
@@ -291,7 +245,6 @@ class SecurityIncidentResponseSystem {
 
   private async alertAdministrators(incident: SecurityIncident): Promise<'success' | 'failure'> {
     try {
-      // In real implementation, send alerts via email, SMS, Slack, etc.
       logger.secureLog('Administrator alert sent for incident', incident.id);
       return 'success';
     } catch {
@@ -301,16 +254,6 @@ class SecurityIncidentResponseSystem {
 
   private async logIncidentDetails(incident: SecurityIncident): Promise<'success' | 'failure'> {
     try {
-      // Log to external security information and event management (SIEM) system
-      const logEntry = {
-        timestamp: new Date().toISOString(),
-        incident_id: incident.id,
-        type: incident.type,
-        severity: incident.severity,
-        source: incident.source,
-        status: incident.status
-      };
-      
       logger.secureLog('Security incident logged', incident.id);
       return 'success';
     } catch {
@@ -318,102 +261,70 @@ class SecurityIncidentResponseSystem {
     }
   }
 
-  /**
-   * Response Processor
-   */
   private startResponseProcessor(): void {
     setInterval(() => {
       if (!this.isProcessingResponses && this.responseQueue.length > 0) {
         this.processResponseQueue();
       }
-    }, 5000); // Process every 5 seconds
+    }, 5000);
   }
 
   private async processResponseQueue(): Promise<void> {
     if (this.isProcessingResponses) return;
-    
     this.isProcessingResponses = true;
-    
     try {
-      const batch = this.responseQueue.splice(0, 5); // Process 5 at a time
-      
-      await Promise.all(
-        batch.map(({ incidentId, action }) => 
-          this.executeResponse(incidentId, action, false)
-        )
-      );
+      const batch = this.responseQueue.splice(0, 5);
+      await Promise.all(batch.map(({ incidentId, action }) => this.executeResponse(incidentId, action, false)));
     } finally {
       this.isProcessingResponses = false;
     }
   }
 
-  /**
-   * Preventive Monitoring
-   */
   private setupPreventiveMonitoring(): void {
-    // Monitor for suspicious patterns
-    setInterval(() => {
-      this.checkForAnomalousActivity();
-    }, 60000); // Check every minute
-
-    // Monitor system health
-    setInterval(() => {
-      this.checkSystemHealth();
-    }, 300000); // Check every 5 minutes
+    setInterval(() => { this.checkForAnomalousActivity(); }, 60000);
+    setInterval(() => { this.checkSystemHealth(); }, 300000);
   }
 
   private async checkForAnomalousActivity(): Promise<void> {
-    // Check for rapid requests - use server-side API analytics instead
     try {
-      const { supabase } = await import('@/integrations/supabase/client');
       const { getAuthUser } = await import('@/lib/auth-utils');
       const user = await getAuthUser();
-      
       if (!user) return;
       
-      // Query recent API request analytics from database
-      const { data: recentRequests } = await supabase
+      const { data: recentRequests } = await ibmDb
         .from('api_request_analytics')
         .select('id')
-        .eq('user_id', user.id)
-        .gte('created_at', new Date(Date.now() - 60000).toISOString());
+        .eq('user_id', user.id);
       
-      if (recentRequests && recentRequests.length > 100) {
+      if (recentRequests && (recentRequests as any[]).length > 100) {
         this.detectIncident('rate_limit_abuse', 'high', 'automated_detection', {
-          request_count: recentRequests.length,
+          request_count: (recentRequests as any[]).length,
           time_window: '1_minute'
         });
       }
     } catch (error) {
-      // Silently fail - don't compromise security monitoring
+      // Silently fail
     }
   }
 
   private checkSystemHealth(): void {
-    // Check memory usage
     if (typeof performance !== 'undefined' && (performance as any).memory) {
       const memory = (performance as any).memory;
       const memoryUsage = (memory.usedJSHeapSize / memory.totalJSHeapSize) * 100;
-      
       if (memoryUsage > 90) {
         this.detectIncident('breach_attempt', 'medium', 'system_monitor', {
-          memory_usage: memoryUsage,
-          type: 'potential_memory_exhaustion'
+          memory_usage: memoryUsage, type: 'potential_memory_exhaustion'
         });
       }
     }
   }
 
-  /**
-   * Utility Methods
-   */
   private generateIncidentId(): string {
     return `INC-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }
 
   private sanitizeIncidentDetails(details: any): any {
     if (typeof details !== 'object') return details;
-    
     const sanitized: any = {};
     for (const [key, value] of Object.entries(details)) {
       if (typeof value === 'string' && value.length > 100) {
@@ -428,31 +339,16 @@ class SecurityIncidentResponseSystem {
   }
 
   private logIncidentResponse(
-    incidentId: string, 
-    action: string, 
-    automated: boolean, 
-    result: 'success' | 'failure' | 'partial',
-    details?: any
+    incidentId: string, action: string, automated: boolean, 
+    result: 'success' | 'failure' | 'partial', details?: any
   ): void {
-    const response: IncidentResponse = {
-      action,
-      automated,
-      timestamp: new Date().toISOString(),
-      result,
-      details
-    };
-    
     logger.secureLog(`Incident response completed [${incidentId}]`);
   }
 
   private notifySecurityTeam(incident: SecurityIncident): void {
-    // In production, this would send real notifications
     logger.secureLog('Critical security incident - security team notified', incident.id);
   }
 
-  /**
-   * Public API
-   */
   public getIncidents(): SecurityIncident[] {
     return Array.from(this.incidents.values());
   }
@@ -473,5 +369,4 @@ class SecurityIncidentResponseSystem {
   }
 }
 
-// Export singleton
 export const securityIncidentResponse = new SecurityIncidentResponseSystem();

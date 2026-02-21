@@ -9,7 +9,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
+import { authSignOut, getAuthSession } from '@/lib/auth-utils';
+import { ibmDb } from '@/lib/ibm';
 import { useToast } from '@/hooks/use-toast';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { NotificationBell } from '@/components/NotificationBell';
@@ -39,7 +40,7 @@ export function IBMTopBar({ onMenuClick, sidebarCollapsed }: IBMTopBarProps) {
   const searchRef = useRef<HTMLDivElement>(null);
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    await authSignOut();
     toast({ title: "Signed out successfully" });
     navigate('/auth');
   };
@@ -64,10 +65,10 @@ export function IBMTopBar({ onMenuClick, sidebarCollapsed }: IBMTopBarProps) {
       }
 
       try {
-        const { data: session } = await supabase.auth.getSession();
-        if (!session?.session?.user) return;
+        const session = await getAuthSession();
+        if (!session?.user) return;
 
-        const { data, error } = await supabase
+        const { data, error } = await ibmDb
           .from('contact_entities')
           .select(`
             id, 
@@ -77,23 +78,23 @@ export function IBMTopBar({ onMenuClick, sidebarCollapsed }: IBMTopBarProps) {
             email,
             leads!contact_entity_id(id)
           `)
-          .eq('user_id', session.session.user.id)
+          .eq('user_id', session.user.id)
           .or(`first_name.ilike.%${searchQuery}%,last_name.ilike.%${searchQuery}%,business_name.ilike.%${searchQuery}%`)
           .limit(10);
 
         if (error) throw error;
 
-        setSearchResults(data?.filter(d => d.leads && d.leads.length > 0).map(d => {
+        setSearchResults((data as any[])?.filter((d: any) => d.leads && (d.leads as any[]).length > 0).map((d: any) => {
           const borrowerName = d.first_name && d.last_name 
             ? `${d.first_name} ${d.last_name}`.trim()
             : d.first_name || d.last_name || 'Unknown';
           
           return {
-            id: d.id,
-            leadId: d.leads[0].id,
-            name: borrowerName,
-            businessName: d.business_name || undefined,
-            email: d.email || undefined
+            id: String(d.id),
+            leadId: String(d.leads[0].id),
+            name: String(borrowerName),
+            businessName: d.business_name ? String(d.business_name) : undefined,
+            email: d.email ? String(d.email) : undefined
           };
         }) || []);
         setShowResults(true);

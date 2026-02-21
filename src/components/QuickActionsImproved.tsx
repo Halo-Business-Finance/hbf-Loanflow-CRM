@@ -157,7 +157,7 @@ export function QuickActionsImproved() {
         
         // Step 3: Force sign out
         console.log('Signing out...')
-        await supabase.auth.signOut({ scope: 'global' })
+        await (await import('@/lib/auth-utils')).authSignOut()
         
         // Step 4: Show immediate notification
         toast({

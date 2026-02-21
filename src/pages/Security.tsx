@@ -82,21 +82,8 @@ const SecurityPage: React.FC = () => {
     fetchSecurityMetrics();
     const interval = setInterval(fetchSecurityMetrics, 30000); // Refresh every 30s
     
-    // Real-time subscription for active sessions
-    const channel = supabase
-      .channel('active-sessions-changes')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'active_sessions'
-      }, () => {
-        fetchSecurityMetrics(); // Refresh metrics when sessions change
-      })
-      .subscribe();
-    
     return () => {
       clearInterval(interval);
-      supabase.removeChannel(channel);
     };
   }, []);
 

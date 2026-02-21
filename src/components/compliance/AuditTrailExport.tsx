@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 
 interface AuditFilter {
   startDate: Date | undefined;
@@ -86,7 +86,7 @@ export function AuditTrailExport() {
   const fetchPreview = async () => {
     setLoading(true);
     try {
-      let query = supabase
+      let query = ibmDb
         .from('audit_logs')
         .select('*')
         .order('created_at', { ascending: false })
@@ -111,7 +111,7 @@ export function AuditTrailExport() {
       const { data, error } = await query;
 
       if (error) throw error;
-      setPreviewData(data || []);
+      setPreviewData((data as any[]) || []);
     } catch (error) {
       console.error('Error fetching audit logs:', error);
       toast.error('Failed to fetch audit logs');

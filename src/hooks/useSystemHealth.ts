@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 
 export interface SystemHealth {
   databaseStatus: 'healthy' | 'degraded' | 'offline';
@@ -31,25 +31,26 @@ export function useSystemHealth() {
     const checkSystemHealth = async () => {
       try {
         // Check database connectivity
-        const { error: dbError } = await supabase
+        const { error: dbError } = await ibmDb
           .from('profiles')
-          .select('count', { count: 'exact', head: true });
+          .select('id')
+          .limit(1);
 
         const databaseStatus = dbError ? 'offline' : 'healthy';
 
         // Get active sessions count
-        const { count: sessionsCount } = await supabase
+        const { count: sessionsCount } = await ibmDb
           .from('user_sessions')
-          .select('*', { count: 'exact', head: true })
+          .select('*')
           .eq('is_active', true);
 
         // Get unique active users
-        const { data: activeSessions } = await supabase
+        const { data: activeSessions } = await ibmDb
           .from('user_sessions')
           .select('user_id')
           .eq('is_active', true);
 
-        const uniqueUsers = new Set(activeSessions?.map(s => s.user_id) || []).size;
+        const uniqueUsers = new Set((activeSessions as any[])?.map(s => s.user_id) || []).size;
 
         // Simulate system metrics (in real app, these would come from backend)
         const cpuUsage = Math.floor(Math.random() * 30) + 20; // 20-50%

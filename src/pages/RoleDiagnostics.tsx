@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { CheckCircle2, XCircle, AlertCircle, RefreshCw, Shield, Eye, EyeOff, Users, Settings as SettingsIcon, AlertTriangle } from 'lucide-react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useRoleBasedAccess } from '@/hooks/useRoleBasedAccess';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 import { toast } from 'sonner';
 import { IBMPageHeader } from '@/components/ui/IBMPageHeader';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -165,14 +165,14 @@ export default function RoleDiagnostics() {
 
   const checkHealthEndpoint = async () => {
     try {
-      const { data, error } = await supabase.functions.invoke('health-check');
+      const { data, error } = await ibmDb.rpc('health_check');
       
       if (error) {
         toast.error('Health check failed: ' + error.message);
         return;
       }
 
-      setHealthStatus(data);
+      setHealthStatus(data as any);
       toast.success('Health check completed');
     } catch (error) {
       toast.error('Failed to connect to health endpoint');

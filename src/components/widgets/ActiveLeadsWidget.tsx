@@ -17,7 +17,7 @@ import {
   DollarSign,
   FileText
 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 import { getAuthUser } from '@/lib/auth-utils';
 import {
   Popover,
@@ -72,7 +72,7 @@ export const ActiveLeadsWidget = () => {
       if (!user) return;
 
       // Fetch leads assigned to current user or unassigned
-      let query = supabase
+      let query = ibmDb
         .from('leads')
         .select(`
           id,
@@ -104,7 +104,7 @@ export const ActiveLeadsWidget = () => {
 
       // Fetch contact entities
       const contactIds = leadsData.map(l => l.contact_entity_id).filter(Boolean);
-      const { data: contacts, error: contactsError } = await supabase
+      const { data: contacts, error: contactsError } = await ibmDb
         .from('contact_entities')
         .select('id, name, business_name, email, phone, loan_type, loan_amount, stage, priority')
         .in('id', contactIds as string[]);

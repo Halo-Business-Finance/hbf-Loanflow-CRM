@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '@/integrations/supabase/client'
+import { ibmDb } from '@/lib/ibm'
 import { useToast } from '@/hooks/use-toast'
 import { useRealtimeSubscription } from './useRealtimeSubscription'
 
@@ -37,7 +37,7 @@ export function useRealtimeDashboard() {
       setLoading(true)
       
       // Fetch leads
-      const { data: leadsData } = await supabase
+      const { data: leadsData } = await ibmDb
         .from('leads')
         .select(`
           id,
@@ -50,24 +50,24 @@ export function useRealtimeDashboard() {
         `)
 
       // Fetch clients
-      const { data: clientsData } = await supabase
+      const { data: clientsData } = await ibmDb
         .from('clients')
         .select('id, total_loans, total_loan_value')
 
       // Calculate stats
       const totalLeads = leadsData?.length || 0
-      const activeLeads = leadsData?.filter(lead => 
+      const activeLeads = (leadsData as any[])?.filter(lead => 
         lead.contact_entity?.stage && !['Loan Funded', 'Archive'].includes(lead.contact_entity.stage)
       ).length || 0
       
       const totalClients = clientsData?.length || 0
-      const totalLoans = clientsData?.reduce((sum, client) => sum + (client.total_loans || 0), 0) || 0
+      const totalLoans = (clientsData as any[])?.reduce((sum, client) => sum + (client.total_loans || 0), 0) || 0
       
-      const pipelineValue = leadsData?.reduce((sum, lead) => 
+      const pipelineValue = (leadsData as any[])?.reduce((sum, lead) => 
         sum + (lead.contact_entity?.loan_amount || 0), 0
       ) || 0
       
-      const convertedLeads = leadsData?.filter(lead => 
+      const convertedLeads = (leadsData as any[])?.filter(lead => 
         lead.contact_entity?.stage === 'Loan Funded'
       ).length || 0
       

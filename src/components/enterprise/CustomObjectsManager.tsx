@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { ibmDb } from "@/lib/ibm";
 import { getAuthUser } from '@/lib/auth-utils';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -85,13 +85,13 @@ export function CustomObjectsManager() {
 
   const fetchObjects = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await ibmDb
         .from('custom_objects')
         .select('*')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setObjects(data || []);
+      setObjects((data as unknown as CustomObject[]) || []);
     } catch (error) {
       console.error('Error fetching objects:', error);
       toast({
@@ -106,14 +106,14 @@ export function CustomObjectsManager() {
 
   const fetchFields = async (objectId: string) => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await ibmDb
         .from('custom_fields')
         .select('*')
         .eq('object_id', objectId)
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-      setFields(data || []);
+      setFields((data as unknown as CustomField[]) || []);
     } catch (error) {
       console.error('Error fetching fields:', error);
       toast({
@@ -129,7 +129,7 @@ export function CustomObjectsManager() {
       const user = await getAuthUser();
       if (!user) throw new Error('Not authenticated');
 
-      const { error } = await supabase
+      const { error } = await ibmDb
         .from('custom_objects')
         .insert({
           ...objectForm,
@@ -167,7 +167,7 @@ export function CustomObjectsManager() {
         ? fieldForm.picklist_values.split('\n').filter(v => v.trim())
         : null;
 
-      const { error } = await supabase
+      const { error } = await ibmDb
         .from('custom_fields')
         .insert({
           object_id: selectedObject,

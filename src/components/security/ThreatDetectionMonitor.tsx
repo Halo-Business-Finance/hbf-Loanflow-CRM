@@ -6,7 +6,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Shield, AlertTriangle, Bug, Target, Zap, Activity } from "lucide-react";
 import { ibmDb } from "@/lib/ibm";
-import { supabase } from "@/integrations/supabase/client";
+// IBM migration: supabase import removed - using ibmDb already imported above
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
 import { serverSecureStorage } from "@/lib/server-encryption";
@@ -146,7 +146,7 @@ export function ThreatDetectionMonitor() {
 
   const performVulnerabilityScan = useCallback(async () => {
     try {
-      const { data, error } = await supabase.functions.invoke('vulnerability-scanner', {
+      const { data, error } = await ibmDb.rpc('vulnerability-scanner', {
         body: { action: 'scan' }
       });
 

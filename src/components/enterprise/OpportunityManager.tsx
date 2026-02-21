@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { ibmDb } from "@/lib/ibm";
 import { getAuthUser } from '@/lib/auth-utils';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -91,13 +91,13 @@ export function OpportunityManager() {
 
   const fetchOpportunities = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await ibmDb
         .from('opportunities')
         .select('*')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setOpportunities(data || []);
+      setOpportunities((data as unknown as Opportunity[]) || []);
     } catch (error) {
       console.error('Error fetching opportunities:', error);
       toast({
@@ -112,14 +112,14 @@ export function OpportunityManager() {
 
   const fetchSplits = async (opportunityId: string) => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await ibmDb
         .from('opportunity_splits')
         .select('*')
         .eq('opportunity_id', opportunityId)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setSplits(data || []);
+      setSplits((data as unknown as OpportunitySplit[]) || []);
     } catch (error) {
       console.error('Error fetching splits:', error);
       toast({
@@ -135,7 +135,7 @@ export function OpportunityManager() {
       const user = await getAuthUser();
       if (!user) throw new Error('Not authenticated');
 
-      const { error } = await supabase
+      const { error } = await ibmDb
         .from('opportunities')
         .insert({
           name: opportunityForm.name,
@@ -181,7 +181,7 @@ export function OpportunityManager() {
 
       const splitAmount = (opportunity.amount * parseFloat(splitForm.percentage)) / 100;
 
-      const { error } = await supabase
+      const { error } = await ibmDb
         .from('opportunity_splits')
         .insert({
           opportunity_id: selectedOpportunity,

@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Mail, Check, X, Loader2, Shield } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { supabase } from "@/integrations/supabase/client"
+import { ibmDb } from "@/lib/ibm"
 import { getAuthUser } from '@/lib/auth-utils'
 import { useSecureEmailAccounts } from "@/hooks/useSecureEmailAccounts"
 
@@ -34,14 +34,14 @@ export function EmailSetup({ trigger }: EmailSetupProps) {
       if (!user) throw new Error("Not authenticated")
 
       // Call edge function to get Microsoft OAuth URL
-      const { data, error } = await supabase.functions.invoke('microsoft-auth', {
+      const { data, error } = await ibmDb.rpc('microsoft-auth', {
         body: { action: 'get_auth_url' }
       })
 
       if (error) throw error
 
       // Redirect to Microsoft OAuth
-      window.location.href = data.auth_url
+      window.location.href = (data as any).auth_url
       
     } catch (error: any) {
       console.error('Error connecting to Microsoft:', error)

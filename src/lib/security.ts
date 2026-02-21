@@ -1,5 +1,5 @@
 // Security manager - server-side encryption should be used for sensitive data
-import { supabase } from "@/integrations/supabase/client";
+import { ibmDb } from "@/lib/ibm";
 import { getAuthUser, getAuthSession } from '@/lib/auth-utils';
 import { logger } from '@/lib/logger';
 
@@ -37,7 +37,7 @@ export class SecurityManager {
   // Password validation
   static async validatePassword(password: string): Promise<PasswordValidationResult> {
     try {
-      const { data, error } = await supabase.functions.invoke('enhanced-auth', {
+      const { data, error } = await ibmDb.rpc('enhanced-auth', {
         body: {
           action: 'validate_password',
           password
@@ -45,7 +45,7 @@ export class SecurityManager {
       });
 
       if (error) throw error;
-      return data.validation_result;
+      return (data as any).validation_result;
     } catch (error: any) {
       logger.error('Password validation error:', error);
       return {
@@ -58,7 +58,7 @@ export class SecurityManager {
   // Rate limiting
   static async checkRateLimit(identifier: string, action: string = 'login'): Promise<RateLimitResult> {
     try {
-      const { data, error } = await supabase.functions.invoke('enhanced-auth', {
+      const { data, error } = await ibmDb.rpc('enhanced-auth', {
         body: {
           action: 'check_rate_limit',
           identifier,
@@ -67,7 +67,7 @@ export class SecurityManager {
       });
 
       if (error) throw error;
-      return data.rate_limit_result;
+      return (data as any).rate_limit_result;
     } catch (error: any) {
       logger.error('Rate limit check error:', error);
       return {
@@ -81,7 +81,7 @@ export class SecurityManager {
   // Security event logging
   static async logSecurityEvent(eventData: SecurityEventData): Promise<string | null> {
     try {
-      const { data, error } = await supabase.functions.invoke('enhanced-auth', {
+      const { data, error } = await ibmDb.rpc('enhanced-auth', {
         body: {
           action: 'log_security_event',
           ...eventData
@@ -89,7 +89,7 @@ export class SecurityManager {
       });
 
       if (error) throw error;
-      return data.event_id;
+      return (data as any).event_id;
     } catch (error: any) {
       logger.error('Security event logging error:', error);
       return null;
@@ -112,7 +112,7 @@ export class SecurityManager {
         return { valid: false };
       }
 
-      const { data, error } = await supabase.functions.invoke('enhanced-auth', {
+      const { data, error } = await ibmDb.rpc('enhanced-auth', {
         body: {
           action: 'validate_session'
         }
@@ -121,8 +121,8 @@ export class SecurityManager {
       if (error) throw error;
       return {
         valid: true,
-        user: data.user,
-        security: data.security
+        user: (data as any).user,
+        security: (data as any).security
       };
     } catch (error: any) {
       logger.error('Session validation error:', error);
@@ -376,7 +376,7 @@ export class SecurityManager {
 
     // Check MFA status
     if (session) {
-      const { data: mfaSettings } = await supabase
+      const { data: mfaSettings } = await ibmDb
         .from('mfa_settings')
         .select('is_enabled')
         .single();
@@ -392,7 +392,7 @@ export class SecurityManager {
 
     // Check password policy compliance
     try {
-      const { data: policy } = await supabase
+      const { data: policy } = await ibmDb
         .from('password_policies')
         .select('*')
         .eq('is_active', true)
@@ -415,7 +415,7 @@ export class SecurityManager {
 
     // Check for recent security events
     try {
-      const { data: recentEvents } = await supabase
+      const { data: recentEvents } = await ibmDb
         .from('security_events')
         .select('severity')
         .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())

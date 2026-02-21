@@ -10,7 +10,7 @@ import { UserPlus, Loader2, BarChart3, Users, Search, Filter, X, CheckCircle2 } 
 import { IBMPageHeader } from "@/components/ui/IBMPageHeader"
 import { StandardContentCard } from "@/components/StandardContentCard"
 import { Skeleton } from "@/components/ui/skeleton"
-import { supabase } from "@/integrations/supabase/client"
+import { ibmDb } from "@/lib/ibm"
 import { useToast } from "@/hooks/use-toast"
 import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription"
 import { Badge } from "@/components/ui/badge"
@@ -71,7 +71,7 @@ export default function LeadAssignmentPage() {
   const fetchUnassignedLeads = async () => {
     try {
       // Step 1: get unassigned leads ids only (avoid cross-table RLS join issues)
-      const { data: leads, error: leadsError } = await supabase
+      const { data: leads, error: leadsError } = await ibmDb
         .from('leads')
         .select(`id, contact_entity_id, created_at`)
         .is('user_id', null)
@@ -88,7 +88,7 @@ export default function LeadAssignmentPage() {
       const contactIds = leads.map(l => l.contact_entity_id).filter(Boolean)
 
       // Step 2: fetch related contact details
-      const { data: contacts, error: contactsError } = await supabase
+      const { data: contacts, error: contactsError } = await ibmDb
         .from('contact_entities')
         .select('id, name, email, stage, priority')
         .in('id', contactIds as string[])
@@ -127,7 +127,7 @@ export default function LeadAssignmentPage() {
       twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24)
 
       // Step 1: Get recently assigned leads
-      const { data: leads, error: leadsError } = await supabase
+      const { data: leads, error: leadsError } = await ibmDb
         .from('leads')
         .select(`id, contact_entity_id, user_id, assigned_at, created_at`)
         .not('user_id', 'is', null)
@@ -147,7 +147,7 @@ export default function LeadAssignmentPage() {
       const userIds = leads.map(l => l.user_id).filter(Boolean)
 
       // Step 2: Fetch contact details
-      const { data: contacts, error: contactsError } = await supabase
+      const { data: contacts, error: contactsError } = await ibmDb
         .from('contact_entities')
         .select('id, name, email, stage, priority')
         .in('id', contactIds as string[])
@@ -155,7 +155,7 @@ export default function LeadAssignmentPage() {
       if (contactsError) throw contactsError
 
       // Step 3: Fetch user profiles
-      const { data: profiles, error: profilesError } = await supabase
+      const { data: profiles, error: profilesError } = await ibmDb
         .from('profiles')
         .select('id, first_name, last_name')
         .in('id', userIds as string[])
@@ -196,7 +196,7 @@ export default function LeadAssignmentPage() {
   const fetchTeamMembers = async () => {
     try {
       // Get all active team members
-      const { data: profiles, error: profilesError } = await supabase
+      const { data: profiles, error: profilesError } = await ibmDb
         .from('profiles')
         .select('id, first_name, last_name')
         .eq('is_active', true)
@@ -204,7 +204,7 @@ export default function LeadAssignmentPage() {
       if (profilesError) throw profilesError
 
       // Get lead counts using secure RPC function
-      const { data: leadCounts, error: countsError } = await supabase
+      const { data: leadCounts, error: countsError } = await ibmDb
         .rpc('get_lead_counts')
 
       if (countsError) throw countsError
@@ -213,9 +213,9 @@ export default function LeadAssignmentPage() {
       const countsMap = new Map((leadCounts || []).map((lc: any) => [lc.user_id, lc.lead_count]))
       
       const membersWithCounts = (profiles || []).map((profile) => ({
-        ...profile,
-        leadCount: countsMap.get(profile.id) || 0
-      }))
+        ...(profile as any),
+        leadCount: countsMap.get((profile as any).id) || 0
+      })) as TeamMember[]
 
       setTeamMembers(membersWithCounts)
     } catch (error) {
@@ -265,7 +265,7 @@ export default function LeadAssignmentPage() {
 
     setAssigning(leadId)
     try {
-      const { error } = await supabase
+      const { error } = await ibmDb
         .from('leads')
         .update({ user_id: agentId })
         .eq('id', lead.lead_id)
@@ -359,7 +359,7 @@ export default function LeadAssignmentPage() {
 
       for (const leadId of leadIds) {
         try {
-          const { error } = await supabase
+          const { error } = await ibmDb
             .from('leads')
             .update({ user_id: bulkAssignAgent })
             .eq('id', leadId)

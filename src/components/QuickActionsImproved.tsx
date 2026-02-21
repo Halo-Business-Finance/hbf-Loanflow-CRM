@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { Plus, Phone, Mail, Calendar, User, Users, FileText, BarChart3, Bell, Settings, Zap, AlertTriangle } from "lucide-react"
-import { supabase } from "@/integrations/supabase/client"
+// IBM migration: supabase import removed - quick actions use navigation only
 import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 

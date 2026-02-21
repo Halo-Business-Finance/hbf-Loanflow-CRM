@@ -35,7 +35,7 @@ import {
   Handshake,
   BarChart3
 } from 'lucide-react';
-import { supabase } from "@/integrations/supabase/client";
+// IBM migration: supabase import removed - bank partners use local state only
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";

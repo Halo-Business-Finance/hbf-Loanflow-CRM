@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { useParams, useNavigate } from "react-router-dom"
-import { supabase } from "@/integrations/supabase/client"
+import { ibmDb } from "@/lib/ibm"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -60,7 +60,7 @@ export default function LeadDocuments() {
     if (!isValidUuid(leadId)) return
 
     try {
-      const { data, error } = await supabase
+      const { data, error } = await ibmDb
         .from('leads')
         .select(`
           id,

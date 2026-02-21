@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { supabase } from "@/integrations/supabase/client"
+import { ibmDb } from "@/lib/ibm"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { useToast } from "@/hooks/use-toast"
 
@@ -97,7 +97,7 @@ export function ActionReminder({ entityId, entityName, entityType, isOpen, onClo
       const [hours, minutes] = selectedTime.split(':')
       reminderDateTime.setHours(parseInt(hours), parseInt(minutes))
 
-      const { error } = await supabase
+      const { error } = await ibmDb
         .from('notifications')
         .insert({
           user_id: user?.id,
@@ -112,7 +112,7 @@ export function ActionReminder({ entityId, entityName, entityType, isOpen, onClo
       if (error) throw error
 
       // Create audit log entry for reminder creation
-      await supabase
+      await ibmDb
         .from('audit_logs')
         .insert({
           user_id: user?.id,

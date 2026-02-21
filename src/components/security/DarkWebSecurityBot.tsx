@@ -140,16 +140,16 @@ export function DarkWebSecurityBot() {
         .limit(10);
 
       if (incidents) {
-        const formattedThreats: DarkWebThreat[] = incidents.map(incident => {
+        const formattedThreats: DarkWebThreat[] = (incidents as unknown as any[]).map(incident => {
           const data = incident.incident_data as any;
           return {
-            id: incident.id,
-            type: incident.incident_type,
+            id: String(incident.id),
+            type: String(incident.incident_type),
             severity: incident.severity as "low" | "medium" | "high" | "critical",
             source: data?.source || 'Unknown',
             description: data?.description || 'Dark web threat detected',
             blocked: true,
-            timestamp: incident.created_at,
+            timestamp: String(incident.created_at),
             metadata: data?.metadata || {}
           };
         });

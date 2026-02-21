@@ -57,7 +57,7 @@ export function EmergencyShutdown() {
         .select('role')
         .eq('user_id', user.user.id);
 
-      const hasAdminRole = roles?.some(r => 
+      const hasAdminRole = (roles as unknown as { role: string }[])?.some(r => 
         ['admin', 'super_admin', 'security_admin'].includes(r.role)
       );
       
@@ -94,14 +94,14 @@ export function EmergencyShutdown() {
         .limit(10);
 
       if (events) {
-        setEmergencyEvents(events.map(event => ({
-          id: event.id,
-          threat_type: event.threat_type,
+        setEmergencyEvents((events as unknown as any[]).map(event => ({
+          id: String(event.id),
+          threat_type: String(event.threat_type),
           severity: event.severity as 'critical' | 'high',
-          trigger_source: event.trigger_source,
-          auto_shutdown: event.auto_shutdown,
-          manual_override: event.manual_override,
-          triggered_at: event.created_at,
+          trigger_source: String(event.trigger_source),
+          auto_shutdown: Boolean(event.auto_shutdown),
+          manual_override: Boolean(event.manual_override),
+          triggered_at: String(event.created_at),
           resolved_at: event.resolved_at
         })));
       }

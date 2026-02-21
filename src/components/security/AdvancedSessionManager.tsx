@@ -90,12 +90,7 @@ export function AdvancedSessionManager() {
         { role: 'loan_originator', timeout_minutes: 480, max_concurrent_sessions: 3, require_2fa: false }
       ];
 
-      setSessions((sessionsData || []).map(session => ({
-        ...session,
-        ip_address: session.ip_address as string,
-        session_start: session.last_activity,
-        concurrent_session_count: 1
-      })));
+      setSessions((sessionsData || []) as unknown as SessionData[]);
       setRoleConfigs(mockRoleConfigs);
     } catch (error) {
       console.error('Error loading session data:', error);

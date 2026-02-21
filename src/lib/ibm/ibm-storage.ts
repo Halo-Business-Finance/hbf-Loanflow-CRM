@@ -38,7 +38,7 @@ class IBMStorageBucket {
   async upload(
     path: string,
     file: File | Blob | ArrayBuffer,
-    options?: { contentType?: string; upsert?: boolean }
+    options?: { contentType?: string; upsert?: boolean; cacheControl?: string }
   ): Promise<UploadResult> {
     try {
       const headers = await getAuthHeaders();
@@ -54,6 +54,7 @@ class IBMStorageBucket {
           operation: 'upload',
           contentType: options?.contentType || (file instanceof File ? file.type : 'application/octet-stream'),
           upsert: options?.upsert ?? false,
+          cacheControl: options?.cacheControl,
         }),
       });
 
@@ -68,6 +69,7 @@ class IBMStorageBucket {
         method: 'PUT',
         headers: {
           'Content-Type': options?.contentType || (file instanceof File ? file.type : 'application/octet-stream'),
+          ...(options?.cacheControl ? { 'Cache-Control': options.cacheControl } : {}),
         },
         body: file,
       });
@@ -87,7 +89,7 @@ class IBMStorageBucket {
   }
 
   /** Download a file as a Blob via a signed GET URL */
-  async download(path: string): Promise<{ data: Blob | null; error: Error | null }> {
+  async download(path: string): Promise<{ data: Blob; error: null } | { data: null; error: Error }> {
     try {
       const headers = await getAuthHeaders();
       const baseUrl = IBM_CONFIG.database.functionsBaseUrl;
@@ -110,16 +112,41 @@ class IBMStorageBucket {
     }
   }
 
-  /** Get a public/signed URL for viewing a file */
-  async getPublicUrl(path: string): Promise<{ data: { publicUrl: string } }> {
+  /** Get a public URL for viewing a file (synchronous) */
+  getPublicUrl(path: string): { data: { publicUrl: string } } {
     const cosEndpoint = IBM_CONFIG.cos.endpoint;
     const bucket = this.bucket;
-    // For public buckets: construct the direct URL
     return {
       data: {
         publicUrl: `https://${bucket}.${cosEndpoint}/${path}`,
       },
     };
+  }
+
+  /** Create a signed URL for temporary access */
+  async createSignedUrl(path: string, expiresIn: number): Promise<{ data: { signedUrl: string }; error: null } | { data: null; error: Error }> {
+    try {
+      const headers = await getAuthHeaders();
+      const baseUrl = IBM_CONFIG.database.functionsBaseUrl;
+
+      const res = await fetch(`${baseUrl}/storage-sign`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          bucket: this.bucket,
+          path,
+          operation: 'download',
+          expiresIn,
+        }),
+      });
+
+      if (!res.ok) throw new Error('Failed to create signed URL');
+      const { signedUrl } = await res.json();
+
+      return { data: { signedUrl }, error: null };
+    } catch (err) {
+      return { data: null, error: err instanceof Error ? err : new Error(String(err)) };
+    }
   }
 
   /** List files in a folder */

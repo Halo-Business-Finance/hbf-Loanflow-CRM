@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Upload, FileText } from "lucide-react"
-import { supabase } from "@/integrations/supabase/client"
+import { ibmDb, ibmAuth, ibmStorage } from '@/lib/ibm'
 import { useToast } from "@/hooks/use-toast"
 
 interface TemplateUploadModalProps {
@@ -40,7 +40,6 @@ export function TemplateUploadModal({ isOpen, onClose, onSuccess }: TemplateUplo
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
-      // Validate file type
       const allowedTypes = [
         'application/pdf',
         'application/msword',
@@ -58,7 +57,6 @@ export function TemplateUploadModal({ isOpen, onClose, onSuccess }: TemplateUplo
         return
       }
 
-      // Validate file size (max 10MB)
       if (file.size > 10 * 1024 * 1024) {
         toast({
           title: "File too large",
@@ -69,7 +67,6 @@ export function TemplateUploadModal({ isOpen, onClose, onSuccess }: TemplateUplo
       }
 
       setSelectedFile(file)
-      // Auto-populate template name from filename if empty
       if (!templateName) {
         setTemplateName(file.name.replace(/\.[^/.]+$/, ""))
       }
@@ -89,16 +86,15 @@ export function TemplateUploadModal({ isOpen, onClose, onSuccess }: TemplateUplo
     setUploading(true)
 
     try {
-      // Get current user
-      const { data: { user } } = await supabase.auth.getUser()
+      const session = await ibmAuth.getSession()
+      const user = session?.user
       if (!user) throw new Error("Not authenticated")
 
-      // Upload file to storage
       const fileExt = selectedFile.name.split('.').pop()
       const fileName = `${Date.now()}_${templateName.replace(/[^a-zA-Z0-9]/g, '_')}.${fileExt}`
       const filePath = `${fileName}`
 
-      const { error: uploadError } = await supabase.storage
+      const { error: uploadError } = await ibmStorage
         .from('document-templates')
         .upload(filePath, selectedFile, {
           cacheControl: '3600',
@@ -107,8 +103,7 @@ export function TemplateUploadModal({ isOpen, onClose, onSuccess }: TemplateUplo
 
       if (uploadError) throw uploadError
 
-      // Create database record
-      const { error: dbError } = await supabase
+      const { error: dbError } = await ibmDb
         .from('document_templates')
         .insert({
           name: templateName,
@@ -121,8 +116,7 @@ export function TemplateUploadModal({ isOpen, onClose, onSuccess }: TemplateUplo
         })
 
       if (dbError) {
-        // If database insert fails, delete the uploaded file
-        await supabase.storage
+        await ibmStorage
           .from('document-templates')
           .remove([filePath])
         throw dbError
@@ -133,7 +127,6 @@ export function TemplateUploadModal({ isOpen, onClose, onSuccess }: TemplateUplo
         description: "Template uploaded successfully"
       })
 
-      // Reset form
       setSelectedFile(null)
       setTemplateName("")
       setDescription("")

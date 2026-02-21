@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb, ibmStorage } from '@/lib/ibm';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useToast } from '@/hooks/use-toast';
 
@@ -35,18 +35,16 @@ export const useSecureDocuments = () => {
     }
 
     try {
-      const { data, error } = await supabase.functions.invoke('secure-document-manager', {
-        body: {
-          action: 'validate_upload_access',
-          lead_id: leadId
-        }
+      const { data, error } = await ibmDb.rpc('secure_document_manager', {
+        p_action: 'validate_upload_access',
+        p_lead_id: leadId
       });
 
       if (error) {
         throw error;
       }
 
-      return data;
+      return data as any;
     } catch (error: any) {
       console.error('Error validating upload access:', error);
       return { allowed: false, reason: 'Validation failed' };
@@ -122,19 +120,19 @@ export const useSecureDocuments = () => {
       const securePath = `${user.id}/${leadId}/${timestamp}-${randomName}.${fileExtension}`;
 
       // Upload file to storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const uploadResult = await ibmStorage
         .from('lead-documents')
         .upload(securePath, file, {
           cacheControl: '3600',
           upsert: false
         });
 
-      if (uploadError) {
-        throw uploadError;
+      if (uploadResult.error) {
+        throw uploadResult.error;
       }
 
       // Create document record in database
-      const { data: docData, error: docError } = await supabase
+      const { data: docData, error: docError } = await ibmDb
         .from('lead_documents')
         .insert({
           lead_id: leadId,
@@ -156,7 +154,7 @@ export const useSecureDocuments = () => {
 
       if (docError) {
         // Clean up uploaded file if database insert fails
-        await supabase.storage
+        await ibmStorage
           .from('lead-documents')
           .remove([securePath]);
         throw docError;
@@ -167,7 +165,7 @@ export const useSecureDocuments = () => {
         description: `${file.name} uploaded securely`,
       });
 
-      return docData;
+      return docData as any;
     } catch (error: any) {
       console.error('Error uploading document:', error);
       toast({
@@ -188,18 +186,16 @@ export const useSecureDocuments = () => {
     if (!user) return false;
 
     try {
-      const { data, error } = await supabase.functions.invoke('secure-document-manager', {
-        body: {
-          action: `validate_document_${action === 'read' ? 'access' : action === 'write' ? 'modification' : 'deletion'}`,
-          document_id: documentId
-        }
+      const { data, error } = await ibmDb.rpc('secure_document_manager', {
+        p_action: `validate_document_${action === 'read' ? 'access' : action === 'write' ? 'modification' : 'deletion'}`,
+        p_document_id: documentId
       });
 
       if (error) {
         throw error;
       }
 
-      return data.allowed;
+      return (data as any)?.allowed ?? false;
     } catch (error: any) {
       console.error('Error validating document access:', error);
       return false;
@@ -212,18 +208,16 @@ export const useSecureDocuments = () => {
     try {
       setIsLoading(true);
 
-      const { data, error } = await supabase.functions.invoke('secure-document-manager', {
-        body: {
-          action: 'get_secure_documents',
-          lead_id: leadId
-        }
+      const { data, error } = await ibmDb.rpc('secure_document_manager', {
+        p_action: 'get_secure_documents',
+        p_lead_id: leadId
       });
 
       if (error) {
         throw error;
       }
 
-      const secureDocuments = data.documents || [];
+      const secureDocuments = (data as any)?.documents || [];
       setDocuments(secureDocuments);
       return secureDocuments;
     } catch (error: any) {
@@ -255,7 +249,7 @@ export const useSecureDocuments = () => {
       }
 
       // Get document details
-      const { data: doc, error: docError } = await supabase
+      const { data: doc, error: docError } = await ibmDb
         .from('lead_documents')
         .select('file_path, document_name')
         .eq('id', documentId)
@@ -265,22 +259,24 @@ export const useSecureDocuments = () => {
         throw new Error('Document not found');
       }
 
+      const docAny = doc as any;
+
       // Create signed URL for secure download (30 minute expiry)
-      const { data: signedUrlData, error: urlError } = await supabase.storage
+      const { data: signedUrlData, error: urlError } = await ibmStorage
         .from('lead-documents')
-        .createSignedUrl(doc.file_path, 1800); // 30 minutes expiry
+        .createSignedUrl(docAny.file_path, 1800);
 
       if (urlError) {
         throw urlError;
       }
 
       // Log secure document access
-      await supabase.rpc('log_security_event', {
+      await ibmDb.rpc('log_security_event', {
         p_event_type: 'document_download',
         p_severity: 'low',
         p_details: {
           document_id: documentId,
-          document_name: doc.document_name,
+          document_name: docAny.document_name,
           action: 'download',
           timestamp: new Date().toISOString()
         }
@@ -314,7 +310,7 @@ export const useSecureDocuments = () => {
       }
 
       // Get document details before deletion
-      const { data: doc, error: docError } = await supabase
+      const { data: doc, error: docError } = await ibmDb
         .from('lead_documents')
         .select('file_path, document_name')
         .eq('id', documentId)
@@ -324,8 +320,10 @@ export const useSecureDocuments = () => {
         throw new Error('Document not found');
       }
 
+      const docAny = doc as any;
+
       // Delete from database first (triggers audit log)
-      const { error: deleteError } = await supabase
+      const { error: deleteError } = await ibmDb
         .from('lead_documents')
         .delete()
         .eq('id', documentId);
@@ -334,17 +332,14 @@ export const useSecureDocuments = () => {
         throw deleteError;
       }
 
-      // Clean up file from storage using secure cleanup
-      await supabase.functions.invoke('secure-document-manager', {
-        body: {
-          action: 'secure_file_cleanup',
-          file_path: doc.file_path
-        }
-      });
+      // Clean up file from storage
+      await ibmStorage
+        .from('lead-documents')
+        .remove([docAny.file_path]);
 
       toast({
         title: "Document Deleted",
-        description: `${doc.document_name} deleted securely`,
+        description: `${docAny.document_name} deleted securely`,
       });
 
       return true;

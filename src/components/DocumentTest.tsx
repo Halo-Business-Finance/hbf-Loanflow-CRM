@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb, ibmStorage } from '@/lib/ibm';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 
@@ -11,8 +11,7 @@ export function DocumentTest() {
     try {
       setTestResult('Testing document access...');
       
-      // Test 1: Can we fetch documents?
-      const { data: docs, error: docsError } = await supabase
+      const { data: docs, error: docsError } = await ibmDb
         .from('lead_documents')
         .select('*')
         .limit(1);
@@ -27,13 +26,12 @@ export function DocumentTest() {
         return;
       }
       
-      const doc = docs[0];
+      const doc = docs[0] as any;
       setTestResult(`Found document: ${doc.document_name}`);
       
-      // Test 2: Can we access the file?
       if (doc.file_path) {
         try {
-          const { data: fileData, error: downloadError } = await supabase.storage
+          const { data: fileData, error: downloadError } = await ibmStorage
             .from('lead-documents')
             .download(doc.file_path);
 

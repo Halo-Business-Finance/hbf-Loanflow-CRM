@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb, ibmStorage } from '@/lib/ibm';
 import { useFileUploadProgress, formatBytes } from '@/hooks/useFileUpload';
 import { DocumentVersionHistory } from '@/components/DocumentVersionHistory';
 
@@ -125,14 +125,14 @@ export function LoanDocumentSubmission({
     if (!user || !leadId) return;
 
     try {
-      const { data, error } = await supabase
+      const { data, error } = await ibmDb
         .from('lead_documents')
         .select('*')
         .eq('lead_id', leadId)
         .order('uploaded_at', { ascending: false });
 
       if (error) throw error;
-      setUploadedDocs(data || []);
+      setUploadedDocs((data as unknown as UploadedDocument[]) || []);
     } catch (error) {
       console.error('Error fetching documents:', error);
     }
@@ -328,7 +328,7 @@ export function LoanDocumentSubmission({
       const filePath = `${user.id}/${leadId}/${fileName}`;
 
       // Upload to storage
-      const { error: uploadError } = await supabase.storage
+      const { error: uploadError } = await ibmStorage
         .from('lead-documents')
         .upload(filePath, fileItem.file, {
           cacheControl: '3600',
@@ -345,7 +345,7 @@ export function LoanDocumentSubmission({
       );
 
       // Create database record
-      const { error: dbError } = await supabase
+      const { error: dbError } = await ibmDb
         .from('lead_documents')
         .insert({
           lead_id: leadId,
@@ -464,13 +464,13 @@ export function LoanDocumentSubmission({
     try {
       // Delete from storage
       if (filePath) {
-        await supabase.storage
+        await ibmStorage
           .from('lead-documents')
           .remove([filePath]);
       }
 
       // Delete from database
-      const { error } = await supabase
+      const { error } = await ibmDb
         .from('lead_documents')
         .delete()
         .eq('id', docId);

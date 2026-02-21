@@ -18,7 +18,7 @@ import {
   Copy,
   Download
 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 import { useToast } from '@/hooks/use-toast';
 
 interface Condition {
@@ -104,20 +104,20 @@ export function AutoConditionGenerator({ application, onConditionsGenerated }: A
 
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('generate-conditions', {
-        body: { application }
+      const { data, error } = await ibmDb.rpc('generate_conditions', {
+        application
       });
 
       if (error) {
         throw error;
       }
 
-      if (data.error) {
-        throw new Error(data.error);
+      if ((data as any).error) {
+        throw new Error((data as any).error);
       }
 
-      setGeneratedConditions(data);
-      setSelectedConditions(new Set(data.conditions.filter((c: Condition) => c.priority === 'Required').map((c: Condition) => c.id)));
+      setGeneratedConditions(data as any);
+      setSelectedConditions(new Set((data as any).conditions.filter((c: Condition) => c.priority === 'Required').map((c: Condition) => c.id)));
       
       if (onConditionsGenerated) {
         onConditionsGenerated(data);

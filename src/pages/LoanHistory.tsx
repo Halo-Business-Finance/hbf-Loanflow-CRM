@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { FileText, Download, Search, DollarSign, Calendar, TrendingUp, User } from "lucide-react";
 import { useAuth } from '@/components/auth/AuthProvider';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 import { useToast } from '@/hooks/use-toast';
 import { useRoleBasedAccess } from '@/hooks/useRoleBasedAccess';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
@@ -72,7 +72,7 @@ export default function LoanHistory() {
       const isManagerOrAdmin = hasRole('manager') || hasRole('admin') || hasRole('super_admin');
       
       // Try embedded join first
-      let query = supabase
+      let query = ibmDb
         .from('clients')
         .select(`
           id,
@@ -104,7 +104,7 @@ export default function LoanHistory() {
       if (error) {
         console.warn('[LoanHistory] Embedded join failed, using fallback:', error);
         
-        let clientsQuery = supabase
+        let clientsQuery = ibmDb
           .from('clients')
           .select('*')
           .order('created_at', { ascending: false });
@@ -124,7 +124,7 @@ export default function LoanHistory() {
         
         let contactsData: any[] = [];
         if (contactIds.length > 0) {
-          const { data: contacts, error: contactsError } = await supabase
+          const { data: contacts, error: contactsError } = await ibmDb
             .from('contact_entities')
             .select('*')
             .in('id', contactIds as string[]);

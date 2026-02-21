@@ -9,7 +9,7 @@
  * - All keys managed securely by Supabase encryption-key-service
  */
 
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 import { getAuthUser } from '@/lib/auth-utils';
 
 export interface EncryptionResult {
@@ -32,16 +32,14 @@ export const encryptData = async (data: any, context?: string): Promise<Encrypti
       context
     };
 
-    const { data: result, error } = await supabase.functions.invoke('encrypt-data', {
-      body: payload
-    });
+    const { data: result, error } = await ibmDb.rpc('encrypt_data', payload);
 
     if (error) {
       console.error('Encryption failed:', error);
       return { success: false, error: error.message };
     }
 
-    return { success: true, encrypted: result.encrypted };
+    return { success: true, encrypted: (result as any).encrypted };
   } catch (error) {
     console.error('Encryption error:', error);
     return { 
@@ -64,9 +62,7 @@ export const decryptData = async (encrypted: string, context?: string): Promise<
       context
     };
 
-    const { data: result, error } = await supabase.functions.invoke('encrypt-data', {
-      body: payload
-    });
+    const { data: result, error } = await ibmDb.rpc('encrypt_data', payload);
 
     if (error) {
       console.error('Decryption failed:', error);
@@ -76,9 +72,9 @@ export const decryptData = async (encrypted: string, context?: string): Promise<
     // Try to parse as JSON, fallback to raw string
     let decrypted;
     try {
-      decrypted = JSON.parse(result.decrypted);
+      decrypted = JSON.parse((result as any).decrypted);
     } catch {
-      decrypted = result.decrypted;
+      decrypted = (result as any).decrypted;
     }
 
     return { success: true, decrypted };
@@ -127,7 +123,7 @@ export class ServerSecureStorage {
         ? new Date(Date.now() + options.ttl * 60 * 1000).toISOString()
         : new Date(Date.now() + 480 * 60 * 1000).toISOString(); // Default 8 hours
 
-      const { error } = await supabase
+      const { error } = await ibmDb
         .from('secure_session_data')
         .upsert({
           user_id: user.id,
@@ -162,7 +158,7 @@ export class ServerSecureStorage {
       }
 
       // Fetch encrypted data from Supabase
-      const { data, error } = await supabase
+      const { data, error } = await ibmDb
         .from('secure_session_data')
         .select('session_value, expires_at')
         .eq('user_id', user.id)
@@ -204,7 +200,7 @@ export class ServerSecureStorage {
       const user = await getAuthUser();
       if (!user) return false;
 
-      const { error } = await supabase
+      const { error } = await ibmDb
         .from('secure_session_data')
         .delete()
         .eq('user_id', user.id)
@@ -225,7 +221,7 @@ export class ServerSecureStorage {
       const user = await getAuthUser();
       if (!user) return false;
 
-      const { error } = await supabase
+      const { error } = await ibmDb
         .from('secure_session_data')
         .delete()
         .eq('user_id', user.id);

@@ -13,7 +13,7 @@ import {
   BarChart3,
   ChevronRight
 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 
 interface CommissionTier {
   name: string;
@@ -56,7 +56,7 @@ export function CommissionCalculator() {
   const fetchCommissionData = async () => {
     try {
       // Fetch funded/closing loans for commission calculation
-      const { data: contacts, error } = await supabase
+      const { data: contacts, error } = await ibmDb
         .from('contact_entities')
         .select('id, name, business_name, loan_amount, stage, created_at')
         .in('stage', ['Closing', 'Funded', 'Pre-approval', 'Approved'])
@@ -72,7 +72,7 @@ export function CommissionCalculator() {
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
       const startOfYear = new Date(now.getFullYear(), 0, 1);
 
-      const calculatedCommissions: LoanCommission[] = (contacts || []).map(contact => {
+      const calculatedCommissions: LoanCommission[] = ((contacts as any[]) || []).map(contact => {
         const loanAmount = contact.loan_amount || 0;
         const createdAt = new Date(contact.created_at);
         

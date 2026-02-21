@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 import { useAuth } from '@/components/auth/AuthProvider';
 
 interface DocumentAnalyticsData {
@@ -38,7 +38,7 @@ export const useDocumentAnalytics = (data: DocumentAnalyticsData | null) => {
       startTimeRef.current = Date.now();
       setIsTracking(true);
 
-      const { data: analyticsRecord, error } = await supabase
+      const { data: analyticsRecord, error } = await ibmDb
         .from('document_analytics')
         .insert({
           user_id: user.id,
@@ -57,7 +57,7 @@ export const useDocumentAnalytics = (data: DocumentAnalyticsData | null) => {
       }
 
       if (analyticsRecord) {
-        setAnalyticsId(analyticsRecord.id);
+        setAnalyticsId((analyticsRecord as any).id);
       }
     } catch (error) {
       console.error('Error in startTracking:', error);
@@ -73,7 +73,7 @@ export const useDocumentAnalytics = (data: DocumentAnalyticsData | null) => {
       const endTime = Date.now();
       const totalViewTime = Math.round((endTime - startTimeRef.current) / 1000);
 
-      await supabase
+      await ibmDb
         .from('document_analytics')
         .update({
           view_ended_at: new Date().toISOString(),
@@ -139,7 +139,7 @@ export const useDocumentAnalytics = (data: DocumentAnalyticsData | null) => {
     if (!user) return;
 
     try {
-      await supabase
+      await ibmDb
         .from('document_error_logs')
         .insert({
           user_id: user.id,
@@ -172,7 +172,7 @@ export const useDocumentAnalytics = (data: DocumentAnalyticsData | null) => {
         const currentViewTime = Math.round((Date.now() - startTimeRef.current) / 1000);
         
         try {
-          await supabase
+          await ibmDb
             .from('document_analytics')
             .update({
               total_view_time_seconds: currentViewTime,

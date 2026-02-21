@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 import { useToast } from '@/hooks/use-toast';
 
 export interface LenderPerformance {
@@ -39,12 +39,12 @@ export function useLenderAnalytics(dateRange?: { start: Date; end: Date }) {
 
       // Fetch everything in parallel - 2 queries instead of N+1
       const [lendersResult, contactsResult] = await Promise.all([
-        supabase
+        ibmDb
           .from('lenders')
           .select('id, name, logo_url, lender_type, is_active')
           .eq('is_active', true)
           .order('name'),
-        supabase
+        ibmDb
           .from('contact_entities')
           .select('id, stage, loan_amount, created_at, updated_at, lender_id')
           .not('lender_id', 'is', null)
@@ -53,8 +53,8 @@ export function useLenderAnalytics(dateRange?: { start: Date; end: Date }) {
       if (lendersResult.error) throw lendersResult.error;
       if (contactsResult.error) throw contactsResult.error;
 
-      const lenders = lendersResult.data || [];
-      const allContacts = contactsResult.data || [];
+      const lenders = (lendersResult.data as any[]) || [];
+      const allContacts = (contactsResult.data as any[]) || [];
 
       // Group contacts by lender_id for fast lookup
       const contactsByLender = allContacts.reduce((acc, contact) => {

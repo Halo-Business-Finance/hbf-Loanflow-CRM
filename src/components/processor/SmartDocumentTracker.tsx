@@ -14,7 +14,7 @@ import {
   FileX,
   FileCheck
 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 import { useToast } from '@/hooks/use-toast';
 
 interface DocumentStatus {
@@ -56,7 +56,7 @@ export function SmartDocumentTracker() {
     setLoading(true);
     try {
       // Fetch applications in documentation stage
-      const { data: contacts, error } = await supabase
+      const { data: contacts, error } = await ibmDb
         .from('contact_entities')
         .select('id, name, business_name, email, created_at, stage')
         .in('stage', ['Documentation', 'Pre-approval', 'Application']);
@@ -65,19 +65,19 @@ export function SmartDocumentTracker() {
 
       // Fetch uploaded documents for each application
       const statuses: DocumentStatus[] = await Promise.all(
-        (contacts || []).map(async (contact) => {
-          const { data: docs } = await supabase
+        ((contacts as any[]) || []).map(async (contact) => {
+          const { data: docs } = await ibmDb
             .from('lead_documents')
             .select('document_name, document_type, created_at')
             .eq('contact_entity_id', contact.id);
 
-          const uploadedDocs = (docs || []).map(d => d.document_type || d.document_name);
+          const uploadedDocs = ((docs as any[]) || []).map(d => d.document_type || d.document_name);
           const missingDocs = REQUIRED_DOCUMENTS.filter(
             req => !uploadedDocs.some(up => up.toLowerCase().includes(req.toLowerCase().split(' ')[0]))
           );
           
           // Simulate expired docs (docs older than 90 days)
-          const expiredDocs = (docs || [])
+          const expiredDocs = ((docs as any[]) || [])
             .filter(d => {
               const uploadDate = new Date(d.created_at);
               const daysSince = (Date.now() - uploadDate.getTime()) / (1000 * 60 * 60 * 24);

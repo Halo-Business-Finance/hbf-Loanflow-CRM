@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { CheckCircle, XCircle, AlertTriangle, Clock, UserPlus } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/lib/utils';
 import { TaskAssignmentDialog } from '@/components/collaboration/TaskAssignmentDialog';
@@ -35,7 +35,7 @@ export function ApprovalQueueWidget() {
 
   const fetchQueue = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await ibmDb
         .from('contact_entities')
         .select('id, name, business_name, loan_amount, loan_type, stage, created_at')
         .in('stage', ['Pre-approval', 'Documentation', 'Underwriting'])
@@ -45,7 +45,7 @@ export function ApprovalQueueWidget() {
       if (error) throw error;
 
       // Assign risk levels based on loan amount (simplified logic)
-      const queueWithRisk = (data || []).map(item => ({
+      const queueWithRisk = ((data as any[]) || []).map(item => ({
         ...item,
         risk_level: 
           (item.loan_amount || 0) > 500000 ? 'high' :
@@ -62,7 +62,7 @@ export function ApprovalQueueWidget() {
 
   const handleApprove = async (id: string) => {
     try {
-      const { error } = await supabase
+      const { error } = await ibmDb
         .from('contact_entities')
         .update({ stage: 'Closing', updated_at: new Date().toISOString() })
         .eq('id', id);
@@ -85,7 +85,7 @@ export function ApprovalQueueWidget() {
 
   const handleReject = async (id: string) => {
     try {
-      const { error } = await supabase
+      const { error } = await ibmDb
         .from('contact_entities')
         .update({ stage: 'Rejected', updated_at: new Date().toISOString() })
         .eq('id', id);

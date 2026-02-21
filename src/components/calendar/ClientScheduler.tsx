@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, Clock, Plus, Phone, Video, Users } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 import { getAuthUser } from '@/lib/auth-utils';
 import { format, isPast, isToday } from 'date-fns';
 import { ScheduleMeetingModal } from './ScheduleMeetingModal';
@@ -39,7 +39,7 @@ export function ClientScheduler({ clientId, clientName, clientType, compact = fa
       const user = await getAuthUser();
       if (!user) return;
 
-      const { data, error } = await supabase
+      const { data, error } = await ibmDb
         .from('notifications')
         .select('id, title, message, type, scheduled_for')
         .eq('related_id', clientId)
@@ -47,7 +47,7 @@ export function ClientScheduler({ clientId, clientName, clientType, compact = fa
         .order('scheduled_for', { ascending: true });
 
       if (error) throw error;
-      setEvents(data || []);
+      setEvents((data as any[]) || []);
     } catch (error) {
       console.error('Error fetching client events:', error);
     } finally {

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { DollarSign, CheckCircle, Clock, UserPlus, AlertTriangle } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/lib/utils';
 import { TaskAssignmentDialog } from '@/components/collaboration/TaskAssignmentDialog';
@@ -35,7 +35,7 @@ export function FundingQueueWidget() {
 
   const fetchFundingQueue = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await ibmDb
         .from('contact_entities')
         .select('id, name, business_name, loan_amount, loan_type, stage, priority, updated_at')
         .in('stage', ['Approved', 'Closing'])
@@ -44,7 +44,7 @@ export function FundingQueueWidget() {
         .limit(10);
 
       if (error) throw error;
-      setQueue(data || []);
+      setQueue((data as any[]) || []);
     } catch (error) {
       console.error('Error fetching funding queue:', error);
     } finally {
@@ -54,7 +54,7 @@ export function FundingQueueWidget() {
 
   const handleFund = async (id: string, amount: number) => {
     try {
-      const { error } = await supabase
+      const { error } = await ibmDb
         .from('contact_entities')
         .update({ stage: 'Loan Funded', updated_at: new Date().toISOString() })
         .eq('id', id);

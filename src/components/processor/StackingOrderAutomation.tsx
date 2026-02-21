@@ -14,7 +14,7 @@ import {
   ArrowUp,
   ArrowDown
 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 import { useToast } from '@/hooks/use-toast';
 
 interface StackedDocument {
@@ -61,16 +61,18 @@ export function StackingOrderAutomation({ applicationId }: StackingOrderAutomati
     setLoading(true);
     try {
       // Fetch application info
-      const { data: contact } = await supabase
+      const { data: contactData } = await ibmDb
         .from('contact_entities')
         .select('name, business_name')
         .eq('id', applicationId)
         .single();
+      
+      const contact = contactData as any;
 
       setApplicantName(contact?.business_name || contact?.name || 'Unknown');
 
       // Fetch uploaded documents
-      const { data: uploadedDocs } = await supabase
+      const { data: uploadedDocs } = await ibmDb
         .from('lead_documents')
         .select('id, document_name, document_type, file_path')
         .eq('contact_entity_id', applicationId);
@@ -81,7 +83,7 @@ export function StackingOrderAutomation({ applicationId }: StackingOrderAutomati
 
       STACKING_ORDER.forEach(section => {
         section.items.forEach(item => {
-          const matchingDoc = (uploadedDocs || []).find(d => 
+          const matchingDoc = ((uploadedDocs as any[]) || []).find(d => 
             (d.document_type || d.document_name || '').toLowerCase().includes(item.toLowerCase().split(' ')[0].toLowerCase())
           );
 

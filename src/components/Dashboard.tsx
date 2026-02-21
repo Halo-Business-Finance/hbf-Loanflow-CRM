@@ -34,7 +34,7 @@ import {
   LabelList
 } from 'recharts';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { SidebarTrigger } from '@/components/ui/sidebar';
@@ -115,7 +115,7 @@ function Dashboard() {
       console.log('Fetching dashboard data for user:', user.id);
       
       // Fetch all contact entities for this user (which includes lead data)
-      const { data: contactEntities, error: contactError } = await supabase
+      const { data: contactEntitiesData, error: contactError } = await ibmDb
         .from('contact_entities')
         .select('*')
         .eq('user_id', user.id);
@@ -124,29 +124,30 @@ function Dashboard() {
         console.warn('Contact entities query error (non-blocking):', contactError);
       }
 
+      const contactEntities = (contactEntitiesData as any[]) || [];
       console.log('Fetched contact entities:', contactEntities?.length || 0);
       console.log('Contact entities data:', contactEntities);
 
       // Calculate real metrics from contact_entities (the source of truth)
       const totalLeads = contactEntities?.length || 0;
-      const activeLeads = contactEntities?.filter(contact => 
+      const activeLeads = contactEntities?.filter((contact: any) => 
         contact.stage && 
         !['Funded', 'Closed Won', 'Closed Lost', 'Archive'].includes(contact.stage)
       ).length || 0;
 
-      const totalRevenue = contactEntities?.reduce((sum, contact) => 
+      const totalRevenue = contactEntities?.reduce((sum: number, contact: any) => 
         sum + (contact.loan_amount || 0), 0
       ) || 0;
 
-      const pipelineValue = contactEntities?.filter(contact => 
+      const pipelineValue = contactEntities?.filter((contact: any) => 
         contact.stage && 
         !['Funded', 'Closed Won', 'Closed Lost', 'Archive'].includes(contact.stage)
-      ).reduce((sum, contact) => 
+      ).reduce((sum: number, contact: any) => 
         sum + (contact.loan_amount || 0), 0
       ) || 0;
 
       // Calculate conversion rate
-      const closedWonLeads = contactEntities?.filter(contact => 
+      const closedWonLeads = contactEntities?.filter((contact: any) => 
         ['Funded', 'Closed Won'].includes(contact.stage || '')
       ).length || 0;
       const conversionRate = totalLeads > 0 ? (closedWonLeads / totalLeads) * 100 : 0;
@@ -162,7 +163,7 @@ function Dashboard() {
       }
 
       // Group contact entities by stage for funnel chart
-      const stageGroups = contactEntities?.reduce((acc, contact) => {
+      const stageGroups = contactEntities?.reduce((acc: any, contact: any) => {
         const stage = contact.stage || 'unknown';
         if (!acc[stage]) {
           acc[stage] = { count: 0, value: 0 };
@@ -174,12 +175,12 @@ function Dashboard() {
 
       const leadsByStageData = Object.entries(stageGroups).map(([stage, data]) => ({
         stage: stage.replace('_', ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase()),
-        count: data.count,
-        value: data.value
+        count: (data as any).count,
+        value: (data as any).value
       }));
 
       // Group by loan type
-      const loanGroups = contactEntities?.reduce((acc, contact) => {
+      const loanGroups = contactEntities?.reduce((acc: any, contact: any) => {
         const loanType = contact.loan_type || 'Unknown';
         if (!acc[loanType]) {
           acc[loanType] = { count: 0, total_amount: 0 };
@@ -191,8 +192,8 @@ function Dashboard() {
 
       const loanDistributionData = Object.entries(loanGroups).map(([loan_type, data]) => ({
         loan_type,
-        count: data.count,
-        total_amount: data.total_amount
+        count: (data as any).count,
+        total_amount: (data as any).total_amount
       }));
 
       // Update state with real data
@@ -224,44 +225,16 @@ function Dashboard() {
     fetchDashboardData();
   }, [user?.id]);
 
-  // Set up real-time subscriptions
   useEffect(() => {
     if (!user?.id) return;
 
-    // Subscribe to leads changes
-    const channel = supabase
-      .channel('dashboard-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'leads',
-          filter: `user_id=eq.${user.id}`
-        },
-        () => {
-          console.log('Leads changed, refreshing dashboard...');
-          fetchDashboardData();
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'contact_entities',
-          filter: `user_id=eq.${user.id}`
-        },
-        () => {
-          console.log('Contact entities changed, refreshing dashboard...');
-          fetchDashboardData();
-        }
-      )
-      .subscribe();
+    // Polling replacement for realtime subscriptions
+    const interval = setInterval(() => {
+      console.log('Polling dashboard data...');
+      fetchDashboardData();
+    }, 30000); // 30 seconds
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => clearInterval(interval);
   }, [user?.id]);
 
   const formatCurrency = (amount: number) => {
@@ -473,27 +446,21 @@ function Dashboard() {
                   <TrendingUp className="h-5 w-5 text-blue-600" />
                   Live Data Status
                 </CardTitle>
-                <CardDescription className="text-muted-foreground">
-                  Real-time system information
-                </CardDescription>
+                <CardDescription>System performance and metrics</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center justify-between p-4 bg-secondary border border-border rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse"></div>
-                    <div>
-                      <div className="text-sm font-medium text-foreground">
-                        Connected to Live Database
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        All charts show live data from your database
-                      </div>
-                      {loading && (
-                        <div className="text-xs text-blue-600">
-                          Refreshing data...
-                        </div>
-                      )}
-                    </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="flex flex-col p-4 bg-muted/30 rounded-lg">
+                    <span className="text-sm text-muted-foreground">Active Leads</span>
+                    <span className="text-2xl font-semibold text-foreground">{metrics.activeLeads}</span>
+                  </div>
+                  <div className="flex flex-col p-4 bg-muted/30 rounded-lg">
+                    <span className="text-sm text-muted-foreground">Pipeline Value</span>
+                    <span className="text-2xl font-semibold text-foreground">{formatCurrency(metrics.pipelineValue)}</span>
+                  </div>
+                  <div className="flex flex-col p-4 bg-muted/30 rounded-lg">
+                    <span className="text-sm text-muted-foreground">Conversion Rate</span>
+                    <span className="text-2xl font-semibold text-foreground">{metrics.conversionRate.toFixed(1)}%</span>
                   </div>
                 </div>
               </CardContent>

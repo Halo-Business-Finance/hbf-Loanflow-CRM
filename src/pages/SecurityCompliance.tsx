@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { StandardContentCard } from "@/components/StandardContentCard"
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useZeroLocalStorage } from '@/lib/zero-localStorage-security';
 import { toast } from '@/hooks/use-toast';
@@ -65,7 +65,7 @@ export default function SecurityCompliance() {
     
     try {
       // Check session activity tracking
-      const { data: sessionActivity } = await supabase
+      const { data: sessionActivity } = await ibmDb
         .from('session_activity_log')
         .select('*')
         .eq('user_id', user.id)
@@ -73,7 +73,7 @@ export default function SecurityCompliance() {
         .limit(1);
 
       // Check active sessions with enhanced tracking
-      const { data: activeSessions } = await supabase
+      const { data: activeSessions } = await ibmDb
         .from('active_sessions')
         .select('*')
         .eq('user_id', user.id)
@@ -86,7 +86,7 @@ export default function SecurityCompliance() {
       );
 
       // Check server-side secure storage usage
-      const { data: secureStorage } = await supabase
+      const { data: secureStorage } = await ibmDb
         .from('security_events')
         .select('*')
         .eq('user_id', user.id)
@@ -110,7 +110,7 @@ export default function SecurityCompliance() {
       const complianceScore = (passedChecks / totalChecks) * 100;
 
       // Calculate last audit days
-      const { data: lastAudit } = await supabase
+      const { data: lastAudit } = await ibmDb
         .from('security_events')
         .select('created_at')
         .eq('event_type', 'security_audit_manual')
@@ -118,7 +118,7 @@ export default function SecurityCompliance() {
         .limit(1);
       
       const lastAuditDays = lastAudit?.[0] 
-        ? Math.floor((Date.now() - new Date(lastAudit[0].created_at).getTime()) / (1000 * 60 * 60 * 24))
+        ? Math.floor((Date.now() - new Date((lastAudit as any)[0].created_at).getTime()) / (1000 * 60 * 60 * 24))
         : 0;
 
       setOverviewStats({
@@ -158,7 +158,7 @@ export default function SecurityCompliance() {
     try {
       auditLocalStorage();
       
-      await supabase
+      await ibmDb
         .from('security_events')
         .insert({
           user_id: user?.id,

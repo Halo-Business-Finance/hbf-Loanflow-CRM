@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useCollaboration } from '@/hooks/useCollaboration';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 import { toast } from 'sonner';
 
 interface TaskAssignmentDialogProps {
@@ -67,14 +67,14 @@ export function TaskAssignmentDialog({
   const fetchUsers = async () => {
     try {
       // Fetch profiles to get user information
-      const { data, error } = await supabase
+      const { data, error } = await ibmDb
         .from('profiles')
         .select('id, email')
         .order('email');
 
       if (error) throw error;
       
-      setUsers(data || []);
+      setUsers((data as any[]) || []);
     } catch (error) {
       console.error('Error fetching users:', error);
     }

@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 import { getAuthUser } from '@/lib/auth-utils';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -75,7 +75,7 @@ export function ScheduleMeetingModal({
     try {
       const currentUser = await getAuthUser();
       
-      const { data, error } = await supabase
+      const { data, error } = await ibmDb
         .from('profiles')
         .select('id, first_name, last_name, email, is_active')
         .eq('is_active', true)
@@ -84,20 +84,20 @@ export function ScheduleMeetingModal({
 
       if (error) throw error;
       
-      const activeUsers = (data || []).filter(u => u.first_name || u.last_name);
+      const activeUsers = ((data as any[]) || []).filter((u: any) => u.first_name || u.last_name) as unknown as TeamUser[];
       setUsers(activeUsers);
     } catch (error) {
       console.error('Error fetching users:', error);
       try {
         const currentUser = await getAuthUser();
-        const { data, error: fallbackError } = await supabase
+        const { data, error: fallbackError } = await ibmDb
           .from('profiles')
           .select('id, first_name, last_name, email')
           .neq('id', currentUser?.id || '')
           .order('first_name', { ascending: true });
         
         if (fallbackError) throw fallbackError;
-        const activeUsers = (data || []).filter(u => u.first_name || u.last_name);
+        const activeUsers = ((data as any[]) || []).filter((u: any) => u.first_name || u.last_name) as unknown as TeamUser[];
         setUsers(activeUsers);
       } catch (fallbackError) {
         console.error('Error in fallback fetch:', fallbackError);
@@ -111,7 +111,7 @@ export function ScheduleMeetingModal({
       if (!user) return;
 
       // Fetch from contact_entities (leads/contacts)
-      const { data: contacts, error } = await supabase
+      const { data: contacts, error } = await ibmDb
         .from('contact_entities')
         .select('id, name, business_name, email, phone')
         .order('name', { ascending: true })
@@ -119,7 +119,7 @@ export function ScheduleMeetingModal({
 
       if (error) throw error;
 
-      const clientList: ClientContact[] = (contacts || []).map(c => ({
+      const clientList: ClientContact[] = ((contacts as any[]) || []).map((c: any) => ({
         id: c.id,
         name: c.name,
         business_name: c.business_name,
@@ -155,7 +155,7 @@ export function ScheduleMeetingModal({
       const scheduledFor = new Date(`${formData.scheduledDate}T${formData.scheduledTime}`);
 
       // Create notification for the current user
-      const { error } = await supabase
+      const { error } = await ibmDb
         .from('notifications')
         .insert({
           user_id: user.id,
@@ -171,7 +171,7 @@ export function ScheduleMeetingModal({
 
       // If a user is assigned and it's a team meeting, create a notification for them too
       if (formData.assignedUserId && formData.assignedUserId !== user.id) {
-        const { error: assignedError } = await supabase
+        const { error: assignedError } = await ibmDb
           .from('notifications')
           .insert({
             user_id: formData.assignedUserId,

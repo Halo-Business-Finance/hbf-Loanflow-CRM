@@ -134,6 +134,15 @@ class IBMQueryBuilder<T = Record<string, unknown>> {
     return this.addFilter('not', column, { operator, value });
   }
 
+  /**
+   * PostgREST-style OR filter string.
+   * Stored as a special filter and sent as `or` query param.
+   * Example: `.or('first_name.ilike.%foo%,last_name.ilike.%foo%')`
+   */
+  or(filterString: string): IBMQueryBuilder<T> {
+    return this.addFilter('or', '__or__', filterString);
+  }
+
   order(column: string, options: { ascending?: boolean } = {}): IBMQueryBuilder<T> {
     return new IBMQueryBuilder<T>({
       ...this.state,
@@ -197,12 +206,20 @@ class IBMQueryBuilder<T = Record<string, unknown>> {
     const allowed = new Set(route.filterParams ?? []);
 
     for (const f of this.state.filters) {
+      if (f.type === 'or' && f.column === '__or__') {
+        // Pass PostgREST-style OR filter as `or` query param
+        params.set('or', String(f.value));
+        continue;
+      }
       if (f.type === 'eq' && allowed.has(f.column) && f.value != null) {
         params.set(f.column, String(f.value));
       }
+      if (f.type === 'ilike' && f.value != null) {
+        params.set(`${f.column}__ilike`, String(f.value));
+      }
     }
 
-    if (this.state.limitCount && allowed.has('limit')) {
+    if (this.state.limitCount) {
       params.set('limit', String(this.state.limitCount));
     }
 

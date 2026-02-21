@@ -13,6 +13,8 @@ export interface IBMUser {
   family_name?: string;
   roles?: string[];
   raw: Record<string, unknown>;
+  /** Compatibility shim — mirrors Supabase User.user_metadata */
+  user_metadata: Record<string, any>;
 }
 
 export interface IBMSession {
@@ -131,16 +133,25 @@ class IBMAuthService {
   }
 
   private mapUser(userInfo: Record<string, unknown>): IBMUser {
+    const given_name = userInfo.given_name as string | undefined;
+    const family_name = userInfo.family_name as string | undefined;
     return {
       id: (userInfo.sub as string) || '',
       email: (userInfo.email as string) || '',
       name:
         (userInfo.name as string) ||
-        `${userInfo.given_name ?? ''} ${userInfo.family_name ?? ''}`.trim(),
-      given_name: userInfo.given_name as string | undefined,
-      family_name: userInfo.family_name as string | undefined,
+        `${given_name ?? ''} ${family_name ?? ''}`.trim(),
+      given_name,
+      family_name,
       roles: (userInfo['https://crm.hbf/roles'] as string[]) ?? [],
       raw: userInfo,
+      user_metadata: {
+        first_name: given_name || '',
+        last_name: family_name || '',
+        display_name: (userInfo.name as string) || '',
+        phone_number: (userInfo.phone_number as string) || '',
+        time_zone: (userInfo.zoneinfo as string) || '',
+      },
     };
   }
 

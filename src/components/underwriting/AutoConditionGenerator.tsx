@@ -120,12 +120,12 @@ export function AutoConditionGenerator({ application, onConditionsGenerated }: A
       setSelectedConditions(new Set((data as any).conditions.filter((c: Condition) => c.priority === 'Required').map((c: Condition) => c.id)));
       
       if (onConditionsGenerated) {
-        onConditionsGenerated(data);
+        onConditionsGenerated(data as GeneratedConditions);
       }
 
       toast({
         title: "Conditions Generated",
-        description: `Generated ${data.conditions.length} conditions for this application.`
+        description: `Generated ${(data as any).conditions.length} conditions for this application.`
       });
     } catch (error) {
       console.error('Error generating conditions:', error);

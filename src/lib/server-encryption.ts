@@ -170,14 +170,14 @@ export class ServerSecureStorage {
       }
 
       // Check expiration
-      if (new Date(data.expires_at) < new Date()) {
+      if (new Date((data as any).expires_at) < new Date()) {
         // Data expired, delete it
         await this.removeItem(key);
         return null;
       }
 
       // Decrypt data server-side
-      const decryptResult = await decryptData(data.session_value, options?.context || key);
+      const decryptResult = await decryptData((data as any).session_value as string, options?.context || key);
       
       if (!decryptResult.success) {
         console.error('Failed to decrypt stored data');

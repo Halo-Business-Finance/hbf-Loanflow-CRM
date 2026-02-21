@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { IBMPageHeader } from "@/components/ui/IBMPageHeader"
 import { StandardContentCard } from "@/components/StandardContentCard"
 import { useToast } from "@/hooks/use-toast"
-import { supabase } from "@/integrations/supabase/client"
+import { ibmDb } from "@/lib/ibm"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { User, Briefcase, Phone, Mail, FileText } from "lucide-react"
 import { Separator } from "@/components/ui/separator"
@@ -38,14 +38,14 @@ export default function NewLenderContact() {
     const fetchLender = async () => {
       if (!lenderId) return
       
-      const { data, error } = await supabase
+      const { data, error } = await ibmDb
         .from('lenders')
         .select('name')
         .eq('id', lenderId)
         .single()
       
       if (!error && data) {
-        setLenderName(data.name)
+        setLenderName(String((data as any).name))
       }
     }
     
@@ -89,7 +89,7 @@ export default function NewLenderContact() {
     setIsSubmitting(true)
 
     try {
-      const { error } = await supabase.from('lender_contacts').insert([{
+      const { error } = await ibmDb.from('lender_contacts').insert([{
         lender_id: lenderId,
         name: formData.name.trim(),
         title: formData.title.trim() || null,

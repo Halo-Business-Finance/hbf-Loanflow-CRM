@@ -8,7 +8,7 @@ import { sanitizeError } from '@/lib/error-sanitizer';
 import { applyClientSecurityHeaders } from '@/lib/security-headers';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 import { logger } from '@/lib/logger';
 
 export const useEnhancedSecurity = () => {
@@ -140,7 +140,7 @@ export const useEnhancedSecurity = () => {
       if (!user) return;
 
       // Send ALL security events to server immediately - no localStorage batching
-      await supabase.from('security_events').insert({
+      await ibmDb.from('security_events').insert({
         event_type: eventType,
         severity,
         user_id: user.id,

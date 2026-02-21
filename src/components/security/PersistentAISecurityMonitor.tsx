@@ -44,8 +44,7 @@ export const PersistentAISecurityMonitor: React.FC = () => {
   useEffect(() => {
     if (!user) return;
 
-    let botSubscription: any;
-    let alertSubscription: any;
+    let pollingInterval: ReturnType<typeof setInterval> | null = null;
 
     const startMonitoring = async () => {
       setIsMonitoring(true);
@@ -76,60 +75,15 @@ export const PersistentAISecurityMonitor: React.FC = () => {
         setEmergencyAlerts(emergency);
       }
 
-      // Subscribe to real-time AI bot alerts
-      alertSubscription = supabase
-        .channel('ai_bot_alerts')
-        .on('postgres_changes', 
-          { 
-            event: 'INSERT', 
-            schema: 'public', 
-            table: 'ai_bot_alerts'
-          }, 
-          (payload) => {
-            const newAlert = { ...payload.new, severity: payload.new.severity as 'low' | 'medium' | 'high' | 'critical' | 'emergency' } as AIBotAlert;
-            setAlerts(prev => [newAlert, ...prev.slice(0, 19)]);
-            
-            if (newAlert.severity === 'emergency' || newAlert.severity === 'critical') {
-              setEmergencyAlerts(prev => [newAlert, ...prev.slice(0, 4)]);
-              
-              toast.error(`🚨 AI SECURITY ALERT: ${newAlert.title}`, {
-                description: `Confidence: ${newAlert.confidence_score}% | ${newAlert.alert_type}`,
-                duration: 15000,
-                action: newAlert.requires_human_review ? {
-                  label: "Review",
-                  onClick: () => handleAlertReview(newAlert.id)
-                } : undefined
-              });
-            }
-          }
-        )
-        .subscribe();
-
-      // Subscribe to AI bot status updates
-      botSubscription = supabase
-        .channel('ai_bot_status')
-        .on('postgres_changes', 
-          { 
-            event: 'UPDATE', 
-            schema: 'public', 
-            table: 'ai_security_bots'
-          }, 
-          (payload) => {
-            const updatedBot = payload.new as AIBot;
-            setAiBots(prev => prev.map(bot => 
-              bot.id === updatedBot.id ? updatedBot : bot
-            ));
-          }
-        )
-        .subscribe();
+      // Poll for new alerts and bot status every 15s
+      pollingInterval = setInterval(startMonitoring, 15000);
     };
 
     startMonitoring();
 
     return () => {
       setIsMonitoring(false);
-      if (alertSubscription) alertSubscription.unsubscribe();
-      if (botSubscription) botSubscription.unsubscribe();
+      if (pollingInterval) clearInterval(pollingInterval);
     };
   }, [user]);
 

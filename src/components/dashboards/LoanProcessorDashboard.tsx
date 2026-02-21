@@ -134,133 +134,13 @@ export const LoanProcessorDashboard = () => {
   useEffect(() => {
     fetchProcessorData();
 
-    // Set up realtime subscriptions for count updates
-    const contactsChannel = supabase
-      .channel('processor-contacts-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'contact_entities',
-          filter: 'stage=in.(Application,Pre-approval)'
-        },
-        (payload) => {
-          // New application received - payload logged securely
-          
-          const priority = payload.new.priority || 'medium';
-          const toastStyle = getPriorityToastStyle(priority);
-          
-          // Show toast notification for new application with priority styling
-          toast({
-            ...toastStyle,
-            description: `${payload.new.name || 'A new application'} has been added and requires processing. Priority: ${priority.toUpperCase()}`,
-            duration: priority === 'urgent' ? 10000 : priority === 'high' ? 7000 : 5000,
-          });
-          
-          // Show pulse animation on relevant badges
-          setUpdatingBadges(prev => ({ ...prev, pending: true, pipeline: true }));
-          
-          fetchProcessorData();
-          
-          // Remove pulse animation after 2 seconds
-          setTimeout(() => {
-            setUpdatingBadges(prev => ({ ...prev, pending: false, pipeline: false }));
-          }, 2000);
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'contact_entities'
-        },
-        (payload) => {
-          // Application updated - refreshing data
-          
-          // Show pulse animation on relevant badges
-          setUpdatingBadges(prev => ({ ...prev, pending: true, pipeline: true, completed: true }));
-          
-          fetchProcessorData();
-          
-          // Remove pulse animation after 2 seconds
-          setTimeout(() => {
-            setUpdatingBadges(prev => ({ ...prev, pending: false, pipeline: false, completed: false }));
-          }, 2000);
-        }
-      )
-      .subscribe();
+    // Poll for data changes every 15s
+    const pollingInterval = setInterval(() => {
+      fetchProcessorData();
+    }, 15000);
 
-    const documentsChannel = supabase
-      .channel('processor-documents-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'lead_documents'
-        },
-        async (payload) => {
-          // New document uploaded - refreshing count
-          
-          // Show toast notification for new document
-          toast({
-            title: "New Document Uploaded",
-            description: `${payload.new.document_name || 'A new document'} has been uploaded.`,
-            duration: 4000,
-          });
-          
-          // Show pulse animation
-          setUpdatingBadges(prev => ({ ...prev, documents: true }));
-          
-          try {
-            const { count } = await supabase
-              .from('lead_documents')
-              .select('id', { count: 'exact' });
-            setDocumentCount(count || 0);
-          } catch (err) {
-            // Silently handle error in real-time handler
-          }
-          
-          // Remove pulse animation after 2 seconds
-          setTimeout(() => {
-            setUpdatingBadges(prev => ({ ...prev, documents: false }));
-          }, 2000);
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'lead_documents'
-        },
-        async () => {
-          // Document updated - refreshing count
-          setUpdatingBadges(prev => ({ ...prev, documents: true }));
-          
-          try {
-            const { count } = await supabase
-              .from('lead_documents')
-              .select('id', { count: 'exact' });
-            setDocumentCount(count || 0);
-          } catch (err) {
-            // Silently handle error in real-time handler
-          }
-          
-          // Remove pulse animation after 2 seconds
-          setTimeout(() => {
-            setUpdatingBadges(prev => ({ ...prev, documents: false }));
-          }, 2000);
-        }
-      )
-      .subscribe();
-
-    // Cleanup subscriptions on unmount
     return () => {
-      supabase.removeChannel(contactsChannel);
-      supabase.removeChannel(documentsChannel);
+      clearInterval(pollingInterval);
     };
   }, [toast]);
 

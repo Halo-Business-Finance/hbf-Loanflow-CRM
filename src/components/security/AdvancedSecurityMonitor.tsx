@@ -106,33 +106,8 @@ export const AdvancedSecurityMonitor: React.FC = () => {
     // Set up periodic monitoring
     const interval = setInterval(monitorSecurity, 30000); // Every 30 seconds
 
-    // Set up real-time subscriptions for security events
-    const subscription = supabase
-      .channel('security_events')
-      .on('postgres_changes', 
-        { 
-          event: 'INSERT', 
-          schema: 'public', 
-          table: 'security_events',
-          filter: `user_id=eq.${user.id}`
-        }, 
-        (payload) => {
-          const newAlert = payload.new as SecurityAlert;
-          setAlerts(prev => [newAlert, ...prev.slice(0, 9)]);
-          
-          // Show notification for high severity events
-          if (newAlert.severity === 'critical' || newAlert.severity === 'high') {
-            toast.warning(`Security Alert: ${newAlert.event_type}`, {
-              description: `Severity: ${newAlert.severity}`
-            });
-          }
-        }
-      )
-      .subscribe();
-
     return () => {
       clearInterval(interval);
-      subscription.unsubscribe();
     };
   }, [user, monitorSecurity]);
 

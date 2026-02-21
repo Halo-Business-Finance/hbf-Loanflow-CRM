@@ -89,24 +89,11 @@ export default function SecurityAudit() {
   useEffect(() => {
     fetchAuditLogs()
     
-    // Set up realtime subscription
-    const channel = supabase
-      .channel('audit_logs_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'audit_logs'
-        },
-        () => {
-          fetchAuditLogs()
-        }
-      )
-      .subscribe()
+    // Poll for audit log changes every 15s
+    const interval = setInterval(() => fetchAuditLogs(), 15000)
     
     return () => {
-      supabase.removeChannel(channel)
+      clearInterval(interval)
     }
   }, [])
 

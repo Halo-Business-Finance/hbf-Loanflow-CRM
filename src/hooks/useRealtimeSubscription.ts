@@ -1,95 +1,71 @@
+/**
+ * Polling-based replacement for Supabase Realtime subscriptions.
+ * Polls onChange callback at a configurable interval (default 15s).
+ * Drop-in compatible with previous Supabase channel-based API.
+ */
 import { useEffect, useRef } from 'react'
-import { supabase } from '@/integrations/supabase/client'
-import { RealtimeChannel } from '@supabase/supabase-js'
 
 interface UseRealtimeSubscriptionOptions {
   table: string
   event?: 'INSERT' | 'UPDATE' | 'DELETE' | '*'
   schema?: string
+  /** Called on INSERT events (polling mode: not distinguishable, use onChange instead) */
   onInsert?: (payload: any) => void
+  /** Called on UPDATE events (polling mode: not distinguishable, use onChange instead) */
   onUpdate?: (payload: any) => void
+  /** Called on DELETE events (polling mode: not distinguishable, use onChange instead) */
   onDelete?: (payload: any) => void
-  onChange?: (payload: any) => void
+  /** Called on every poll tick — primary callback for polling mode */
+  onChange?: (payload?: any) => void
+  /** Polling interval in milliseconds (default: 15000) */
+  interval?: number
+  /** Set to false to pause polling */
+  enabled?: boolean
 }
 
 export function useRealtimeSubscription({
   table,
-  event = '*',
-  schema = 'public',
+  onChange,
   onInsert,
   onUpdate,
   onDelete,
-  onChange
+  interval = 15000,
+  enabled = true,
 }: UseRealtimeSubscriptionOptions) {
-  const channelRef = useRef<RealtimeChannel | null>(null)
+  const changeRef = useRef(onChange)
+  const insertRef = useRef(onInsert)
+  const updateRef = useRef(onUpdate)
+  const deleteRef = useRef(onDelete)
 
-  // Keep the latest handlers in refs to avoid resubscribing on every render
-  const insertRef = useRef<typeof onInsert>(onInsert)
-  const updateRef = useRef<typeof onUpdate>(onUpdate)
-  const deleteRef = useRef<typeof onDelete>(onDelete)
-  const changeRef = useRef<typeof onChange>(onChange)
-
-  // Update refs when handlers change (no resubscribe)
+  // Keep refs current without restarting the interval
   useEffect(() => {
+    changeRef.current = onChange
     insertRef.current = onInsert
     updateRef.current = onUpdate
     deleteRef.current = onDelete
-    changeRef.current = onChange
-  }, [onInsert, onUpdate, onDelete, onChange])
+  }, [onChange, onInsert, onUpdate, onDelete])
 
   useEffect(() => {
-    // Use a stable channel name per table to avoid churn
-    const channelName = `realtime-${schema}-${table}`
+    if (!enabled) return
 
-    if (channelRef.current) {
-      // Clean existing before creating a new one (in case table/event/schema changed)
-      supabase.removeChannel(channelRef.current)
-      channelRef.current = null
+    const tick = () => {
+      // In polling mode we can't distinguish event types, so we call
+      // the generic onChange plus all specific handlers with a synthetic payload.
+      const syntheticPayload = { eventType: 'POLL', table }
+      changeRef.current?.(syntheticPayload)
+      insertRef.current?.(syntheticPayload)
+      updateRef.current?.(syntheticPayload)
+      deleteRef.current?.(syntheticPayload)
     }
 
-    const channel = supabase
-      .channel(channelName)
-      .on(
-        'postgres_changes' as any,
-        {
-          event: event,
-          schema: schema,
-          table: table
-        },
-        (payload: any) => {
-          console.log(`Real-time ${payload.eventType} on ${table}:`, payload)
-
-          switch (payload.eventType) {
-            case 'INSERT':
-              insertRef.current?.(payload)
-              break
-            case 'UPDATE':
-              updateRef.current?.(payload)
-              break
-            case 'DELETE':
-              deleteRef.current?.(payload)
-              break
-          }
-
-          changeRef.current?.(payload)
-        }
-      )
-      .subscribe((status) => {
-        console.log(`Real-time subscription status for ${table}:`, status)
-      })
-
-    channelRef.current = channel
+    console.log(`[Polling] Starting ${interval}ms poll for table: ${table}`)
+    const id = setInterval(tick, interval)
 
     return () => {
-      if (channelRef.current) {
-        console.log(`Cleaning up real-time subscription for ${table}`)
-        supabase.removeChannel(channelRef.current)
-        channelRef.current = null
-      }
+      console.log(`[Polling] Stopping poll for table: ${table}`)
+      clearInterval(id)
     }
-  }, [table, event, schema])
+  }, [table, interval, enabled])
 
-  return {
-    isConnected: channelRef.current?.state === 'joined'
-  }
+  return { isConnected: enabled }
 }

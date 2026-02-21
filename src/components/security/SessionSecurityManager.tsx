@@ -6,6 +6,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Shield, AlertTriangle, Monitor, Clock, MapPin, Smartphone } from 'lucide-react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { supabase } from '@/integrations/supabase/client';
+import { getAuthSession, getAccessToken } from '@/lib/auth-utils';
 import { useToast } from '@/hooks/use-toast';
 
 interface SessionData {
@@ -92,8 +93,7 @@ export const SessionSecurityManager: React.FC = () => {
   const terminateAllOtherSessions = async () => {
     try {
       // Get current session to avoid terminating it
-      const { data: { session } } = await supabase.auth.getSession();
-      const currentSessionToken = session?.access_token;
+      const currentSessionToken = getAccessToken();
 
       const { error } = await supabase
         .from('active_sessions')

@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Upload, FileText, Check, X, AlertTriangle, Loader2, FileSpreadsheet, Database } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ibmDb } from "@/lib/ibm";
-import { supabase } from "@/integrations/supabase/client";
+import { getAuthUser } from '@/lib/auth-utils';
 import readXlsxFile from "read-excel-file";
 
 interface CSVImporterProps {
@@ -303,7 +303,7 @@ export function CSVImporter({ onImportComplete }: CSVImporterProps) {
     const results = { success: 0, failed: 0, errors: [] as string[] };
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getAuthUser();
       if (!user) {
         toast({
           title: "Authentication Required",

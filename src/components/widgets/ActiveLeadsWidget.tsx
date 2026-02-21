@@ -18,6 +18,7 @@ import {
   FileText
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { getAuthUser } from '@/lib/auth-utils';
 import {
   Popover,
   PopoverContent,
@@ -67,7 +68,7 @@ export const ActiveLeadsWidget = () => {
       setLoading(true);
       
       // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getAuthUser();
       if (!user) return;
 
       // Fetch leads assigned to current user or unassigned

@@ -202,8 +202,9 @@ class SecurityIncidentResponseSystem {
   private async enhanceMonitoring(): Promise<'success' | 'failure'> {
     try {
       // Enable enhanced monitoring mode - server-side only
+      const { getAuthUser } = await import('@/lib/auth-utils');
       const { supabase } = await import('@/integrations/supabase/client');
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getAuthUser();
       
       if (user) {
         await supabase.rpc('store_secure_session_data', {
@@ -220,8 +221,9 @@ class SecurityIncidentResponseSystem {
   private async enableRateLimiting(source: string): Promise<'success' | 'failure'> {
     try {
       // Implement dynamic rate limiting - server-side
+      const { getAuthUser } = await import('@/lib/auth-utils');
       const { supabase } = await import('@/integrations/supabase/client');
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getAuthUser();
       
       if (user) {
         const rateLimitData = JSON.stringify({
@@ -246,8 +248,9 @@ class SecurityIncidentResponseSystem {
   private async temporaryIPBlock(source: string, duration: number): Promise<'success' | 'failure'> {
     try {
       // Temporary IP block - server-side
+      const { getAuthUser } = await import('@/lib/auth-utils');
       const { supabase } = await import('@/integrations/supabase/client');
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getAuthUser();
       
       if (user) {
         const blockData = JSON.stringify({
@@ -270,8 +273,9 @@ class SecurityIncidentResponseSystem {
   private async enableCaptcha(): Promise<'success' | 'failure'> {
     try {
       // Enable CAPTCHA requirement - server-side
+      const { getAuthUser } = await import('@/lib/auth-utils');
       const { supabase } = await import('@/integrations/supabase/client');
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getAuthUser();
       
       if (user) {
         await supabase.rpc('store_secure_session_data', {
@@ -362,7 +366,8 @@ class SecurityIncidentResponseSystem {
     // Check for rapid requests - use server-side API analytics instead
     try {
       const { supabase } = await import('@/integrations/supabase/client');
-      const { data: { user } } = await supabase.auth.getUser();
+      const { getAuthUser } = await import('@/lib/auth-utils');
+      const user = await getAuthUser();
       
       if (!user) return;
       

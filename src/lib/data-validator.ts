@@ -1,5 +1,6 @@
 import { ibmDb } from "@/lib/ibm"
 import { supabase } from "@/integrations/supabase/client"
+import { getAuthUser } from '@/lib/auth-utils'
 
 interface DataValidationResult {
   isValid: boolean
@@ -476,8 +477,8 @@ export class DataFieldValidator {
 
     try {
       // First check if user is authenticated
-      const { data: { user }, error: authError } = await supabase.auth.getUser()
-      console.log('🔐 Auth check - User:', user?.id || 'Not authenticated', 'Error:', authError)
+      const user = await getAuthUser()
+      console.log('🔐 Auth check - User:', user?.id || 'Not authenticated')
       
       if (!user) {
         throw new Error('User not authenticated. Please log in to perform data audit.')

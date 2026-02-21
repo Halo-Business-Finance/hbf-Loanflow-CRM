@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
+import { getAccessToken } from '@/lib/auth-utils';
 import { logger } from '@/lib/logger';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -164,8 +165,7 @@ export default function UserDirectory() {
 
       // Fallback path: direct fetch to Edge Functions domain if invoke fails (network/env quirks)
       if (error || !data?.users) {
-        const { data: sessionData } = await supabase.auth.getSession();
-        const accessToken = sessionData?.session?.access_token || '';
+        const accessToken = getAccessToken() || '';
         const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://gshxxsniwytjgcnthyfq.supabase.co';
         const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '';
         const response = await fetch(

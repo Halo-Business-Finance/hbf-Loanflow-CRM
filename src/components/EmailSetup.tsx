@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Mail, Check, X, Loader2, Shield } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { supabase } from "@/integrations/supabase/client"
+import { getAuthUser } from '@/lib/auth-utils'
 import { useSecureEmailAccounts } from "@/hooks/useSecureEmailAccounts"
 
 interface EmailSetupProps {
@@ -29,7 +30,7 @@ export function EmailSetup({ trigger }: EmailSetupProps) {
     try {
       setIsConnecting(true)
       
-      const { data: { user } } = await supabase.auth.getUser()
+      const user = await getAuthUser()
       if (!user) throw new Error("Not authenticated")
 
       // Call edge function to get Microsoft OAuth URL

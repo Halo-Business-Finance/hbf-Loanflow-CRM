@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ibmDb } from '@/lib/ibm';
 import { supabase } from '@/integrations/supabase/client';
+import { getAuthUser } from '@/lib/auth-utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -55,7 +56,7 @@ export function MessageComposer({ replyTo, onClose, onSent }: MessageComposerPro
 
   const fetchUsers = async () => {
     try {
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      const currentUser = await getAuthUser();
       
       // Fetch users excluding current user
       let query = supabase
@@ -122,7 +123,7 @@ export function MessageComposer({ replyTo, onClose, onSent }: MessageComposerPro
 
     try {
       setSending(true);
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getAuthUser();
       if (!user) throw new Error('Not authenticated');
 
       const { error } = await ibmDb.from('user_messages').insert({

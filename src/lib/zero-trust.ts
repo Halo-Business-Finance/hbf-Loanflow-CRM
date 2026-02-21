@@ -7,6 +7,7 @@
 
 import { ibmDb } from "@/lib/ibm";
 import { supabase } from "@/integrations/supabase/client";
+import { getAuthSession } from '@/lib/auth-utils';
 import { SecurityManager } from "./security";
 import { encryptData, decryptData } from "./server-encryption";
 import { logger } from "./logger";
@@ -48,7 +49,7 @@ export class ZeroTrustManager {
   }
 
   private async performIdentityVerification(): Promise<void> {
-    const { data: { session } } = await supabase.auth.getSession();
+    const session = await getAuthSession();
     if (!session?.user) return;
     
     const userId = session.user.id;
@@ -200,7 +201,7 @@ export class ZeroTrustManager {
   }
 
   private async recordBehavioralData(type: string, data: any): Promise<void> {
-    const { data: { session } } = await supabase.auth.getSession();
+    const session = await getAuthSession();
     if (!session?.user) return;
     
     const userId = session.user.id;
@@ -313,7 +314,7 @@ export class ZeroTrustManager {
   }
 
   private async adjustAccessControls(): Promise<void> {
-    const { data: { session } } = await supabase.auth.getSession();
+    const session = await getAuthSession();
     if (!session?.user) return;
     
     const userId = session.user.id;

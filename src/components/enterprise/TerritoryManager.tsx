@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getAuthUser } from '@/lib/auth-utils';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -129,7 +130,7 @@ export function TerritoryManager() {
 
   const handleCreateTerritory = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getAuthUser();
       if (!user) throw new Error('Not authenticated');
 
       let rules;
@@ -174,7 +175,7 @@ export function TerritoryManager() {
     if (!selectedTerritory) return;
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getAuthUser();
       if (!user) throw new Error('Not authenticated');
 
       const { error } = await supabase

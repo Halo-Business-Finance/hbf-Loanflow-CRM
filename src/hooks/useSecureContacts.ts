@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { getAuthUser } from '@/lib/auth-utils';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useToast } from '@/hooks/use-toast';
 import type { ContactEntity } from '@/types/lead';
@@ -91,9 +92,9 @@ export const useSecureContacts = () => {
 
     try {
       // Validate authentication and session
-      const { data: authTest, error: authError } = await supabase.auth.getUser();
+      const authUser = await getAuthUser();
       
-      if (authError || !authTest.user) {
+      if (!authUser) {
         toast({
           title: "Authentication Error",
           description: "Please sign out and sign back in",

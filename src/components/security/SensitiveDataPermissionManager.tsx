@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { supabase } from "@/integrations/supabase/client";
+import { ibmDb } from "@/lib/ibm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,7 +44,6 @@ export function SensitiveDataPermissionManager() {
   const [loading, setLoading] = useState(true);
   const [showGrantForm, setShowGrantForm] = useState(false);
 
-  // Form state
   const [targetUserId, setTargetUserId] = useState("");
   const [adminUserId, setAdminUserId] = useState("");
   const [permissionType, setPermissionType] = useState("financial_data");
@@ -58,40 +57,32 @@ export function SensitiveDataPermissionManager() {
 
   const fetchPermissions = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await ibmDb
         .from('sensitive_data_permissions')
         .select('*')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setPermissions(data || []);
+      setPermissions((data || []) as unknown as SensitiveDataPermission[]);
     } catch (error) {
       console.error('Error fetching permissions:', error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch permissions",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Failed to fetch permissions", variant: "destructive" });
     }
   };
 
   const fetchAccessLogs = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await ibmDb
         .from('sensitive_data_access_logs')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(50);
 
       if (error) throw error;
-      setAccessLogs(data || []);
+      setAccessLogs((data || []) as unknown as AccessLog[]);
     } catch (error) {
       console.error('Error fetching access logs:', error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch access logs",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Failed to fetch access logs", variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -99,16 +90,12 @@ export function SensitiveDataPermissionManager() {
 
   const grantPermission = async () => {
     if (!adminUserId || !targetUserId || !justification.trim()) {
-      toast({
-        title: "Error",
-        description: "Please fill in all required fields",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Please fill in all required fields", variant: "destructive" });
       return;
     }
 
     try {
-      const { data, error } = await supabase.rpc('grant_sensitive_data_permission', {
+      const { data, error } = await ibmDb.rpc('grant_sensitive_data_permission', {
         p_admin_user_id: adminUserId,
         p_target_user_id: targetUserId,
         p_permission_type: permissionType,
@@ -118,33 +105,22 @@ export function SensitiveDataPermissionManager() {
 
       if (error) throw error;
 
-      toast({
-        title: "Success",
-        description: "Permission granted successfully",
-      });
-
-      // Reset form
+      toast({ title: "Success", description: "Permission granted successfully" });
       setTargetUserId("");
       setAdminUserId("");
       setJustification("");
       setExpiresHours(null);
       setShowGrantForm(false);
-
-      // Refresh data
       fetchPermissions();
     } catch (error: any) {
       console.error('Error granting permission:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to grant permission",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: error.message || "Failed to grant permission", variant: "destructive" });
     }
   };
 
   const revokePermission = async (permissionId: string) => {
     try {
-      const { error } = await supabase
+      const { error } = await ibmDb
         .from('sensitive_data_permissions')
         .update({ 
           is_active: false, 
@@ -154,20 +130,11 @@ export function SensitiveDataPermissionManager() {
         .eq('id', permissionId);
 
       if (error) throw error;
-
-      toast({
-        title: "Success",
-        description: "Permission revoked successfully",
-      });
-
+      toast({ title: "Success", description: "Permission revoked successfully" });
       fetchPermissions();
     } catch (error) {
       console.error('Error revoking permission:', error);
-      toast({
-        title: "Error",
-        description: "Failed to revoke permission",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Failed to revoke permission", variant: "destructive" });
     }
   };
 
@@ -200,7 +167,6 @@ export function SensitiveDataPermissionManager() {
         </Button>
       </div>
 
-      {/* Grant Permission Form */}
       {showGrantForm && (
         <Card>
           <CardHeader>
@@ -210,21 +176,11 @@ export function SensitiveDataPermissionManager() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="adminUserId">Administrator User ID</Label>
-                <Input
-                  id="adminUserId"
-                  value={adminUserId}
-                  onChange={(e) => setAdminUserId(e.target.value)}
-                  placeholder="UUID of the administrator"
-                />
+                <Input id="adminUserId" value={adminUserId} onChange={(e) => setAdminUserId(e.target.value)} placeholder="UUID of the administrator" />
               </div>
               <div>
                 <Label htmlFor="targetUserId">Target User ID</Label>
-                <Input
-                  id="targetUserId"
-                  value={targetUserId}
-                  onChange={(e) => setTargetUserId(e.target.value)}
-                  placeholder="UUID of the user whose data to access"
-                />
+                <Input id="targetUserId" value={targetUserId} onChange={(e) => setTargetUserId(e.target.value)} placeholder="UUID of the user whose data to access" />
               </div>
             </div>
 
@@ -232,9 +188,7 @@ export function SensitiveDataPermissionManager() {
               <div>
                 <Label htmlFor="permissionType">Permission Type</Label>
                 <Select value={permissionType} onValueChange={setPermissionType}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="financial_data">Financial Data</SelectItem>
                     <SelectItem value="credit_data">Credit Data</SelectItem>
@@ -245,39 +199,22 @@ export function SensitiveDataPermissionManager() {
               </div>
               <div>
                 <Label htmlFor="expiresHours">Expires in Hours (optional)</Label>
-                <Input
-                  id="expiresHours"
-                  type="number"
-                  value={expiresHours || ""}
-                  onChange={(e) => setExpiresHours(e.target.value ? parseInt(e.target.value) : null)}
-                  placeholder="Leave empty for no expiration"
-                />
+                <Input id="expiresHours" type="number" value={expiresHours || ""} onChange={(e) => setExpiresHours(e.target.value ? parseInt(e.target.value) : null)} placeholder="Leave empty for no expiration" />
               </div>
             </div>
 
             <div>
               <Label htmlFor="justification">Business Justification *</Label>
-              <Textarea
-                id="justification"
-                value={justification}
-                onChange={(e) => setJustification(e.target.value)}
-                placeholder="Explain why this access is needed..."
-                className="min-h-[100px]"
-              />
+              <Textarea id="justification" value={justification} onChange={(e) => setJustification(e.target.value)} placeholder="Explain why this access is needed..." className="min-h-[100px]" />
             </div>
 
-            <Button onClick={grantPermission} className="w-full">
-              Grant Permission
-            </Button>
+            <Button onClick={grantPermission} className="w-full">Grant Permission</Button>
           </CardContent>
         </Card>
       )}
 
-      {/* Active Permissions */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Active Permissions</CardTitle>
-        </CardHeader>
+        <CardHeader><CardTitle className="text-lg">Active Permissions</CardTitle></CardHeader>
         <CardContent>
           {permissions.length === 0 ? (
             <p className="text-muted-foreground">No permissions granted yet.</p>
@@ -295,44 +232,20 @@ export function SensitiveDataPermissionManager() {
                           <span className="text-muted-foreground">→</span>
                           <span className="font-medium">Target: {permission.target_user_id.slice(0, 8)}...</span>
                         </div>
-                        
                         <div className="flex items-center gap-2">
-                          <Badge variant={status.color as any}>
-                            {status.status}
-                          </Badge>
-                          <Badge variant="outline">
-                            {permission.permission_type.replace('_', ' ')}
-                          </Badge>
-                          {permission.access_count > 0 && (
-                            <Badge variant="secondary">
-                              Used {permission.access_count} times
-                            </Badge>
-                          )}
+                          <Badge variant={status.color as any}>{status.status}</Badge>
+                          <Badge variant="outline">{permission.permission_type.replace('_', ' ')}</Badge>
+                          {permission.access_count > 0 && <Badge variant="secondary">Used {permission.access_count} times</Badge>}
                         </div>
-
-                        <p className="text-sm text-muted-foreground">
-                          <strong>Justification:</strong> {permission.business_justification}
-                        </p>
-
+                        <p className="text-sm text-muted-foreground"><strong>Justification:</strong> {permission.business_justification}</p>
                         <div className="flex items-center gap-4 text-xs text-muted-foreground">
                           <span>Granted: {format(new Date(permission.granted_at), 'PPp')}</span>
-                          {permission.expires_at && (
-                            <span>Expires: {format(new Date(permission.expires_at), 'PPp')}</span>
-                          )}
-                          {permission.last_accessed && (
-                            <span>Last used: {format(new Date(permission.last_accessed), 'PPp')}</span>
-                          )}
+                          {permission.expires_at && <span>Expires: {format(new Date(permission.expires_at), 'PPp')}</span>}
+                          {permission.last_accessed && <span>Last used: {format(new Date(permission.last_accessed), 'PPp')}</span>}
                         </div>
                       </div>
-
                       {permission.is_active && (
-                        <Button 
-                          variant="destructive" 
-                          size="sm"
-                          onClick={() => revokePermission(permission.id)}
-                        >
-                          Revoke
-                        </Button>
+                        <Button variant="destructive" size="sm" onClick={() => revokePermission(permission.id)}>Revoke</Button>
                       )}
                     </div>
                   </div>
@@ -343,11 +256,8 @@ export function SensitiveDataPermissionManager() {
         </CardContent>
       </Card>
 
-      {/* Access Logs */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Recent Access Logs</CardTitle>
-        </CardHeader>
+        <CardHeader><CardTitle className="text-lg">Recent Access Logs</CardTitle></CardHeader>
         <CardContent>
           {accessLogs.length === 0 ? (
             <p className="text-muted-foreground">No access logs yet.</p>
@@ -359,30 +269,17 @@ export function SensitiveDataPermissionManager() {
                     <div className="space-y-1">
                       <div className="flex items-center gap-2 text-sm">
                         <AlertTriangle className="h-4 w-4 text-orange-600" />
-                        <span className="font-medium">
-                          Admin {log.admin_user_id.slice(0, 8)}... accessed {log.data_type}
-                        </span>
-                        <span className="text-muted-foreground">
-                          for user {log.target_user_id.slice(0, 8)}...
-                        </span>
+                        <span className="font-medium">Admin {log.admin_user_id.slice(0, 8)}... accessed {log.data_type}</span>
+                        <span className="text-muted-foreground">for user {log.target_user_id.slice(0, 8)}...</span>
                       </div>
-                      
                       {log.fields_accessed && log.fields_accessed.length > 0 && (
-                        <p className="text-xs text-muted-foreground">
-                          Fields: {log.fields_accessed.join(', ')}
-                        </p>
+                        <p className="text-xs text-muted-foreground">Fields: {log.fields_accessed.join(', ')}</p>
                       )}
-                      
                       {log.access_reason && (
-                        <p className="text-xs text-muted-foreground">
-                          Reason: {log.access_reason}
-                        </p>
+                        <p className="text-xs text-muted-foreground">Reason: {log.access_reason}</p>
                       )}
                     </div>
-                    
-                    <span className="text-xs text-muted-foreground">
-                      {format(new Date(log.created_at), 'PPp')}
-                    </span>
+                    <span className="text-xs text-muted-foreground">{format(new Date(log.created_at), 'PPp')}</span>
                   </div>
                 </div>
               ))}

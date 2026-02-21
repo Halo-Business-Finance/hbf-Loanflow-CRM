@@ -2,7 +2,7 @@
  * CRITICAL SECURITY FIX: Secure client-side encryption utilities
  * This replaces the mock encryption with real AES-256-GCM encryption
  */
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 
 interface EncryptionResult {
   success: boolean;
@@ -38,14 +38,12 @@ export class SecureEncryptionClient {
       }
 
       // Call the secure encryption edge function
-      const { data: result, error } = await supabase.functions.invoke('encrypt-data', {
-        body: {
-          action: 'encrypt',
-          data: data.toString(),
-          tableName,
-          fieldName,
-          recordId
-        }
+      const { data: result, error } = await ibmDb.rpc('encrypt-data', {
+        action: 'encrypt',
+        data: data.toString(),
+        tableName,
+        fieldName,
+        recordId
       });
 
       if (error) {
@@ -56,17 +54,18 @@ export class SecureEncryptionClient {
         };
       }
 
-      if (!result.success) {
+      const r = result as any;
+      if (!r.success) {
         return {
           success: false,
-          error: result.error || 'Encryption failed'
+          error: r.error || 'Encryption failed'
         };
       }
 
       return {
         success: true,
-        encryptedValue: result.encryptedValue,
-        keyId: result.keyId
+        encryptedValue: r.encryptedValue,
+        keyId: r.keyId
       };
 
     } catch (error) {
@@ -96,13 +95,11 @@ export class SecureEncryptionClient {
       }
 
       // Call the secure encryption edge function
-      const { data: result, error } = await supabase.functions.invoke('encrypt-data', {
-        body: {
-          action: 'decrypt',
-          tableName,
-          fieldName,
-          recordId
-        }
+      const { data: result, error } = await ibmDb.rpc('encrypt-data', {
+        action: 'decrypt',
+        tableName,
+        fieldName,
+        recordId
       });
 
       if (error) {
@@ -113,16 +110,17 @@ export class SecureEncryptionClient {
         };
       }
 
-      if (!result.success) {
+      const r = result as any;
+      if (!r.success) {
         return {
           success: false,
-          error: result.error || 'Decryption failed'
+          error: r.error || 'Decryption failed'
         };
       }
 
       return {
         success: true,
-        decryptedValue: result.decryptedValue
+        decryptedValue: r.decryptedValue
       };
 
     } catch (error) {
@@ -196,7 +194,7 @@ export class SecureEncryptionClient {
    */
   static async validateCriticalOperation(): Promise<boolean> {
     try {
-      const { data, error } = await supabase.rpc('validate_critical_operation_access');
+      const { data, error } = await ibmDb.rpc('validate_critical_operation_access');
       
       if (error) {
         console.error('Session validation error:', error);
@@ -223,7 +221,7 @@ export class SecureInputValidator {
     maxLength: number = 255
   ): Promise<{ valid: boolean; sanitized?: string; errors?: string[] }> {
     try {
-      const { data, error } = await supabase.rpc('validate_and_sanitize_input_enhanced', {
+      const { data, error } = await ibmDb.rpc('validate_and_sanitize_input_enhanced', {
         p_input: input,
         p_field_type: fieldType,
         p_max_length: maxLength,

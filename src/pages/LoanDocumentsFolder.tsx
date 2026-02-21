@@ -3,7 +3,7 @@ import { IBMPageHeader } from '@/components/ui/IBMPageHeader'
 import { BorrowerDocumentsWidget } from '@/components/BorrowerDocumentsWidget'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
-import { supabase } from '@/integrations/supabase/client'
+import { ibmDb } from '@/lib/ibm'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, Building2 } from 'lucide-react'
 
@@ -29,7 +29,7 @@ export default function LoanDocumentsFolder() {
 
       try {
         // First try to get info from lead_documents since we know documents exist for this lead_id
-        const { data: docData, error: docError } = await supabase
+        const { data: docData, error: docError } = await ibmDb
           .from('lead_documents')
           .select(`
             contact_entity:contact_entities!contact_entity_id(
@@ -48,24 +48,24 @@ export default function LoanDocumentsFolder() {
         if (docError) throw docError
 
         if (docData?.contact_entity) {
-          // Construct location from available fields
-          const locationParts = []
-          if (docData.contact_entity.business_city) locationParts.push(docData.contact_entity.business_city)
-          if (docData.contact_entity.business_state) locationParts.push(docData.contact_entity.business_state)
+          const ce = docData.contact_entity as any
+          const locationParts: string[] = []
+          if (ce.business_city) locationParts.push(ce.business_city)
+          if (ce.business_state) locationParts.push(ce.business_state)
           const constructedLocation = locationParts.length > 0 
             ? locationParts.join(', ') 
-            : (docData.contact_entity.location || '')
+            : (ce.location || '')
 
           setLeadInfo({
             id: leadId,
             contact_entity: {
-              ...docData.contact_entity,
+              ...ce,
               location: constructedLocation
             }
           })
         } else {
           // Fallback: try querying leads table
-          const { data: leadData, error: leadError } = await supabase
+          const { data: leadData, error: leadError } = await ibmDb
             .from('leads')
             .select(`
               id,
@@ -80,7 +80,7 @@ export default function LoanDocumentsFolder() {
             .maybeSingle()
 
           if (leadError) throw leadError
-          setLeadInfo(leadData)
+          setLeadInfo(leadData as unknown as LeadInfo)
         }
       } catch (error) {
         console.error('Error fetching lead info:', error)

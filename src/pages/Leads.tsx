@@ -30,7 +30,7 @@ import {
   UserX
 } from 'lucide-react';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 import { useToast } from '@/hooks/use-toast';
 import { LeadsList } from '@/components/leads/LeadsList';
 import { LeadFilters } from '@/components/LeadFilters';
@@ -105,13 +105,13 @@ export default function Leads() {
   // Fetch users for assignment
   useEffect(() => {
     const fetchUsers = async () => {
-      const { data, error } = await supabase
+      const { data, error } = await ibmDb
         .from('profiles')
         .select('id, email')
         .order('email');
       
       if (!error && data) {
-        setUsers(data);
+        setUsers(data as unknown as Array<{ id: string; email: string }>);
       }
     };
     
@@ -170,7 +170,7 @@ export default function Leads() {
     if (selectedLeads.length === 0) return;
     
     try {
-      const { error } = await supabase
+      const { error } = await ibmDb
         .from('leads')
         .delete()
         .in('id', selectedLeads);
@@ -199,7 +199,7 @@ export default function Leads() {
     
     try {
       // Get the contact_entity_ids for the selected leads
-      const { data: leadData, error: leadError } = await supabase
+      const { data: leadData, error: leadError } = await ibmDb
         .from('leads')
         .select('contact_entity_id')
         .in('id', selectedLeads);
@@ -226,10 +226,10 @@ export default function Leads() {
 
       // Only update if there's something to update
       if (Object.keys(updateData).length > 0) {
-        const { error } = await supabase
+        const { error } = await ibmDb
           .from('contact_entities')
           .update(updateData)
-          .in('id', contactEntityIds);
+          .in('id', contactEntityIds as string[]);
 
         if (error) throw error;
 
@@ -314,7 +314,7 @@ export default function Leads() {
 
   const handleDelete = async (leadId: string, leadName: string) => {
     try {
-      const { error } = await supabase
+      const { error } = await ibmDb
         .from('leads')
         .delete()
         .eq('id', leadId);
@@ -339,7 +339,7 @@ export default function Leads() {
 
   const handleConvert = async (lead: Lead) => {
     try {
-      const { error } = await supabase
+      const { error } = await ibmDb
         .from('contact_entities')
         .update({ stage: 'Loan Funded' })
         .eq('id', lead.contact_entity_id);
@@ -399,7 +399,7 @@ export default function Leads() {
 
         console.log('Updating contact entity with data:', updateData);
 
-        const { error } = await supabase
+        const { error } = await ibmDb
           .from('contact_entities')
           .update(updateData)
           .eq('id', editingLead.contact_entity_id);
@@ -436,7 +436,7 @@ export default function Leads() {
 
         console.log('Creating contact entity with data:', contactData);
 
-        const { data: contactEntity, error: contactError } = await supabase
+        const { data: contactEntity, error: contactError } = await ibmDb
           .from('contact_entities')
           .insert(contactData)
           .select()
@@ -453,7 +453,7 @@ export default function Leads() {
 
         console.log('Created contact entity:', contactEntity);
 
-        const { data: leadData, error: leadError } = await supabase
+        const { data: leadData, error: leadError } = await ibmDb
           .from('leads')
           .insert({
             user_id: user.id,

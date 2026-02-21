@@ -3,15 +3,9 @@
  * 
  * This service provides encryption/decryption using keys derived server-side
  * to eliminate XSS vulnerabilities from client-side key storage.
- * 
- * Security Features:
- * - Keys derived server-side via Edge Function
- * - No client-side key persistence (not in localStorage or sessionStorage)
- * - Ephemeral in-memory cache with automatic expiry
- * - Audit logging for all key access
  */
 
-import { supabase } from '@/integrations/supabase/client'
+import { ibmDb } from '@/lib/ibm'
 
 interface CachedKey {
   key: string
@@ -19,13 +13,9 @@ interface CachedKey {
 }
 
 class SecureEncryptionService {
-  // Ephemeral in-memory cache only (cleared on page reload)
   private keyCache: Map<string, CachedKey> = new Map()
-  private readonly KEY_CACHE_DURATION = 3600000 // 1 hour
+  private readonly KEY_CACHE_DURATION = 3600000
 
-  /**
-   * Get encryption key from server (cached in memory only)
-   */
   private async getServerDerivedKey(
     keyType: 'master' | 'field' | 'session',
     fieldIdentifier?: string
@@ -33,41 +23,34 @@ class SecureEncryptionService {
     const cacheKey = `${keyType}:${fieldIdentifier || ''}`
     const now = Date.now()
 
-    // Check ephemeral cache
     const cached = this.keyCache.get(cacheKey)
     if (cached && cached.expiresAt > now) {
       return cached.key
     }
 
     try {
-      // Fetch key from server-side Edge Function
-      const { data, error } = await supabase.functions.invoke('encryption-key-service', {
-        body: {
-          action: 'derive',
-          keyType,
-          fieldIdentifier
-        }
+      const { data, error } = await ibmDb.rpc('encryption-key-service', {
+        action: 'derive',
+        keyType,
+        fieldIdentifier
       })
 
       if (error) throw error
-      if (!data.success) throw new Error(data.error || 'Key derivation failed')
+      const result = data as any
+      if (!result.success) throw new Error(result.error || 'Key derivation failed')
 
-      // Cache in memory only (never persisted)
       this.keyCache.set(cacheKey, {
-        key: data.key,
+        key: result.key,
         expiresAt: now + this.KEY_CACHE_DURATION
       })
 
-      return data.key
+      return result.key
     } catch (error) {
       console.error('Failed to get server-derived key:', error)
       throw new Error('Encryption service unavailable')
     }
   }
 
-  /**
-   * Convert base64 string to CryptoKey
-   */
   private async importKey(keyBase64: string): Promise<CryptoKey> {
     const keyData = Uint8Array.from(atob(keyBase64), c => c.charCodeAt(0))
     
@@ -80,9 +63,6 @@ class SecureEncryptionService {
     )
   }
 
-  /**
-   * Encrypt data using server-derived key
-   */
   async encrypt(
     data: string,
     fieldType: 'ssn' | 'credit_score' | 'loan_amount' | 'financial' | 'pii'
@@ -90,7 +70,6 @@ class SecureEncryptionService {
     if (!data || data === '') return ''
 
     try {
-      // Get server-derived key
       const keyBase64 = await this.getServerDerivedKey('field', fieldType)
       const key = await this.importKey(keyBase64)
 
@@ -104,7 +83,6 @@ class SecureEncryptionService {
         dataBuffer
       )
 
-      // Combine IV and encrypted data
       const combined = new Uint8Array(iv.length + encrypted.byteLength)
       combined.set(iv, 0)
       combined.set(new Uint8Array(encrypted), iv.length)
@@ -116,9 +94,6 @@ class SecureEncryptionService {
     }
   }
 
-  /**
-   * Decrypt data using server-derived key
-   */
   async decrypt(
     encryptedData: string,
     fieldType: 'ssn' | 'credit_score' | 'loan_amount' | 'financial' | 'pii'
@@ -126,7 +101,6 @@ class SecureEncryptionService {
     if (!encryptedData || encryptedData === '') return ''
 
     try {
-      // Get server-derived key
       const keyBase64 = await this.getServerDerivedKey('field', fieldType)
       const key = await this.importKey(keyBase64)
 
@@ -144,13 +118,10 @@ class SecureEncryptionService {
       return decoder.decode(decrypted)
     } catch (error) {
       console.error('Decryption failed:', error)
-      return '' // Return empty for corrupted data
+      return ''
     }
   }
 
-  /**
-   * Encrypt multiple fields
-   */
   async encryptMultipleFields(
     data: Record<string, any>,
     fieldConfig: Record<string, 'ssn' | 'credit_score' | 'loan_amount' | 'financial' | 'pii'>
@@ -167,9 +138,6 @@ class SecureEncryptionService {
     return encrypted
   }
 
-  /**
-   * Decrypt multiple fields
-   */
   async decryptMultipleFields(
     data: Record<string, any>,
     fieldConfig: Record<string, 'ssn' | 'credit_score' | 'loan_amount' | 'financial' | 'pii'>
@@ -180,7 +148,6 @@ class SecureEncryptionService {
       if (data[field] && typeof data[field] === 'string') {
         const decryptedValue = await this.decrypt(data[field], type)
 
-        // Convert back to number if needed
         if (type === 'credit_score' || type === 'loan_amount') {
           decrypted[field] = decryptedValue ? parseFloat(decryptedValue) : null
         } else {
@@ -192,26 +159,17 @@ class SecureEncryptionService {
     return decrypted
   }
 
-  /**
-   * Clear all cached keys (security measure)
-   */
   clearCache(): void {
     this.keyCache.clear()
   }
 
-  /**
-   * Request key rotation from server
-   */
   async rotateKeys(keyType: 'master' | 'field' | 'session'): Promise<void> {
     try {
-      await supabase.functions.invoke('encryption-key-service', {
-        body: {
-          action: 'rotate',
-          keyType
-        }
+      await ibmDb.rpc('encryption-key-service', {
+        action: 'rotate',
+        keyType
       })
 
-      // Clear cache to force re-fetch
       this.clearCache()
     } catch (error) {
       console.error('Key rotation failed:', error)
@@ -220,10 +178,8 @@ class SecureEncryptionService {
   }
 }
 
-// Export singleton instance
 export const secureEncryptionService = new SecureEncryptionService()
 
-// Export lead encryption config
 export const LEAD_ENCRYPTION_CONFIG = {
   credit_score: 'credit_score' as const,
   loan_amount: 'loan_amount' as const,
@@ -239,7 +195,6 @@ export const LEAD_ENCRYPTION_CONFIG = {
   location: 'pii' as const
 }
 
-// Utility functions
 export const encryptLeadData = (leadData: any) =>
   secureEncryptionService.encryptMultipleFields(leadData, LEAD_ENCRYPTION_CONFIG)
 

@@ -6,7 +6,7 @@ import { UserCog, Plus, Search, Filter, Mail, Calendar, Phone, Edit, Trash2, X, 
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 import { getAccessToken } from '@/lib/auth-utils';
 import { logger } from '@/lib/logger';
 import { useToast } from '@/hooks/use-toast';
@@ -158,32 +158,17 @@ export default function UserDirectory() {
       setLoading(true);
 
       // Primary path: invoke via Supabase client (adds auth automatically)
-      let { data, error } = await supabase.functions.invoke('admin-get-users', {
-        body: { action: 'list_users' },
-        headers: { 'Content-Type': 'application/json' },
-      });
+      let { data, error } = await ibmDb.rpc('admin-get-users', {
+        action: 'list_users',
+      }) as { data: any; error: any };
 
-      // Fallback path: direct fetch to Edge Functions domain if invoke fails (network/env quirks)
-      if (error || !data?.users) {
-        const accessToken = getAccessToken() || '';
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://gshxxsniwytjgcnthyfq.supabase.co';
-        const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '';
-        const response = await fetch(
-          `${supabaseUrl}/functions/v1/admin-get-users`,
-          {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${accessToken}`,
-              'apikey': supabaseKey,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ action: 'list_users' }),
-          }
-        );
-        if (!response.ok) {
-          throw new Error(`Edge Function HTTP ${response.status}`);
-        }
-        data = await response.json();
+      // Fallback: retry if first call failed
+      if (error || !(data as any)?.users) {
+        const retryResult = await ibmDb.rpc('admin-get-users', {
+          action: 'list_users',
+        }) as { data: any; error: any };
+        if (retryResult.error) throw retryResult.error;
+        data = retryResult.data;
       }
 
       if (data?.users && Array.isArray(data.users)) {
@@ -265,17 +250,15 @@ export default function UserDirectory() {
     try {
       setIsSaving(true);
       
-      const { data, error } = await supabase.functions.invoke('admin-update-user', {
-        body: {
-          userId: selectedUser.id,
-          firstName: values.firstName,
-          lastName: values.lastName,
-          phone: values.phoneNumber || null,
-          city: values.city || null,
-          state: values.state || null,
-          isActive: values.isActive,
-        },
-      });
+      const { data, error } = await ibmDb.rpc('admin-update-user', {
+        userId: selectedUser.id,
+        firstName: values.firstName,
+        lastName: values.lastName,
+        phone: values.phoneNumber || null,
+        city: values.city || null,
+        state: values.state || null,
+        isActive: values.isActive,
+      }) as { data: any; error: any };
 
       if (error) throw error;
 
@@ -308,19 +291,17 @@ export default function UserDirectory() {
     try {
       setIsSaving(true);
       
-      const { data, error } = await supabase.functions.invoke('admin-create-user', {
-        body: {
-          email: values.email,
-          password: values.password,
-          firstName: values.firstName,
-          lastName: values.lastName,
-          phone: values.phoneNumber || null,
-          city: values.city || null,
-          state: values.state || null,
-          role: values.role,
-          isActive: values.isActive,
-        },
-      });
+      const { data, error } = await ibmDb.rpc('admin-create-user', {
+        email: values.email,
+        password: values.password,
+        firstName: values.firstName,
+        lastName: values.lastName,
+        phone: values.phoneNumber || null,
+        city: values.city || null,
+        state: values.state || null,
+        role: values.role,
+        isActive: values.isActive,
+      }) as { data: any; error: any };
 
       if (error) throw error;
 
@@ -350,11 +331,9 @@ export default function UserDirectory() {
     try {
       setIsDeleting(true);
       
-      const { data, error } = await supabase.functions.invoke('admin-delete-user', {
-        body: {
-          userId: selectedUser.id,
-        },
-      });
+      const { data, error } = await ibmDb.rpc('admin-delete-user', {
+        userId: selectedUser.id,
+      }) as { data: any; error: any };
 
       if (error) throw error;
 
@@ -424,9 +403,9 @@ export default function UserDirectory() {
         // Delete users one by one
         for (const userId of selectedUsersArray) {
           try {
-            const { error } = await supabase.functions.invoke('admin-delete-user', {
-              body: { userId },
-            });
+            const { error } = await ibmDb.rpc('admin-delete-user', {
+              userId,
+            }) as { data: any; error: any };
             if (!error) {
               successCount++;
             } else {
@@ -445,12 +424,10 @@ export default function UserDirectory() {
         // Deactivate users one by one
         for (const userId of selectedUsersArray) {
           try {
-            const { error } = await supabase.functions.invoke('admin-update-user', {
-              body: {
-                userId,
-                isActive: false,
-              },
-            });
+            const { error } = await ibmDb.rpc('admin-update-user', {
+              userId,
+              isActive: false,
+            }) as { data: any; error: any };
             if (!error) {
               successCount++;
             } else {
@@ -542,13 +519,11 @@ export default function UserDirectory() {
     try {
       setSendingPasswordReset(user.id);
 
-      const { error } = await supabase.functions.invoke('microsoft-auth', {
-        body: {
-          action: 'send_password_reset',
-          recipientEmail: user.email,
-          recipientName: `${user.first_name} ${user.last_name}`.trim(),
-        },
-      });
+      const { error } = await ibmDb.rpc('microsoft-auth', {
+        action: 'send_password_reset',
+        recipientEmail: user.email,
+        recipientName: `${user.first_name} ${user.last_name}`.trim(),
+      }) as { data: any; error: any };
 
       if (error) throw error;
 
@@ -562,9 +537,10 @@ export default function UserDirectory() {
       // If Microsoft 365 isn't connected, fall back to Supabase's built-in password reset email.
       if (message.toLowerCase().includes('no active email account')) {
         try {
-          const { error: resetError } = await supabase.auth.resetPasswordForEmail(user.email, {
+          const { error: resetError } = await ibmDb.rpc('send-password-reset', {
+            email: user.email,
             redirectTo: `${window.location.origin}/auth?mode=reset`,
-          });
+          }) as { data: any; error: any };
 
           if (resetError) throw resetError;
 

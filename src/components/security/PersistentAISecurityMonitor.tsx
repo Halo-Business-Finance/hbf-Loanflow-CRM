@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -50,23 +50,23 @@ export const PersistentAISecurityMonitor: React.FC = () => {
       setIsMonitoring(true);
 
       // Load AI bots status
-      const { data: bots } = await supabase
+      const { data: bots } = await ibmDb
         .from('ai_security_bots')
         .select('*')
         .order('last_activity', { ascending: false });
 
-      if (bots) setAiBots(bots);
+      if (bots) setAiBots(bots as unknown as AIBot[]);
 
       // Load recent high-priority alerts
-      const { data: recentAlerts } = await supabase
+      const { data: recentAlerts } = await ibmDb
         .from('ai_bot_alerts')
         .select('*')
-        .gte('created_at', new Date(Date.now() - 60 * 60 * 1000).toISOString()) // Last hour
+        .gte('created_at', new Date(Date.now() - 60 * 60 * 1000).toISOString())
         .order('created_at', { ascending: false })
         .limit(20);
 
       if (recentAlerts) {
-        const typedAlerts = recentAlerts.map(alert => ({
+        const typedAlerts = (recentAlerts as any[]).map((alert: any) => ({
           ...alert,
           severity: alert.severity as 'low' | 'medium' | 'high' | 'critical' | 'emergency'
         }));
@@ -89,7 +89,7 @@ export const PersistentAISecurityMonitor: React.FC = () => {
 
   const handleAlertReview = async (alertId: string) => {
     try {
-      const { error } = await supabase
+      const { error } = await ibmDb
         .from('ai_bot_alerts')
         .update({ 
           acknowledged: true, 
@@ -114,12 +114,12 @@ export const PersistentAISecurityMonitor: React.FC = () => {
 
   const triggerManualScan = async () => {
     try {
-      const { data, error } = await supabase.functions.invoke('persistent-ai-security', {
-        body: { action: 'run_scan', manual_trigger: true }
+      const { data, error } = await ibmDb.rpc('persistent-ai-security', {
+        action: 'run_scan', manual_trigger: true
       });
 
-      if (data?.success) {
-        toast.success(`Manual scan completed: ${data.threats_detected} threats detected`);
+      if ((data as any)?.success) {
+        toast.success(`Manual scan completed: ${(data as any).threats_detected} threats detected`);
       } else {
         toast.error('Manual scan failed');
       }

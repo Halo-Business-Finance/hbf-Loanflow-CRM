@@ -17,7 +17,7 @@ import {
   TableIcon, Download, Filter, SortAsc, SortDesc, Loader2 
 } from 'lucide-react';
 import { useReports, DATA_SOURCES, ReportFilter, SavedReport } from '@/hooks/useReports';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 import { toast } from 'sonner';
 import { BarChart, Bar, LineChart as RechartsLineChart, Line, PieChart as RechartsPieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area } from 'recharts';
 

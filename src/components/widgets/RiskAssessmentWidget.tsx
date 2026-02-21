@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { AlertTriangle, TrendingUp, TrendingDown } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 
 interface RiskMetrics {
   highRiskCount: number;
@@ -29,7 +29,7 @@ export function RiskAssessmentWidget() {
 
   const fetchRiskMetrics = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await ibmDb
         .from('contact_entities')
         .select('loan_amount, credit_score, debt_to_income_ratio')
         .in('stage', ['Pre-approval', 'Documentation', 'Underwriting']);
@@ -41,11 +41,10 @@ export function RiskAssessmentWidget() {
       let lowRisk = 0;
       let totalAmount = 0;
 
-      (data || []).forEach((item) => {
+      (((data as any[]) || []) as any[]).forEach((item: any) => {
         const amount = item.loan_amount || 0;
         totalAmount += amount;
 
-        // Simplified risk calculation
         const creditScore = item.credit_score || 650;
         const dti = item.debt_to_income_ratio || 0;
 
@@ -62,8 +61,8 @@ export function RiskAssessmentWidget() {
         highRiskCount: highRisk,
         mediumRiskCount: mediumRisk,
         lowRiskCount: lowRisk,
-        totalApplications: data?.length || 0,
-        avgLoanAmount: data?.length ? totalAmount / data.length : 0,
+        totalApplications: ((data as any[]) || []).length,
+        avgLoanAmount: ((data as any[]) || []).length ? totalAmount / ((data as any[]) || []).length : 0,
       });
     } catch (error) {
       console.error('Error fetching risk metrics:', error);

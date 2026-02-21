@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { CheckCircle, XCircle, FileText, AlertCircle } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 import { PROCESSOR_STAGES } from '@/lib/loan-stages';
 
 interface DocumentStatus {
@@ -28,7 +28,7 @@ export function DocumentChecklistWidget() {
   const fetchDocumentStatus = async () => {
     try {
       // Fetch applications in documentation stage
-      const { data: applications, error: appError } = await supabase
+      const { data: applications, error: appError } = await ibmDb
         .from('contact_entities')
         .select('id, name, business_name, loan_type')
         .in('stage', PROCESSOR_STAGES)
@@ -49,9 +49,9 @@ export function DocumentChecklistWidget() {
       ];
 
       // Fetch document counts for each application
-      const statusPromises = (applications || []).map(async (app) => {
+      const statusPromises = ((applications as any[]) || []).map(async (app: any) => {
         // Get uploaded documents for this application's lead
-        const { data: leadData } = await supabase
+        const { data: leadData } = await ibmDb
           .from('leads')
           .select('id')
           .eq('contact_entity_id', app.id)
@@ -61,13 +61,13 @@ export function DocumentChecklistWidget() {
         let uploadedDocNames: string[] = [];
         
         if (leadData) {
-          const { data: docs, count } = await supabase
+          const { data: docs } = await ibmDb
             .from('lead_documents')
-            .select('document_name', { count: 'exact' })
-            .eq('lead_id', leadData.id);
+            .select('document_name')
+            .eq('lead_id', (leadData as any).id);
           
-          uploadedCount = count || 0;
-          uploadedDocNames = (docs || []).map(d => d.document_name);
+          uploadedCount = ((docs as any[]) || []).length;
+          uploadedDocNames = ((docs as any[]) || []).map((d: any) => d.document_name);
         }
 
         const requiredDocs = standardRequiredDocs.length;

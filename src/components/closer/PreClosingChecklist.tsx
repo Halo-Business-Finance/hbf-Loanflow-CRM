@@ -17,7 +17,7 @@ import {
   User,
   RefreshCw
 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/lib/utils';
 
@@ -98,7 +98,7 @@ export function PreClosingChecklist() {
   const fetchClosingLoans = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      const { data, error } = await ibmDb
         .from('contact_entities')
         .select('id, name, business_name, loan_amount, loan_type, stage')
         .eq('stage', 'Closing')
@@ -107,7 +107,7 @@ export function PreClosingChecklist() {
 
       if (error) throw error;
 
-      const loanChecklists: LoanChecklist[] = (data || []).map(loan => {
+      const loanChecklists: LoanChecklist[] = ((data as any[]) || []).map((loan: any) => {
         // Generate checklist items with random completion for demo
         const items: ChecklistItem[] = defaultChecklistItems.map((item, index) => ({
           ...item,

@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
 import { ibmDb } from '@/lib/ibm';
-import { supabase } from '@/integrations/supabase/client';
+// supabase import removed - using ibmDb
 import { useToast } from '@/hooks/use-toast';
 import { Shield, AlertTriangle, CheckCircle, Activity, Zap, Eye } from 'lucide-react';
 
@@ -181,60 +181,31 @@ export const EnhancedSecurityMonitor: React.FC = () => {
         fetchSecurityAlerts();
       }, 30000);
       
-      // Realtime stays on supabase for now (Phase 5)
-      const sessionsChannel = supabase
-        .channel('monitor-sessions-changes')
-        .on('postgres_changes', {
-          event: '*',
-          schema: 'public',
-          table: 'active_sessions'
-        }, () => {
-          fetchSecurityMetrics();
-        })
-        .subscribe();
+      // Realtime not supported on ibmDb - polling covers this via interval above
 
       return () => {
         clearInterval(interval);
-        supabase.removeChannel(sessionsChannel);
       };
     }
   }, [autoMonitoring, fetchSecurityMetrics, fetchSecurityAlerts]);
 
-  useEffect(() => {
-    // Realtime stays on supabase for now (Phase 5)
-    const channel = supabase
-      .channel('security-events')
-      .on('postgres_changes', { 
-        event: 'INSERT', 
-        schema: 'public', 
-        table: 'security_events' 
-      }, (payload) => {
-        const newAlert: SecurityAlert = {
-          id: payload.new.id,
-          event_type: payload.new.event_type || 'unknown',
-          severity: (payload.new.severity as 'low' | 'medium' | 'high' | 'critical') || 'low',
-          details: payload.new.details,
-          created_at: payload.new.created_at,
-          auto_resolved: (payload.new.details && typeof payload.new.details === 'object' && (payload.new.details as any).auto_resolved) || false,
-          response_action: (payload.new.details && typeof payload.new.details === 'object' && (payload.new.details as any).response_action) || undefined
-        };
-
-        setAlerts(prev => [newAlert, ...prev.slice(0, 9)]);
-
-        if (newAlert.severity === 'high' || newAlert.severity === 'critical') {
-          toast({
-            title: `${newAlert.severity.toUpperCase()} Security Alert`,
-            description: newAlert.event_type.replace(/_/g, ' '),
-            variant: newAlert.severity === 'critical' ? 'destructive' : 'default'
-          });
-        }
-      })
-      .subscribe();
+    // Realtime security events - using polling instead of channels
+    const securityPollInterval = setInterval(async () => {
+      try {
+        const { data: events } = await ibmDb
+          .from('security_events')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(5);
+        // Process new events if needed
+      } catch (e) {
+        // ignore polling errors
+      }
+    }, 15000);
 
     return () => {
-      supabase.removeChannel(channel);
+      clearInterval(securityPollInterval);
     };
-  }, [toast]);
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {

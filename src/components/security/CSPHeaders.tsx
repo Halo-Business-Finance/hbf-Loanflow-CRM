@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 import { applyClientSecurityHeaders, getEnhancedSecurityHeaders } from '@/lib/security-headers';
 import { getCurrentNonce } from '@/security/nonce';
 
@@ -169,13 +169,13 @@ export const CSPHeaders: React.FC = () => {
     // Fetch and apply dynamic security headers from database (production only, not embedded)
     const applyDynamicSecurityHeaders = async () => {
       try {
-        const { data: headers } = await supabase
+        const { data: headers } = await ibmDb
           .from('security_headers')
           .select('*')
           .eq('is_active', true);
 
         if (headers) {
-          headers.forEach((header: SecurityHeader) => {
+          ((headers as any[]) || []).forEach((header: any) => {
             if (header.header_name === 'Content-Security-Policy') {
               // Remove existing dynamic CSP meta tag
               const existingCSP = document.querySelector(

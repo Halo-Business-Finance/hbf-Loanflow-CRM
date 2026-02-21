@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Zap, Clock, TrendingUp, TrendingDown, AlertTriangle, ArrowRight } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, ComposedChart, Area } from 'recharts';
 import { differenceInDays, parseISO, format } from 'date-fns';
 
@@ -55,7 +55,7 @@ export function PipelineVelocity() {
       setLoading(true);
       
       // Fetch leads with stage history
-      const { data: leads, error } = await supabase
+      const { data: leads, error } = await ibmDb
         .from('contact_entities')
         .select('id, stage, created_at, updated_at')
         .not('stage', 'is', null);
@@ -70,7 +70,7 @@ export function PipelineVelocity() {
       });
 
       // Process leads to calculate time in each stage
-      (leads || []).forEach(lead => {
+      ((leads as any[]) || []).forEach((lead: any) => {
         const daysInStage = differenceInDays(
           new Date(lead.updated_at),
           new Date(lead.created_at)

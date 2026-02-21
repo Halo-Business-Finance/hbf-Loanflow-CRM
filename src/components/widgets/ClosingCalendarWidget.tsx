@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Calendar } from '@/components/ui/calendar';
 import { CalendarCheck, Clock } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 import { formatCurrency } from '@/lib/utils';
 import { format } from 'date-fns';
 import { CLOSER_STAGES } from '@/lib/loan-stages';
@@ -29,7 +29,7 @@ export function ClosingCalendarWidget() {
   const fetchClosingEvents = async () => {
     try {
       // Fetch loans in closing stages with scheduled closing dates (next_follow_up)
-      const { data, error } = await supabase
+      const { data, error } = await ibmDb
         .from('contact_entities')
         .select('id, name, business_name, loan_amount, updated_at, next_follow_up')
         .eq('stage', 'Closing')
@@ -39,14 +39,14 @@ export function ClosingCalendarWidget() {
       if (error) throw error;
 
       // Use actual scheduled dates from next_follow_up field
-      const eventsWithDates = (data || [])
-        .filter(item => item.next_follow_up)
-        .map((item) => ({
+      const eventsWithDates = ((data as any[]) || [])
+        .filter((item: any) => item.next_follow_up)
+        .map((item: any) => ({
           ...item,
           closingDate: new Date(item.next_follow_up!),
         }));
 
-      setEvents(eventsWithDates);
+      setEvents(eventsWithDates as ClosingEvent[]);
     } catch (error) {
       console.error('Error fetching closing events:', error);
     } finally {

@@ -3,7 +3,7 @@
  * Eliminates localStorage usage for sensitive data, using only server-side storage
  */
 
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 import { getAuthUser } from '@/lib/auth-utils';
 
 interface SecureStorageOptions {
@@ -65,7 +65,7 @@ class ZeroLocalStorageManager {
         : new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24h default
 
       // Store in security_events table as secure storage
-      const { error } = await supabase
+      const { error } = await ibmDb
         .from('security_events')
         .insert({
           user_id: user.id,
@@ -110,12 +110,12 @@ class ZeroLocalStorageManager {
       const user = await getAuthUser();
       if (!user) return null;
 
-      const { data, error } = await supabase
+      const { data, error } = await ibmDb
         .from('security_events')
         .select('details')
         .eq('user_id', user.id)
         .eq('event_type', 'secure_storage')
-        .filter('details->key', 'eq', key)
+        .eq('details->key', key)
         .gt('details->expires_at', new Date().toISOString())
         .order('created_at', { ascending: false })
         .limit(1)
@@ -155,12 +155,12 @@ class ZeroLocalStorageManager {
       const user = await getAuthUser();
       if (!user) return false;
 
-      const { error } = await supabase
+      const { error } = await ibmDb
         .from('security_events')
         .update({ event_type: 'secure_storage_deleted' })
         .eq('user_id', user.id)
         .eq('event_type', 'secure_storage')
-        .filter('details->key', 'eq', key);
+        .eq('details->key', key);
 
       return !error;
     } catch (error) {
@@ -177,7 +177,7 @@ class ZeroLocalStorageManager {
       const user = await getAuthUser();
       if (!user) return false;
 
-      const { error } = await supabase
+      const { error } = await ibmDb
         .from('security_events')
         .update({ event_type: 'secure_storage_deleted' })
         .eq('user_id', user.id)
@@ -294,7 +294,7 @@ class ZeroLocalStorageManager {
 
   private async logSecurityEvent(eventType: string, details: any): Promise<void> {
     try {
-      await supabase
+      await ibmDb
         .from('security_events')
         .insert({
           event_type: eventType,

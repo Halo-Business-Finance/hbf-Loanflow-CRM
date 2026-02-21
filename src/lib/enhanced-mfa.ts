@@ -5,7 +5,7 @@
  * SECURITY: Uses server-side encryption via Edge Functions
  */
 
-import { supabase } from "@/integrations/supabase/client";
+import { ibmDb } from "@/lib/ibm";
 import { SecurityManager } from "./security";
 import { encryptData, decryptData } from "./server-encryption";
 import { logger } from "./logger";
@@ -165,7 +165,7 @@ export class EnhancedMFA {
         
         const encryptResult = await encryptData(credentialData, 'biometric');
         if (encryptResult.success && encryptResult.encrypted) {
-          await supabase.rpc('store_secure_session_data', {
+          await ibmDb.rpc('store_secure_session_data', {
             p_key: 'biometric_credential',
             p_value: encryptResult.encrypted
           });
@@ -185,7 +185,7 @@ export class EnhancedMFA {
     if (!('credentials' in navigator)) return false;
     
     try {
-      const { data: encryptedData } = await supabase.rpc('get_secure_session_data', {
+      const { data: encryptedData } = await ibmDb.rpc('get_secure_session_data', {
         p_key: 'biometric_credential'
       });
       if (!encryptedData) return false;
@@ -221,19 +221,17 @@ export class EnhancedMFA {
     
     try {
       // In production, integrate with SMS service
-      await supabase.functions.invoke('secure-external-api', {
-        body: {
-          service: 'sms',
-          action: 'send_verification',
-          phone: phoneNumber,
-          code
-        }
+      await ibmDb.rpc('send_external_api', {
+        p_service: 'sms',
+        p_action: 'send_verification',
+        p_phone: phoneNumber,
+        p_code: code
       });
       
       // Store encrypted code using server-side encryption
       const encryptResult = await encryptData(code, 'sms_code');
       if (encryptResult.success && encryptResult.encrypted) {
-        await supabase.rpc('store_secure_session_data', {
+        await ibmDb.rpc('store_secure_session_data', {
           p_key: `_sms_code_${phoneNumber}`,
           p_value: encryptResult.encrypted,
         });
@@ -241,7 +239,7 @@ export class EnhancedMFA {
       
       // Auto-expire in 5 minutes
       setTimeout(() => {
-        supabase.rpc('remove_secure_session_data', { p_key: `_sms_code_${phoneNumber}` });
+        ibmDb.rpc('remove_secure_session_data', { p_key: `_sms_code_${phoneNumber}` });
       }, 300000);
       
       return code; // In production, don't return the actual code
@@ -254,7 +252,7 @@ export class EnhancedMFA {
   // Verify SMS code
   static async verifySMSCode(phoneNumber: string, code: string): Promise<boolean> {
     // Retrieve encrypted code from server-side session storage
-    const { data: storedEncrypted, error } = await supabase.rpc('get_secure_session_data', {
+    const { data: storedEncrypted, error } = await ibmDb.rpc('get_secure_session_data', {
       p_key: `_sms_code_${phoneNumber}`,
     });
     if (error || !storedEncrypted) return false;
@@ -266,7 +264,7 @@ export class EnhancedMFA {
       const isValid = SecurityManager.secureCompare(code, decryptResult.decrypted);
       
       if (isValid) {
-        await supabase.rpc('remove_secure_session_data', { p_key: `_sms_code_${phoneNumber}` });
+        await ibmDb.rpc('remove_secure_session_data', { p_key: `_sms_code_${phoneNumber}` });
       }
       
       return isValid;
@@ -291,7 +289,7 @@ export class EnhancedMFA {
     
     const encryptResult = await encryptData(verificationData, 'email_verification');
     if (encryptResult.success && encryptResult.encrypted) {
-      await supabase.rpc('store_secure_session_data', {
+      await ibmDb.rpc('store_secure_session_data', {
         p_key: `_email_verification_${email}`,
         p_value: encryptResult.encrypted,
       });
@@ -299,17 +297,15 @@ export class EnhancedMFA {
     
     // Auto-expire in 15 minutes (client-side cleanup; server TTL is handled separately)
     setTimeout(() => {
-      supabase.rpc('remove_secure_session_data', { p_key: `_email_verification_${email}` });
+      ibmDb.rpc('remove_secure_session_data', { p_key: `_email_verification_${email}` });
     }, 15 * 60 * 1000);
     
     try {
-      await supabase.functions.invoke('secure-external-api', {
-        body: {
-          service: 'email',
-          action: 'send_verification',
-          email,
-          token
-        }
+      await ibmDb.rpc('send_external_api', {
+        p_service: 'email',
+        p_action: 'send_verification',
+        p_email: email,
+        p_token: token
       });
     } catch (error) {
       logger.error('Email verification failed');
@@ -320,7 +316,7 @@ export class EnhancedMFA {
   // Verify email token
   static async verifyEmailToken(email: string, token: string): Promise<boolean> {
     // Retrieve verification package from server-side session storage
-    const { data: storedEncrypted, error } = await supabase.rpc('get_secure_session_data', {
+    const { data: storedEncrypted, error } = await ibmDb.rpc('get_secure_session_data', {
       p_key: `_email_verification_${email}`,
     });
     if (error || !storedEncrypted) return false;
@@ -335,7 +331,7 @@ export class EnhancedMFA {
       const isNotExpired = Date.now() < verificationData.expiresAt;
       
       if (isValidToken && isNotExpired) {
-        await supabase.rpc('remove_secure_session_data', { p_key: `_email_verification_${email}` });
+        await ibmDb.rpc('remove_secure_session_data', { p_key: `_email_verification_${email}` });
         return true;
       }
       
@@ -387,7 +383,7 @@ export class EnhancedMFA {
         
         const encryptResult = await encryptData(credentialData, 'security_key');
         if (encryptResult.success && encryptResult.encrypted) {
-          await supabase.rpc('store_secure_session_data', {
+          await ibmDb.rpc('store_secure_session_data', {
             p_key: 'security_key',
             p_value: encryptResult.encrypted
           });
@@ -407,7 +403,7 @@ export class EnhancedMFA {
     if (!('credentials' in navigator)) return false;
     
     try {
-      const { data: encryptedData } = await supabase.rpc('get_secure_session_data', {
+      const { data: encryptedData } = await ibmDb.rpc('get_secure_session_data', {
         p_key: 'security_key'
       });
       if (!encryptedData) return false;

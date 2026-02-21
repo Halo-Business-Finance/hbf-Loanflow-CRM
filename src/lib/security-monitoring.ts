@@ -1,4 +1,4 @@
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 import { logger } from '@/lib/logger';
 
 export class SecurityMonitoring {
@@ -18,14 +18,11 @@ export class SecurityMonitoring {
     userId?: string
   ) {
     try {
-      await supabase.functions.invoke('security-monitor', {
-        body: {
-          action: 'log_event',
-          event_type: eventType,
-          severity,
-          details,
-          user_id: userId
-        }
+      await ibmDb.rpc('log_security_event', {
+        p_event_type: eventType,
+        p_severity: severity,
+        p_details: details,
+        p_user_id: userId
       });
     } catch (error) {
       logger.error('Failed to log security event:', error);
@@ -37,10 +34,8 @@ export class SecurityMonitoring {
     targetRole: string,
     targetUserId: string
   ): Promise<boolean> {
-    // Prevent privilege escalation attempts
     const roleHierarchy = {
       'tech': 0,
-      
       'loan_originator': 1,
       'loan_processor': 1,
       'funder': 1,
@@ -54,52 +49,32 @@ export class SecurityMonitoring {
     const currentLevel = roleHierarchy[currentUserRole as keyof typeof roleHierarchy] || 0;
     const targetLevel = roleHierarchy[targetRole as keyof typeof roleHierarchy] || 0;
 
-    // Log privilege escalation attempts
     if (targetLevel > currentLevel) {
-      await this.logSecurityEvent(
-        'privilege_escalation_attempt',
-        'high',
-        {
-          current_role: currentUserRole,
-          target_role: targetRole,
-          target_user_id: targetUserId,
-          escalation_level: targetLevel - currentLevel
-        }
-      );
+      await this.logSecurityEvent('privilege_escalation_attempt', 'high', {
+        current_role: currentUserRole, target_role: targetRole, target_user_id: targetUserId,
+        escalation_level: targetLevel - currentLevel
+      });
       return false;
     }
 
-    // Super admin roles can only be managed by super admins
     if (targetRole === 'super_admin' && currentUserRole !== 'super_admin') {
-      await this.logSecurityEvent(
-        'super_admin_access_attempt',
-        'critical',
-        {
-          current_role: currentUserRole,
-          target_user_id: targetUserId
-        }
-      );
+      await this.logSecurityEvent('super_admin_access_attempt', 'critical', {
+        current_role: currentUserRole, target_user_id: targetUserId
+      });
       return false;
     }
 
     return true;
   }
 
-  async validateGeoSecurity(ipAddress: string): Promise<{
-    allowed: boolean;
-    risk_factors: string[];
-  }> {
+  async validateGeoSecurity(ipAddress: string): Promise<{ allowed: boolean; risk_factors: string[] }> {
     try {
-      const { data, error } = await supabase.functions.invoke('geo-security', {
-        body: { ip_address: ipAddress }
-      });
-
+      const { data, error } = await ibmDb.rpc('geo_security_check', { p_ip_address: ipAddress });
       if (error) {
         logger.error('Geo-security check failed:', error);
         return { allowed: false, risk_factors: ['geo_check_failed'] };
       }
-
-      return data;
+      return data as any;
     } catch (error) {
       logger.error('Geo-security validation error:', error);
       return { allowed: false, risk_factors: ['geo_validation_error'] };
@@ -107,19 +82,11 @@ export class SecurityMonitoring {
   }
 
   async auditUserAction(
-    action: string,
-    tableName: string,
-    recordId?: string,
-    details?: Record<string, any>
+    action: string, tableName: string, recordId?: string, details?: Record<string, any>
   ) {
     try {
-      await supabase.functions.invoke('audit-log', {
-        body: {
-          action,
-          table_name: tableName,
-          record_id: recordId,
-          details
-        }
+      await ibmDb.rpc('create_audit_log', {
+        p_action: action, p_table_name: tableName, p_record_id: recordId, p_details: details
       });
     } catch (error) {
       logger.error('Failed to log audit event:', error);

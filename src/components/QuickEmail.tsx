@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Mail, Send, Loader2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { supabase } from "@/integrations/supabase/client"
+import { ibmDb } from "@/lib/ibm"
 
 interface QuickEmailProps {
   trigger: React.ReactNode
@@ -42,14 +42,12 @@ export function QuickEmail({ trigger, recipientEmail, recipientName }: QuickEmai
     try {
       setIsSending(true)
 
-      const { data, error } = await supabase.functions.invoke('send-email', {
-        body: {
-          to: recipientEmail,
-          subject: formData.subject,
-          body: formData.body,
-          leadName: recipientName,
-          fromName: "LoanFlow Team"
-        }
+      const { data, error } = await ibmDb.rpc('send_email', {
+        p_to: recipientEmail,
+        p_subject: formData.subject,
+        p_body: formData.body,
+        p_lead_name: recipientName,
+        p_from_name: "LoanFlow Team"
       })
 
       if (error) throw error

@@ -143,9 +143,9 @@ export function AdvancedSessionManager() {
         language: session.language
       };
 
-      const { data, error } = await supabase.rpc('validate_enhanced_session', {
+      const { data, error } = await ibmDb.rpc('validate_enhanced_session', {
         p_user_id: session.user_id,
-        p_session_token: sessionId, // Using session ID as token for demo
+        p_session_token: sessionId,
         p_device_fingerprint: deviceFingerprint,
         p_ip_address: session.ip_address
       });

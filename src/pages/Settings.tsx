@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/components/auth/AuthProvider"
-import { supabase } from "@/integrations/supabase/client"
+import { ibmDb } from "@/lib/ibm"
 import { 
   Settings as SettingsIcon,
   User, 
@@ -65,12 +65,12 @@ export default function Settings() {
       // Fetch user role
       if (user?.id) {
         try {
-          const { data: role, error } = await supabase.rpc('get_user_role', {
+          const { data: role, error } = await ibmDb.rpc('get_user_role', {
             p_user_id: user.id
           })
           
           if (!error && role) {
-            setUserRole(role)
+            setUserRole(role as string)
           }
         } catch (error) {
           logger.error('Error fetching user role:', error)
@@ -86,12 +86,10 @@ export default function Settings() {
     
     setIsLoading(true)
     try {
-      const { error } = await supabase.auth.updateUser({
-        data: { 
-          display_name: displayName,
-          phone_number: phoneNumber,
-          time_zone: timeZone
-        }
+      const { error } = await ibmDb.rpc('update_user_profile', { 
+        p_display_name: displayName,
+        p_phone_number: phoneNumber,
+        p_time_zone: timeZone
       })
 
       if (error) throw error
@@ -167,9 +165,7 @@ export default function Settings() {
     logger.secureLog('Attempting password update', { userId: user?.id });
     
     try {
-      const { error } = await supabase.auth.updateUser({
-        password: newPassword
-      })
+      const { error } = await ibmDb.rpc('update_user_password', { p_new_password: newPassword })
 
       if (error) {
         logger.error('Password update failed');

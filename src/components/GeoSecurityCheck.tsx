@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { supabase } from '@/integrations/supabase/client'
+import { ibmDb } from '@/lib/ibm'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Shield, AlertTriangle } from 'lucide-react'
 
@@ -16,7 +16,7 @@ export function GeoSecurityCheck({ children }: GeoSecurityCheckProps) {
     const checkGeoSecurity = async () => {
       try {
         console.log('Performing geo-security check...')
-        const { data, error } = await supabase.functions.invoke('geo-security')
+        const { data, error } = await ibmDb.rpc('geo_security_check', {})
         
         console.log('Geo-security response:', { data, error })
         
@@ -25,10 +25,10 @@ export function GeoSecurityCheck({ children }: GeoSecurityCheckProps) {
           // Allow access on error to prevent lockout
           setIsAllowed(true)
           setBlockReason('')
-        } else if (!data?.allowed) {
+        } else if (!(data as any)?.allowed) {
           setIsAllowed(false)
-          setBlockReason(data?.reason || 'Access restricted to US locations only')
-          console.log('Geo-security check failed:', data?.reason)
+          setBlockReason((data as any)?.reason || 'Access restricted to US locations only')
+          console.log('Geo-security check failed:', (data as any)?.reason)
         } else {
           setIsAllowed(true)
           console.log('Geo-security check passed')

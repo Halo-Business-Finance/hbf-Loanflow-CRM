@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 import { useToast } from '@/hooks/use-toast';
 
 interface BehaviorPattern {
@@ -131,7 +131,7 @@ export const useAdvancedBehaviorAnalysis = () => {
   const fetchBehaviorPatterns = useCallback(async () => {
     try {
       // Use security_events table since user_behavior_patterns may not have the expected structure
-      const { data, error } = await supabase
+      const { data, error } = await ibmDb
         .from('security_events')
         .select('*')
         .eq('event_type', 'behavioral_anomaly')
@@ -247,7 +247,7 @@ export const useAdvancedBehaviorAnalysis = () => {
 
       // Log anomaly if detected
       if (isAnomalous) {
-        await supabase.from('security_events').insert({
+        await ibmDb.from('security_events').insert({
           event_type: 'behavioral_anomaly',
           severity: riskLevel === 'critical' ? 'critical' : riskLevel === 'high' ? 'high' : 'medium',
           details: {
@@ -312,7 +312,7 @@ export const useAdvancedBehaviorAnalysis = () => {
       };
 
       // Log baseline update as security event for now
-      const { error } = await supabase
+      const { error } = await ibmDb
         .from('security_events')
         .insert({
           event_type: 'behavior_baseline_update',

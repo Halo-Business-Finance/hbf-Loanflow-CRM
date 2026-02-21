@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { ibmDb } from '@/lib/ibm';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useToast } from '@/hooks/use-toast';
@@ -52,7 +53,7 @@ export const useSecurityPatternDetection = () => {
         if (criticalPatterns.length > 0) {
           for (const pattern of criticalPatterns) {
             // Insert into security_pattern_alerts
-            await supabase.from('security_pattern_alerts').insert({
+            await ibmDb.from('security_pattern_alerts').insert({
               pattern_type: pattern.pattern_type,
               severity: pattern.severity,
               detection_count: pattern.count,
@@ -79,7 +80,7 @@ export const useSecurityPatternDetection = () => {
     if (!isAdmin) return;
 
     try {
-      const { data, error } = await supabase
+      const { data, error } = await ibmDb
         .from('security_pattern_alerts')
         .select('*')
         .eq('resolved', false)
@@ -97,13 +98,13 @@ export const useSecurityPatternDetection = () => {
     if (!isAdmin || !user) return;
 
     try {
-      const { error } = await supabase
+      const { error } = await ibmDb
         .from('security_pattern_alerts')
         .update({
           acknowledged: true,
           acknowledged_by: user.id,
           acknowledged_at: new Date().toISOString(),
-        })
+        } as Record<string, unknown>)
         .eq('id', alertId);
 
       if (error) throw error;
@@ -127,13 +128,13 @@ export const useSecurityPatternDetection = () => {
     if (!isAdmin) return;
 
     try {
-      const { error } = await supabase
+      const { error } = await ibmDb
         .from('security_pattern_alerts')
         .update({
           resolved: true,
           resolved_at: new Date().toISOString(),
           resolution_notes: notes,
-        })
+        } as Record<string, unknown>)
         .eq('id', alertId);
 
       if (error) throw error;

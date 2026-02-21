@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DollarSign, User, Calendar, ArrowRight, Eye, Edit } from "lucide-react";
+import { ibmDb } from "@/lib/ibm";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
@@ -162,12 +163,9 @@ export function InteractivePipeline() {
       // Managers and admins can see all leads, others see only their own
       const isManagerOrAdmin = hasRole('manager') || hasRole('admin') || hasRole('super_admin');
       
-      let query = supabase
+      let query = ibmDb
         .from('leads')
-        .select(`
-          *,
-          contact_entity:contact_entities!leads_contact_entity_id_fkey(*)
-        `);
+        .select('*');
       
       // Only filter by user_id if not a manager/admin
       if (!isManagerOrAdmin) {
@@ -180,7 +178,7 @@ export function InteractivePipeline() {
       let error = respAny?.error as any;
       if (error) {
         console.warn('[Pipeline] Embedded join failed, falling back:', error);
-        const baseQuery = supabase.from('leads').select('*');
+        const baseQuery = ibmDb.from('leads').select('*');
         const baseResp = !isManagerOrAdmin
           ? await baseQuery.eq('user_id', user?.id)
           : await baseQuery;
@@ -189,7 +187,7 @@ export function InteractivePipeline() {
         if (baseError) throw baseError;
         const ids = (baseLeads || []).map(l => l.contact_entity_id).filter(Boolean);
         const contactsResp = ids.length
-          ? await supabase.from('contact_entities').select('*').in('id', ids as string[])
+          ? await ibmDb.from('contact_entities').select('*').in('id', ids as string[])
           : ({ data: [], error: null } as any);
         const contacts = (contactsResp.data as any[]) || [];
         const contactsError = contactsResp.error as any;
@@ -237,17 +235,17 @@ export function InteractivePipeline() {
       }
 
       // Update the stage in contact_entities table
-      const { error } = await supabase
+      const { error } = await ibmDb
         .from('contact_entities')
-        .update({ stage: newStage, updated_at: new Date().toISOString() })
+        .update({ stage: newStage, updated_at: new Date().toISOString() } as Record<string, unknown>)
         .eq('id', lead.contact_entity_id);
 
       if (error) throw error;
 
       // Also update the lead's updated_at timestamp
-      await supabase
+      await ibmDb
         .from('leads')
-        .update({ updated_at: new Date().toISOString() })
+        .update({ updated_at: new Date().toISOString() } as Record<string, unknown>)
         .eq('id', leadId);
 
       toast({

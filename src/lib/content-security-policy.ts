@@ -189,8 +189,8 @@ export function setupCSPReporting(): void {
 
       // Log to Supabase for monitoring
       try {
-        const { supabase } = await import('@/integrations/supabase/client');
-        await supabase.from('security_events').insert({
+        const { ibmDb } = await import('@/lib/ibm');
+        await ibmDb.from('security_events').insert({
           event_type: 'csp_violation',
           severity: 'medium',
           details: {

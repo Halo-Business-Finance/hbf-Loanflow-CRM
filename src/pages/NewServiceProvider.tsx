@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { IBMPageHeader } from "@/components/ui/IBMPageHeader"
 import { StandardContentCard } from "@/components/StandardContentCard"
 import { useToast } from "@/hooks/use-toast"
-import { supabase } from "@/integrations/supabase/client"
+import { ibmDb } from "@/lib/ibm"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { Building2, MapPin, Phone, Mail, Globe, FileText, User, Plus } from "lucide-react"
 import { Separator } from "@/components/ui/separator"
@@ -127,7 +127,7 @@ export default function NewServiceProvider() {
     setIsSubmitting(true)
 
     try {
-      const { error } = await supabase.from('service_providers').insert([{
+      const { error } = await ibmDb.from('service_providers').insert([{
         name: formData.name.trim(),
         provider_type: formData.provider_type,
         contact_person: formData.contact_person.trim() || null,

@@ -19,7 +19,7 @@ import {
   Mail, Bell
 } from 'lucide-react';
 import { useReports, SavedReport, DATA_SOURCES } from '@/hooks/useReports';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { toast } from 'sonner';
 import { format, formatDistanceToNow } from 'date-fns';
@@ -84,7 +84,7 @@ export default function AdvancedReports() {
     
     setSavingSchedule(true);
     try {
-      const { error } = await supabase.from('report_schedules').insert({
+      const { error } = await ibmDb.from('report_schedules').insert({
         report_id: selectedReport.id,
         user_id: user.id,
         schedule_type: scheduleConfig.schedule_type,

@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { Shield, AlertTriangle, TrendingUp, Activity, Globe, Lock } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 
 interface ThreatPattern {
   id: string;
@@ -38,7 +38,7 @@ export const AdvancedThreatDetection: React.FC = () => {
   const fetchThreatData = async () => {
     try {
       // Get recent threat patterns from security events
-      const { data: patterns } = await supabase
+      const { data: patterns } = await ibmDb
         .from('security_events')
         .select('*')
         .in('severity', ['high', 'critical'])
@@ -46,7 +46,7 @@ export const AdvancedThreatDetection: React.FC = () => {
         .limit(10);
 
       // Get suspicious IP addresses from sessions
-      const { data: suspiciousIPs } = await supabase
+      const { data: suspiciousIPs } = await ibmDb
         .from('active_sessions')
         .select('ip_address')
         .not('ip_address', 'is', null)
@@ -124,7 +124,7 @@ export const AdvancedThreatDetection: React.FC = () => {
   const mitigateThreat = async (patternId: string) => {
     try {
       // Log mitigation action
-      await supabase.from('security_events').insert({
+      await ibmDb.from('security_events').insert({
         event_type: 'threat_mitigation',
         severity: 'medium',
         details: { pattern_id: patternId, action: 'manual_mitigation' }

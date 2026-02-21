@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Shield, AlertTriangle, Eye, Globe, Users, Activity } from "lucide-react";
+import { ibmDb } from "@/lib/ibm";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
@@ -86,7 +87,7 @@ export function DarkWebSecurityBot() {
 
     // Log to threat incidents table
     try {
-      await supabase.from('threat_incidents').insert({
+      await ibmDb.from('threat_incidents').insert({
         incident_type: 'dark_web_threat',
         severity: mockThreat.severity,
         threat_vector: 'dark_web_access',
@@ -131,7 +132,7 @@ export function DarkWebSecurityBot() {
     const fetchDarkWebData = async () => {
       setLoading(true);
       if (!isAdmin) { setLoading(false); return; }
-      const { data: incidents } = await supabase
+      const { data: incidents } = await ibmDb
         .from('threat_incidents')
         .select('*')
         .eq('threat_vector', 'dark_web_access')

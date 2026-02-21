@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { toast } from 'sonner';
 
@@ -121,7 +121,7 @@ export function useReports() {
     if (!user) return;
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      const { data, error } = await ibmDb
         .from('saved_reports')
         .select('*')
         .order('updated_at', { ascending: false });
@@ -160,7 +160,7 @@ export function useReports() {
         user_id: user.id,
       };
       
-      const { data, error } = await supabase
+      const { data, error } = await ibmDb
         .from('saved_reports')
         .insert([insertData] as any)
         .select()
@@ -184,7 +184,7 @@ export function useReports() {
         filters: updates.filters as unknown as Record<string, unknown>[] | undefined,
       };
       
-      const { error } = await supabase
+      const { error } = await ibmDb
         .from('saved_reports')
         .update(dbUpdates)
         .eq('id', id);
@@ -200,7 +200,7 @@ export function useReports() {
 
   const deleteReport = useCallback(async (id: string) => {
     try {
-      const { error } = await supabase
+      const { error } = await ibmDb
         .from('saved_reports')
         .delete()
         .eq('id', id);
@@ -220,7 +220,7 @@ export function useReports() {
     
     try {
       // Build query based on report configuration
-      let query = supabase.from(report.data_source as any).select(
+      let query = ibmDb.from(report.data_source as any).select(
         report.selected_columns.length > 0 
           ? report.selected_columns.join(',') 
           : '*'
@@ -261,7 +261,7 @@ export function useReports() {
       const executionTime = Date.now() - startTime;
 
       // Log execution
-      await supabase.from('report_execution_logs').insert({
+      await ibmDb.from('report_execution_logs').insert({
         report_id: report.id,
         user_id: user.id,
         execution_type: 'manual',
@@ -272,12 +272,12 @@ export function useReports() {
       });
 
       // Update report stats
-      await supabase
+      await ibmDb
         .from('saved_reports')
         .update({ 
           last_run_at: new Date().toISOString(),
           run_count: (report.run_count || 0) + 1 
-        })
+        } as Record<string, unknown>)
         .eq('id', report.id);
 
       return data;
@@ -285,7 +285,7 @@ export function useReports() {
       console.error('Error running report:', error);
       
       // Log failure
-      await supabase.from('report_execution_logs').insert({
+      await ibmDb.from('report_execution_logs').insert({
         report_id: report.id,
         user_id: user.id,
         execution_type: 'manual',

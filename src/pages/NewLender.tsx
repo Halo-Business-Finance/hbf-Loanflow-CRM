@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { IBMPageHeader } from "@/components/ui/IBMPageHeader"
 import { StandardContentCard } from "@/components/StandardContentCard"
 import { useToast } from "@/hooks/use-toast"
-import { supabase } from "@/integrations/supabase/client"
+import { ibmDb } from "@/lib/ibm"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { Building2, MapPin, Phone, Mail, Globe, FileText } from "lucide-react"
 import { Separator } from "@/components/ui/separator"
@@ -91,7 +91,7 @@ export default function NewLender() {
     setIsSubmitting(true)
 
     try {
-      const { error } = await supabase.from('lenders').insert([{
+      const { error } = await ibmDb.from('lenders').insert([{
         name: formData.name.trim(),
         lender_type: formData.lender_type,
         logo_url: formData.logo_url.trim() || null,

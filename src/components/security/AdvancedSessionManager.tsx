@@ -13,6 +13,7 @@ import {
   UserX,
   RefreshCw
 } from "lucide-react";
+import { ibmDb } from "@/lib/ibm";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -73,7 +74,7 @@ export function AdvancedSessionManager() {
   const loadSessionData = async () => {
     try {
       // Load active sessions
-      const { data: sessionsData, error: sessionsError } = await supabase
+      const { data: sessionsData, error: sessionsError } = await ibmDb
         .from('active_sessions')
         .select('*')
         .eq('is_active', true)
@@ -110,12 +111,12 @@ export function AdvancedSessionManager() {
 
   const terminateSession = async (sessionId: string) => {
     try {
-      const { error } = await supabase
+      const { error } = await ibmDb
         .from('active_sessions')
         .update({ 
           is_active: false,
           expires_at: new Date().toISOString()
-        })
+        } as Record<string, unknown>)
         .eq('id', sessionId);
 
       if (error) throw error;

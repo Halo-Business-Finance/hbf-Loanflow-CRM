@@ -129,6 +129,10 @@ class IBMQueryBuilder<T = Record<string, unknown>> {
     return this.addFilter('is', column, value);
   }
 
+  not(column: string, operator: string, value: unknown): IBMQueryBuilder<T> {
+    return this.addFilter('not', column, { operator, value });
+  }
+
   order(column: string, options: { ascending?: boolean } = {}): IBMQueryBuilder<T> {
     return new IBMQueryBuilder<T>({
       ...this.state,

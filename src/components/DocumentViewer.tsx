@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 
 import { Download, ExternalLink, FileText, X, Loader2 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb, ibmStorage } from '@/lib/ibm';
 import { useToast } from '@/hooks/use-toast';
 import { LeadDocument } from '@/hooks/useDocuments';
 
@@ -73,7 +73,7 @@ export function DocumentViewer({ document, isOpen, onClose }: DocumentViewerProp
       if (isPdfPath) {
         try {
           console.log('Attempting signed URL first for PDF...');
-          const { data: signed, error: signedError } = await supabase.storage
+          const { data: signed, error: signedError } = await ibmStorage
             .from('lead-documents')
             .createSignedUrl(filePath, 3600);
 
@@ -90,7 +90,7 @@ export function DocumentViewer({ document, isOpen, onClose }: DocumentViewerProp
 
       // Download and create a blob URL (works well for images/others)
       try {
-        const { data: fileData, error: downloadError } = await supabase.storage
+        const { data: fileData, error: downloadError } = await ibmStorage
           .from('lead-documents')
           .download(filePath);
 
@@ -105,7 +105,7 @@ export function DocumentViewer({ document, isOpen, onClose }: DocumentViewerProp
       }
       
       // Try signed URL (for non-PDF or download fallback)
-      const { data: signed, error: signedError } = await supabase.storage
+      const { data: signed, error: signedError } = await ibmStorage
         .from('lead-documents')
         .createSignedUrl(filePath, 3600); // 1 hour expiry
 
@@ -147,13 +147,14 @@ export function DocumentViewer({ document, isOpen, onClose }: DocumentViewerProp
   const getAdobeConfig = async () => {
     try {
       console.log('🔍 Fetching Adobe configuration from edge function...');
-      const { data, error } = await supabase.functions.invoke('get-adobe-config');
+      const { data: rawData, error } = await ibmDb.rpc('get_adobe_config', {});
       
       if (error) {
         console.error('❌ Error from get-adobe-config edge function:', error);
         throw error;
       }
       
+      const data = rawData as any;
       console.log('✅ Adobe config retrieved successfully:', data);
       console.log('📋 Client ID:', data?.clientId);
       console.log('🎯 Is Demo:', data?.isDemo);
@@ -373,7 +374,7 @@ export function DocumentViewer({ document, isOpen, onClose }: DocumentViewerProp
 
     try {
       console.log('Downloading document:', document.file_path);
-      const { data, error } = await supabase.storage
+      const { data, error } = await ibmStorage
         .from('lead-documents')
         .download(document.file_path);
 

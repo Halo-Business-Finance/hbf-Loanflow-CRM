@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ibmDb } from '@/lib/ibm';
+import { ibmDb, ibmStorage } from '@/lib/ibm';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useToast } from '@/hooks/use-toast';
 
@@ -49,9 +49,7 @@ export function useDocumentVersions(documentId: string | null) {
       const fileName = `${timestamp}_${sanitizedFileName}`;
       const filePath = `${user.id}/${documentId}/${fileName}`;
 
-      // Storage still uses supabase for now (Phase 4)
-      const { supabase } = await import('@/integrations/supabase/client');
-      const { error: uploadError } = await supabase.storage
+      const { error: uploadError } = await ibmStorage
         .from('lead-documents')
         .upload(filePath, file, { cacheControl: '3600', upsert: false });
       if (uploadError) throw uploadError;
@@ -95,9 +93,7 @@ export function useDocumentVersions(documentId: string | null) {
 
   const downloadVersion = async (version: DocumentVersion) => {
     try {
-      // Storage still uses supabase for now (Phase 4)
-      const { supabase } = await import('@/integrations/supabase/client');
-      const { data, error } = await supabase.storage
+      const { data, error } = await ibmStorage
         .from('lead-documents')
         .download(version.file_path);
       if (error) throw error;

@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { TemplateUploadModal } from "@/components/TemplateUploadModal"
 import { EmailComposer } from "@/components/EmailComposer"
-import { supabase } from "@/integrations/supabase/client"
+import { ibmDb, ibmStorage } from '@/lib/ibm'
 import { useToast } from "@/hooks/use-toast"
 import { useRoleBasedAccess } from "@/hooks/useRoleBasedAccess"
 import { IBMPageHeader } from "@/components/ui/IBMPageHeader"
@@ -46,14 +46,14 @@ export default function DocumentTemplates() {
 
   const fetchTemplates = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await ibmDb
         .from('document_templates')
         .select('*')
         .eq('is_active', true)
         .order('created_at', { ascending: false })
 
       if (error) throw error
-      setTemplates(data || [])
+      setTemplates((data as unknown as DocumentTemplate[]) || [])
     } catch (error: any) {
       console.error('Error fetching templates:', error)
       toast({
@@ -68,7 +68,7 @@ export default function DocumentTemplates() {
 
   const handleView = async (template: DocumentTemplate) => {
     try {
-      const { data } = supabase.storage
+      const { data } = ibmStorage
         .from('document_templates')
         .getPublicUrl(template.file_path)
       
@@ -85,11 +85,11 @@ export default function DocumentTemplates() {
 
   const handleDownload = async (template: DocumentTemplate) => {
     try {
-      await supabase.rpc('increment_template_usage', {
+      await ibmDb.rpc('increment_template_usage', {
         template_id: template.id
       })
 
-      const { data, error } = await supabase.storage
+      const { data, error } = await ibmStorage
         .from('document_templates')
         .download(template.file_path)
 
@@ -124,7 +124,7 @@ export default function DocumentTemplates() {
     if (!newTemplateName.trim()) return
 
     try {
-      const { error } = await supabase
+      const { error } = await ibmDb
         .from('document_templates')
         .update({ name: newTemplateName })
         .eq('id', templateId)
@@ -156,18 +156,18 @@ export default function DocumentTemplates() {
       const fileExt = newVersionFile.name.split('.').pop()
       const filePath = `${selectedTemplateForVersion.template_type}/${crypto.randomUUID()}.${fileExt}`
 
-      const { error: uploadError } = await supabase.storage
+      const { error: uploadError } = await ibmStorage
         .from('document_templates')
         .upload(filePath, newVersionFile)
 
       if (uploadError) throw uploadError
 
       // Delete old file
-      await supabase.storage
+      await ibmStorage
         .from('document_templates')
         .remove([selectedTemplateForVersion.file_path])
 
-      const { error: updateError } = await supabase
+      const { error: updateError } = await ibmDb
         .from('document_templates')
         .update({
           file_path: filePath,
@@ -202,13 +202,13 @@ export default function DocumentTemplates() {
     if (!confirm("Are you sure you want to delete this template?")) return
 
     try {
-      const { error: storageError } = await supabase.storage
+      const { error: storageError } = await ibmStorage
         .from('document_templates')
         .remove([filePath])
 
       if (storageError) throw storageError
 
-      const { error: dbError } = await supabase
+      const { error: dbError } = await ibmDb
         .from('document_templates')
         .update({ is_active: false })
         .eq('id', templateId)

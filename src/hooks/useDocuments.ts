@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb, ibmStorage } from '@/lib/ibm';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { toast } from '@/hooks/use-toast';
 
@@ -42,7 +42,7 @@ export function useDocuments() {
     if (!user) return;
     
     try {
-      const { data, error } = await supabase
+      const { data, error } = await ibmDb
         .from('lead_documents')
         .select(`
           *,
@@ -51,7 +51,7 @@ export function useDocuments() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setDocuments(data || []);
+      setDocuments((data as unknown as LeadDocument[]) || []);
     } catch (error) {
       console.error('Error fetching documents:', error);
       toast({
@@ -75,18 +75,16 @@ export function useDocuments() {
     if (!user) return null;
 
     try {
-      // Upload file to storage
       const fileName = `${Date.now()}_${file.name}`;
       const filePath = `${user.id}/${leadId}/${fileName}`;
       
-      const { error: uploadError } = await supabase.storage
+      const { error: uploadError } = await ibmStorage
         .from('lead-documents')
         .upload(filePath, file);
 
       if (uploadError) throw uploadError;
 
-      // Create document record
-      const { data, error: dbError } = await supabase
+      const { data, error: dbError } = await ibmDb
         .from('lead_documents')
         .insert({
           lead_id: leadId,
@@ -139,7 +137,7 @@ export function useDocuments() {
         updates.verified_by = user.id;
       }
 
-      const { error } = await supabase
+      const { error } = await ibmDb
         .from('lead_documents')
         .update(updates)
         .eq('id', documentId);
@@ -166,7 +164,7 @@ export function useDocuments() {
     if (!document.file_path) return;
 
     try {
-      const { data, error } = await supabase.storage
+      const { data, error } = await ibmStorage
         .from('lead-documents')
         .download(document.file_path);
 
@@ -194,15 +192,13 @@ export function useDocuments() {
     if (!user) return;
 
     try {
-      // Delete from storage if file exists
       if (filePath) {
-        await supabase.storage
+        await ibmStorage
           .from('lead-documents')
           .remove([filePath]);
       }
 
-      // Delete from database
-      const { error } = await supabase
+      const { error } = await ibmDb
         .from('lead_documents')
         .delete()
         .eq('id', documentId);

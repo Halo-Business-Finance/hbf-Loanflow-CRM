@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 import { useToast } from '@/hooks/use-toast';
 
 interface MfaStatus {
@@ -22,7 +22,7 @@ export const useMfaStatus = (userId?: string) => {
     }
 
     try {
-      const { data, error } = await supabase.rpc('check_mfa_requirement', {
+      const { data, error } = await ibmDb.rpc('check_mfa_requirement', {
         p_user_id: userId
       });
 
@@ -34,7 +34,6 @@ export const useMfaStatus = (userId?: string) => {
       const statusData = data as unknown as MfaStatus;
       setMfaStatus(statusData);
 
-      // Show grace period warning
       if (statusData.mfa_setup_required && !statusData.mfa_setup_completed && statusData.grace_logins_remaining > 0) {
         toast({
           title: "MFA Setup Reminder",
@@ -53,13 +52,12 @@ export const useMfaStatus = (userId?: string) => {
     if (!userId) return false;
 
     try {
-      const { data, error } = await supabase.rpc('mark_mfa_completed', {
+      const { data, error } = await ibmDb.rpc('mark_mfa_completed', {
         p_user_id: userId
       });
 
       if (error) throw error;
 
-      // Refresh status
       await checkMfaStatus();
 
       toast({
@@ -83,10 +81,5 @@ export const useMfaStatus = (userId?: string) => {
     checkMfaStatus();
   }, [userId]);
 
-  return {
-    mfaStatus,
-    loading,
-    checkMfaStatus,
-    markMfaCompleted
-  };
+  return { mfaStatus, loading, checkMfaStatus, markMfaCompleted };
 };

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useToast } from '@/hooks/use-toast';
 
@@ -52,40 +52,24 @@ export function useCollaboration() {
     metadata?: any;
   }) => {
     if (!user) {
-      toast({
-        title: 'Error',
-        description: 'You must be logged in to assign tasks',
-        variant: 'destructive',
-      });
+      toast({ title: 'Error', description: 'You must be logged in to assign tasks', variant: 'destructive' });
       return null;
     }
 
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      const { data, error } = await ibmDb
         .from('task_assignments')
-        .insert({
-          ...params,
-          assigned_by: user.id,
-        })
+        .insert({ ...params, assigned_by: user.id })
         .select()
         .single();
 
       if (error) throw error;
-
-      toast({
-        title: 'Task Assigned',
-        description: `Task "${params.title}" has been assigned successfully`,
-      });
-
+      toast({ title: 'Task Assigned', description: `Task "${params.title}" has been assigned successfully` });
       return data;
     } catch (error) {
       console.error('Error assigning task:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to assign task',
-        variant: 'destructive',
-      });
+      toast({ title: 'Error', description: 'Failed to assign task', variant: 'destructive' });
       return null;
     } finally {
       setLoading(false);
@@ -99,40 +83,24 @@ export function useCollaboration() {
     priority: Escalation['priority'];
   }) => {
     if (!user) {
-      toast({
-        title: 'Error',
-        description: 'You must be logged in to escalate applications',
-        variant: 'destructive',
-      });
+      toast({ title: 'Error', description: 'You must be logged in to escalate applications', variant: 'destructive' });
       return null;
     }
 
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      const { data, error } = await ibmDb
         .from('application_escalations')
-        .insert({
-          ...params,
-          escalated_from: user.id,
-        })
+        .insert({ ...params, escalated_from: user.id })
         .select()
         .single();
 
       if (error) throw error;
-
-      toast({
-        title: 'Application Escalated',
-        description: 'The application has been escalated successfully',
-      });
-
+      toast({ title: 'Application Escalated', description: 'The application has been escalated successfully' });
       return data;
     } catch (error) {
       console.error('Error escalating application:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to escalate application',
-        variant: 'destructive',
-      });
+      toast({ title: 'Error', description: 'Failed to escalate application', variant: 'destructive' });
       return null;
     } finally {
       setLoading(false);
@@ -147,26 +115,17 @@ export function useCollaboration() {
         updateData.completed_at = new Date().toISOString();
       }
 
-      const { error } = await supabase
+      const { error } = await ibmDb
         .from('task_assignments')
         .update(updateData)
         .eq('id', taskId);
 
       if (error) throw error;
-
-      toast({
-        title: 'Task Updated',
-        description: `Task status updated to ${status}`,
-      });
-
+      toast({ title: 'Task Updated', description: `Task status updated to ${status}` });
       return true;
     } catch (error) {
       console.error('Error updating task:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to update task status',
-        variant: 'destructive',
-      });
+      toast({ title: 'Error', description: 'Failed to update task status', variant: 'destructive' });
       return false;
     } finally {
       setLoading(false);
@@ -176,7 +135,7 @@ export function useCollaboration() {
   const resolveEscalation = async (escalationId: string, resolution: string, status: 'resolved' | 'rejected') => {
     setLoading(true);
     try {
-      const { error } = await supabase
+      const { error } = await ibmDb
         .from('application_escalations')
         .update({
           status,
@@ -187,31 +146,16 @@ export function useCollaboration() {
         .eq('id', escalationId);
 
       if (error) throw error;
-
-      toast({
-        title: 'Escalation Resolved',
-        description: 'The escalation has been resolved',
-      });
-
+      toast({ title: 'Escalation Resolved', description: 'The escalation has been resolved' });
       return true;
     } catch (error) {
       console.error('Error resolving escalation:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to resolve escalation',
-        variant: 'destructive',
-      });
+      toast({ title: 'Error', description: 'Failed to resolve escalation', variant: 'destructive' });
       return false;
     } finally {
       setLoading(false);
     }
   };
 
-  return {
-    assignTask,
-    escalateApplication,
-    updateTaskStatus,
-    resolveEscalation,
-    loading,
-  };
+  return { assignTask, escalateApplication, updateTaskStatus, resolveEscalation, loading };
 }

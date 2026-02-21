@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 
 export interface EmergencyEvent {
   id: string;
@@ -19,13 +19,11 @@ export function useEmergencyEvents() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    console.log('[useEmergencyEvents] Initializing emergency events subscription');
+    console.log('[useEmergencyEvents] Initializing emergency events polling');
     
-    // Initial fetch
     const fetchEvents = async () => {
       try {
-        console.log('[useEmergencyEvents] Fetching initial events');
-        const { data, error } = await supabase
+        const { data, error } = await ibmDb
           .from('emergency_events')
           .select('*')
           .order('created_at', { ascending: false })
@@ -37,8 +35,7 @@ export function useEmergencyEvents() {
           return;
         }
 
-        console.log('[useEmergencyEvents] Fetched events:', data?.length);
-        setEvents((data || []) as EmergencyEvent[]);
+        setEvents((data || []) as unknown as EmergencyEvent[]);
       } catch (err) {
         console.error('[useEmergencyEvents] Exception:', err);
         setError('Failed to load events');
@@ -49,59 +46,12 @@ export function useEmergencyEvents() {
 
     fetchEvents();
 
-    // Set up real-time subscription
-    console.log('[useEmergencyEvents] Setting up realtime subscription');
-    const channel = supabase
-      .channel('emergency-events-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'emergency_events'
-        },
-        (payload) => {
-          console.log('[useEmergencyEvents] New event received:', payload);
-          setEvents((current) => [payload.new as EmergencyEvent, ...current]);
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'emergency_events'
-        },
-        (payload) => {
-          console.log('[useEmergencyEvents] Event updated:', payload);
-          setEvents((current) =>
-            current.map((event) =>
-              event.id === payload.new.id ? (payload.new as EmergencyEvent) : event
-            )
-          );
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'DELETE',
-          schema: 'public',
-          table: 'emergency_events'
-        },
-        (payload) => {
-          console.log('[useEmergencyEvents] Event deleted:', payload);
-          setEvents((current) =>
-            current.filter((event) => event.id !== payload.old.id)
-          );
-        }
-      )
-      .subscribe((status) => {
-        console.log('[useEmergencyEvents] Subscription status:', status);
-      });
+    // Poll every 15 seconds instead of realtime subscription
+    const interval = setInterval(fetchEvents, 15000);
 
     return () => {
-      console.log('[useEmergencyEvents] Cleaning up subscription');
-      supabase.removeChannel(channel);
+      console.log('[useEmergencyEvents] Cleaning up polling');
+      clearInterval(interval);
     };
   }, []);
 

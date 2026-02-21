@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 import { useAuth } from '@/components/auth/AuthProvider';
 
 export interface CollaborationNotification {
@@ -24,82 +24,45 @@ export function useCollaborationNotifications() {
   const [loading, setLoading] = useState(true);
 
   const fetchNotifications = async () => {
-    if (!user) {
-      setLoading(false);
-      return;
-    }
+    if (!user) { setLoading(false); return; }
 
     try {
-      // Fetch task assignments assigned to current user
-      const { data: tasks, error: tasksError } = await supabase
+      const { data: tasks, error: tasksError } = await ibmDb
         .from('task_assignments')
-        .select(`
-          id,
-          title,
-          description,
-          task_type,
-          priority,
-          status,
-          created_at,
-          assigned_by,
-          related_entity_id,
-          related_entity_type,
-          due_date
-        `)
+        .select('id, title, description, task_type, priority, status, created_at, assigned_by, related_entity_id, related_entity_type, due_date')
         .eq('assigned_to', user.id)
         .in('status', ['pending', 'in_progress'])
         .order('created_at', { ascending: false });
 
       if (tasksError) throw tasksError;
 
-      // Fetch escalations assigned to current user
-      const { data: escalations, error: escalationsError } = await supabase
+      const { data: escalations, error: escalationsError } = await ibmDb
         .from('application_escalations')
-        .select(`
-          id,
-          application_id,
-          escalated_from,
-          reason,
-          priority,
-          status,
-          created_at
-        `)
+        .select('id, application_id, escalated_from, reason, priority, status, created_at')
         .eq('escalated_to', user.id)
         .in('status', ['pending', 'reviewed'])
         .order('created_at', { ascending: false });
 
       if (escalationsError) throw escalationsError;
 
-      // Transform tasks to notifications
-      const taskNotifications: CollaborationNotification[] = (tasks || []).map(task => ({
-        id: task.id,
-        type: 'task_assignment' as const,
-        title: task.title,
-        message: task.description || `New ${task.task_type} task assigned to you`,
-        priority: task.priority,
-        status: task.status,
-        created_at: task.created_at,
+      const taskNotifications: CollaborationNotification[] = (tasks || []).map((task: any) => ({
+        id: task.id, type: 'task_assignment' as const,
+        title: task.title, message: task.description || `New ${task.task_type} task assigned to you`,
+        priority: task.priority, status: task.status, created_at: task.created_at,
         assigned_by: task.assigned_by,
         related_id: task.related_entity_id || undefined,
         related_type: task.related_entity_type || undefined,
         due_date: task.due_date || undefined,
       }));
 
-      // Transform escalations to notifications
-      const escalationNotifications: CollaborationNotification[] = (escalations || []).map(esc => ({
-        id: esc.id,
-        type: 'escalation' as const,
-        title: 'Application Escalated',
-        message: esc.reason,
-        priority: esc.priority,
-        status: esc.status,
-        created_at: esc.created_at,
+      const escalationNotifications: CollaborationNotification[] = (escalations || []).map((esc: any) => ({
+        id: esc.id, type: 'escalation' as const,
+        title: 'Application Escalated', message: esc.reason,
+        priority: esc.priority, status: esc.status, created_at: esc.created_at,
         escalated_from: esc.escalated_from,
-        related_id: esc.application_id,
-        related_type: 'application',
+        related_id: esc.application_id, related_type: 'application',
       }));
 
-      // Combine and sort
       const allNotifications = [...taskNotifications, ...escalationNotifications].sort(
         (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
@@ -114,52 +77,12 @@ export function useCollaborationNotifications() {
 
   useEffect(() => {
     fetchNotifications();
-
     if (!user) return;
 
-    // Subscribe to task assignments
-    const taskChannel = supabase
-      .channel('task_assignments_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'task_assignments',
-          filter: `assigned_to=eq.${user.id}`,
-        },
-        () => {
-          fetchNotifications();
-        }
-      )
-      .subscribe();
-
-    // Subscribe to escalations
-    const escalationChannel = supabase
-      .channel('escalations_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'application_escalations',
-          filter: `escalated_to=eq.${user.id}`,
-        },
-        () => {
-          fetchNotifications();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(taskChannel);
-      supabase.removeChannel(escalationChannel);
-    };
+    // Poll every 30 seconds instead of realtime subscriptions
+    const interval = setInterval(fetchNotifications, 30000);
+    return () => clearInterval(interval);
   }, [user]);
 
-  return {
-    notifications,
-    loading,
-    refresh: fetchNotifications,
-  };
+  return { notifications, loading, refresh: fetchNotifications };
 }

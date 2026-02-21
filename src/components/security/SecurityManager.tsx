@@ -115,7 +115,7 @@ export function SecurityManager() {
         .limit(10);
 
       if (notifications) {
-        setSecurityNotifications(notifications);
+        setSecurityNotifications(notifications as unknown as SecurityNotification[]);
       }
 
       // Fetch MFA settings
@@ -126,14 +126,14 @@ export function SecurityManager() {
         .maybeSingle();
 
       if (mfa) {
+        const m = mfa as Record<string, unknown>;
         setMfaSettings({
-          id: mfa.id,
-          is_enabled: mfa.is_enabled,
-          preferred_method: mfa.preferred_method || 'totp',
-          phone_number: mfa.phone_number
+          id: m.id as string,
+          is_enabled: m.is_enabled as boolean,
+          preferred_method: (m.preferred_method as string) || 'totp',
+          phone_number: m.phone_number as string
         });
       } else {
-        // No MFA settings exist yet, keep default state
         setMfaSettings({
           is_enabled: false,
           preferred_method: 'totp'
@@ -149,7 +149,7 @@ export function SecurityManager() {
           .single();
 
         if (policy) {
-          setPasswordPolicy(policy);
+          setPasswordPolicy(policy as unknown as PasswordPolicy);
         }
 
         // Fetch admin dashboard data
@@ -179,10 +179,7 @@ export function SecurityManager() {
           is_enabled: true,
           preferred_method: mfaSettings.preferred_method,
           phone_number: mfaSettings.phone_number
-        }, {
-          onConflict: 'user_id',
-          ignoreDuplicates: false
-        });
+        } as Record<string, unknown>);
 
       if (error) throw error;
 
@@ -233,7 +230,7 @@ export function SecurityManager() {
     try {
       const { error } = await ibmDb
         .from('password_policies')
-        .update(passwordPolicy)
+        .update(passwordPolicy as unknown as Record<string, unknown>)
         .eq('is_active', true);
 
       if (error) throw error;

@@ -18,7 +18,7 @@ import {
   BarChart3
 } from 'lucide-react';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
 import { useToast } from '@/hooks/use-toast';
 import { IBMPageHeader } from '@/components/ui/IBMPageHeader';
 import { LoadingSkeleton } from '@/components/LoadingSkeleton';
@@ -101,16 +101,17 @@ export default function Lenders() {
 
       if (lendersResult.error) throw lendersResult.error;
 
-      // Aggregate contact counts on client side (more efficient than N queries)
-      const contactCounts = (contactCountsResult.data || []).reduce((acc, contact) => {
-        acc[contact.lender_id] = (acc[contact.lender_id] || 0) + 1;
+      // Aggregate contact counts on client side
+      const contactCounts = (contactCountsResult.data || []).reduce((acc: Record<string, number>, contact) => {
+        const lid = String((contact as Record<string, unknown>).lender_id ?? '');
+        if (lid) acc[lid] = (acc[lid] || 0) + 1;
         return acc;
-      }, {} as Record<string, number>);
+      }, {});
 
-      const lendersWithCount = (lendersResult.data || []).map(lender => ({
-        ...lender,
-        contact_count: contactCounts[lender.id] || 0
-      }));
+      const lendersWithCount: Lender[] = (lendersResult.data || []).map(lender => {
+        const l = lender as unknown as Omit<Lender, 'contact_count'>;
+        return { ...l, contact_count: contactCounts[l.id] || 0 } as Lender;
+      });
 
       setLenders(lendersWithCount);
     } catch (error) {

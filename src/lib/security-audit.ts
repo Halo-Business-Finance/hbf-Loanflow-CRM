@@ -121,7 +121,7 @@ const auditSessionSecurity = async () => {
     if (activeSessions && activeSessions.length > 0) {
       checks.push({ name: 'Session Management', status: 'pass', description: 'Session tracking is active', impact: 'medium' });
       const oldSessions = activeSessions.filter(session => {
-        const lastActivity = new Date(session.last_activity);
+        const lastActivity = new Date(session.last_activity as string);
         return (Date.now() - lastActivity.getTime()) / (1000 * 60 * 60) > 24;
       });
       if (oldSessions.length > 0) {

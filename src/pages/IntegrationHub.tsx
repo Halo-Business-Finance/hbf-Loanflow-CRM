@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { supabase } from "@/integrations/supabase/client";
+import { ibmDb } from "@/lib/ibm";
 import { StandardPageLayout } from "@/components/StandardPageLayout";
 import { IBMPageHeader } from "@/components/ui/IBMPageHeader";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -112,19 +112,19 @@ export default function IntegrationHub() {
 
   const fetchConnections = async () => {
     setIsLoading(true);
-    const { data } = await supabase
+    const { data } = await ibmDb
       .from("integration_connections")
       .select("*")
       .order("created_at", { ascending: false });
     
-    if (data) setConnections(data);
+    if (data) setConnections(data as unknown as Integration[]);
     setIsLoading(false);
   };
 
   const connectIntegration = async () => {
     if (!user || !selectedIntegration) return;
     
-    const { error } = await supabase.from("integration_connections").insert([{
+    const { error } = await ibmDb.from("integration_connections").insert([{
       integration_type: selectedIntegration.id,
       name: selectedIntegration.name,
       provider: selectedIntegration.id,
@@ -145,11 +145,11 @@ export default function IntegrationHub() {
 
   const syncIntegration = async (id: string) => {
     toast.info("Syncing integration...");
-    await supabase.from("integration_connections").update({
+    await ibmDb.from("integration_connections").update({
       last_sync_at: new Date().toISOString(),
     }).eq("id", id);
     
-    await supabase.from("integration_logs").insert([{
+    await ibmDb.from("integration_logs").insert([{
       connection_id: id,
       action: "sync",
       status: "success",

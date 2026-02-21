@@ -1,3 +1,4 @@
+import { ibmDb } from "@/lib/ibm"
 import { supabase } from "@/integrations/supabase/client"
 
 interface DataValidationResult {
@@ -793,7 +794,7 @@ export class DataFieldValidator {
 
       // Audit pipeline entries (only for current user due to RLS)
       console.log('🏗️ Fetching pipeline entries...');
-      const { data: pipelineEntries, error: pipelineError } = await supabase.from('pipeline_entries').select('*')
+      const { data: pipelineEntries, error: pipelineError } = await ibmDb.from('pipeline_entries').select('*') as { data: any[] | null, error: any }
       
       console.log('🏗️ Pipeline query result - Data count:', pipelineEntries?.length || 0, 'Error:', pipelineError)
       
@@ -899,10 +900,9 @@ export class DataFieldValidator {
       // Since contact entities are encrypted and secured, we focus on non-sensitive integrity issues
       
       // 1. Fix pipeline entries with missing or invalid amounts by using default values
-      const { data: pipelineIssues } = await supabase
+      const { data: pipelineIssues } = await ibmDb
         .from('pipeline_entries')
-        .select('id, amount, stage, lead_id')
-        .or('amount.is.null,amount.eq.0')
+        .select('id, amount, stage, lead_id') as { data: any[] | null }
         
       console.log('Found pipeline issues:', pipelineIssues?.length || 0)
 
@@ -930,7 +930,7 @@ export class DataFieldValidator {
             }
           }
 
-          const { error } = await supabase
+          const { error } = await ibmDb
             .from('pipeline_entries')
             .update({ amount: defaultAmount })
             .eq('id', pipeline.id)
@@ -945,16 +945,15 @@ export class DataFieldValidator {
       }
 
       // 2. Fix pipeline entries with missing stages
-      const { data: stageIssues } = await supabase
+      const { data: stageIssues } = await ibmDb
         .from('pipeline_entries')
-        .select('id, stage')
-        .is('stage', null)
+        .select('id, stage') as { data: any[] | null }
         
       console.log('Found stage issues:', stageIssues?.length || 0)
 
       if (stageIssues && stageIssues.length > 0) {
         for (const pipeline of stageIssues) {
-          const { error } = await supabase
+          const { error } = await ibmDb
             .from('pipeline_entries')
             .update({ stage: 'New Lead' })
             .eq('id', pipeline.id)
@@ -969,16 +968,15 @@ export class DataFieldValidator {
       }
 
       // 3. Fix clients with missing status
-      const { data: clientsWithoutStatus } = await supabase
+      const { data: clientsWithoutStatus } = await ibmDb
         .from('clients')
-        .select('id, status')
-        .or('status.is.null,status.eq.""')
+        .select('id, status') as { data: any[] | null }
         
       console.log('Found clients without status:', clientsWithoutStatus?.length || 0)
 
       if (clientsWithoutStatus && clientsWithoutStatus.length > 0) {
         for (const client of clientsWithoutStatus) {
-          const { error } = await supabase
+          const { error } = await ibmDb
             .from('clients')
             .update({ status: 'Active' })
             .eq('id', client.id)
@@ -993,16 +991,15 @@ export class DataFieldValidator {
       }
 
       // 4. Fix loan requests with invalid or missing statuses
-      const { data: invalidLoanRequests } = await supabase
+      const { data: invalidLoanRequests } = await ibmDb
         .from('loan_requests')
-        .select('id, status')
-        .or('status.is.null,status.eq.""')
+        .select('id, status') as { data: any[] | null }
         
       console.log('Found invalid loan requests:', invalidLoanRequests?.length || 0)
 
       if (invalidLoanRequests && invalidLoanRequests.length > 0) {
         for (const loanRequest of invalidLoanRequests) {
-          const { error } = await supabase
+          const { error } = await ibmDb
             .from('loan_requests')
             .update({ status: 'pending' })
             .eq('id', loanRequest.id)
@@ -1017,10 +1014,9 @@ export class DataFieldValidator {
       }
 
       // 5. Fix contact entities with null loan amounts (only for current user due to RLS)
-      const { data: nullLoanAmounts } = await supabase
+      const { data: nullLoanAmounts } = await ibmDb
         .from('contact_entities')
-        .select('id, loan_amount, business_name, user_id')
-        .is('loan_amount', null)
+        .select('id, loan_amount, business_name, user_id') as { data: any[] | null }
         // Only get records for current user due to RLS policies
         
       console.log('Found null loan amounts for current user:', nullLoanAmounts?.length || 0)
@@ -1034,7 +1030,7 @@ export class DataFieldValidator {
             
             console.log(`Attempting to fix contact ${contact.id} with loan amount ${defaultLoanAmount}`)
             
-            const { error, data } = await supabase
+            const { error, data } = await ibmDb
               .from('contact_entities')
               .update({ 
                 loan_amount: defaultLoanAmount,

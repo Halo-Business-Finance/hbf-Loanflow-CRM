@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { supabase } from "@/integrations/supabase/client";
+import { ibmDb } from "@/lib/ibm";
 import { StandardPageLayout } from "@/components/StandardPageLayout";
 import { IBMPageHeader } from "@/components/ui/IBMPageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -96,30 +96,30 @@ export default function ComplianceDashboard() {
         auditLogsResult,
         recentAuditLogs,
       ] = await Promise.all([
-        supabase.from('leads').select('id', { count: 'exact', head: true }),
-        supabase.from('lead_documents').select('id', { count: 'exact', head: true }),
-        supabase.from('active_sessions').select('id', { count: 'exact', head: true }).eq('is_active', true),
-        supabase.from('audit_logs').select('id', { count: 'exact', head: true }),
-        supabase.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(50),
+        ibmDb.from('leads').select('id'),
+        ibmDb.from('lead_documents').select('id'),
+        ibmDb.from('active_sessions').select('id').eq('is_active', true),
+        ibmDb.from('audit_logs').select('id'),
+        ibmDb.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(50),
       ]);
 
-      const logs = recentAuditLogs.data || [];
+      const logs = (recentAuditLogs.data || []) as unknown as AuditLogEntry[];
       const loginCount = logs.filter(log => log.action === 'user_login').length;
       const dataChanges = logs.filter(log => 
-        ['lead_created', 'lead_updated', 'lead_deleted', 'INSERT', 'UPDATE', 'DELETE'].includes(log.action)
+        ['lead_created', 'lead_updated', 'lead_deleted', 'INSERT', 'UPDATE', 'DELETE'].includes(log.action as string)
       ).length;
 
       setMetrics({
-        totalLeads: leadsResult.count || 0,
-        totalDocuments: documentsResult.count || 0,
-        activeSessions: sessionsResult.count || 0,
-        auditLogsCount: auditLogsResult.count || 0,
+        totalLeads: leadsResult.data?.length || 0,
+        totalDocuments: documentsResult.data?.length || 0,
+        activeSessions: sessionsResult.data?.length || 0,
+        auditLogsCount: auditLogsResult.data?.length || 0,
         recentLoginCount: loginCount,
         dataChangesCount: dataChanges,
       });
 
-      setAuditLogs(logs as AuditLogEntry[]);
-      generateComplianceChecks(logs, sessionsResult.count || 0);
+      setAuditLogs(logs);
+      generateComplianceChecks(logs, sessionsResult.data?.length || 0);
       await generateRetentionPolicies();
       setLastScan(new Date().toISOString());
     } catch (error) {
@@ -243,10 +243,10 @@ export default function ComplianceDashboard() {
 
   const generateRetentionPolicies = async () => {
     const [leadsCount, docsCount, auditCount, sessionsCount] = await Promise.all([
-      supabase.from('leads').select('id', { count: 'exact', head: true }),
-      supabase.from('lead_documents').select('id', { count: 'exact', head: true }),
-      supabase.from('audit_logs').select('id', { count: 'exact', head: true }),
-      supabase.from('active_sessions').select('id', { count: 'exact', head: true }),
+      ibmDb.from('leads').select('id'),
+      ibmDb.from('lead_documents').select('id'),
+      ibmDb.from('audit_logs').select('id'),
+      ibmDb.from('active_sessions').select('id'),
     ]);
 
     setRetentionPolicies([

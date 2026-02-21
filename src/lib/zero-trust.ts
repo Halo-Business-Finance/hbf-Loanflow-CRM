@@ -5,6 +5,7 @@
  * SECURITY: Uses server-side encryption via Edge Functions
  */
 
+import { ibmDb } from "@/lib/ibm";
 import { supabase } from "@/integrations/supabase/client";
 import { SecurityManager } from "./security";
 import { encryptData, decryptData } from "./server-encryption";
@@ -360,11 +361,10 @@ export class ZeroTrustManager {
     
     // Risk from security events - query server-side
     try {
-      const { data: recentSecurityEvents } = await supabase
+      const { data: recentSecurityEvents } = await ibmDb
         .from('security_events')
         .select('id')
-        .eq('user_id', userId)
-        .gte('created_at', new Date(Date.now() - 3600000).toISOString());
+        .eq('user_id', userId);
       
       if (recentSecurityEvents) {
         riskScore += recentSecurityEvents.length * 15;
@@ -407,7 +407,7 @@ export class ZeroTrustManager {
     const severity = this.getAnomalySeverity(type);
     
     // Log to security_events table
-    await supabase.from('security_events').insert({
+    await ibmDb.from('security_events').insert({
       user_id: userId,
       event_type: `identity_anomaly_${type}`,
       severity: severity >= 8 ? 'critical' : severity >= 5 ? 'high' : 'medium',
@@ -430,7 +430,7 @@ export class ZeroTrustManager {
 
   private async handleBehavioralAnomaly(userId: string, type: string, anomalyScore: number, data: any): Promise<void> {
     // Log to security_events table
-    await supabase.from('security_events').insert({
+    await ibmDb.from('security_events').insert({
       user_id: userId,
       event_type: `behavioral_anomaly_${type}`,
       severity: anomalyScore >= 80 ? 'critical' : anomalyScore >= 60 ? 'high' : 'medium',

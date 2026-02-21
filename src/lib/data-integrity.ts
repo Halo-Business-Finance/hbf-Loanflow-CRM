@@ -175,8 +175,8 @@ export class DataIntegrity {
     
     // Store audit entry to server only - no localStorage fallback for security
     try {
-      const { supabase } = await import('@/integrations/supabase/client');
-      await supabase.from('audit_logs').insert({
+      const { ibmDb } = await import('@/lib/ibm');
+      await ibmDb.from('audit_logs').insert({
         action,
         user_id: userId,
         details: {

@@ -151,4 +151,66 @@ router.post('/mark-mfa-completed', async (req, res) => {
   }
 });
 
+// POST /auth/login — stub for IBM App ID token validation
+router.post('/login', async (req, res) => {
+  try {
+    const { access_token, id_token } = req.body;
+    if (!access_token) {
+      return res.status(400).json({ error: { message: 'Missing access_token', code: 'BAD_REQUEST' } });
+    }
+
+    // TODO: Validate IBM App ID token via JWKS endpoint
+    // For now, decode the JWT payload (without verification) to extract user info
+    const payload = JSON.parse(Buffer.from(access_token.split('.')[1], 'base64').toString());
+    const userId = payload.sub;
+    const email = payload.email || '';
+
+    if (!userId) {
+      return res.status(401).json({ error: { message: 'Invalid token: missing sub claim', code: 'UNAUTHORIZED' } });
+    }
+
+    // Ensure user has a default role
+    const existing = await query(
+      `SELECT role FROM user_roles WHERE user_id = $1 AND is_active = true ORDER BY created_at DESC LIMIT 1`,
+      [userId]
+    );
+
+    let role = 'viewer';
+    if (existing.length > 0) {
+      role = existing[0].role;
+    } else {
+      const id = require('uuid').v4();
+      await query(
+        `INSERT INTO user_roles (id, user_id, role, is_active, created_at, updated_at) VALUES ($1, $2, 'viewer', true, NOW(), NOW()) ON CONFLICT DO NOTHING`,
+        [id, userId]
+      );
+    }
+
+    // Create/update active session
+    const sessionToken = require('uuid').v4();
+    const sessionId = require('uuid').v4();
+    await query(
+      `INSERT INTO active_sessions (id, user_id, session_token, is_active, expires_at, last_activity, created_at)
+       VALUES ($1, $2, $3, true, NOW() + INTERVAL '24 hours', NOW(), NOW())`,
+      [sessionId, userId, sessionToken]
+    );
+
+    // Audit log
+    await query(
+      `INSERT INTO audit_logs (id, action, table_name, record_id, user_id, new_values, created_at)
+       VALUES ($1, 'login', 'active_sessions', $2, $3, $4, NOW())`,
+      [require('uuid').v4(), sessionId, userId, JSON.stringify({ email, role })]
+    );
+
+    res.json({
+      success: true,
+      user: { id: userId, email, role },
+      session: { token: sessionToken, expires_in: 86400 }
+    });
+  } catch (err) {
+    console.error('[auth] login error:', err.message);
+    res.status(500).json({ error: { message: 'Login failed', code: 'AUTH_ERROR' } });
+  }
+});
+
 module.exports = router;

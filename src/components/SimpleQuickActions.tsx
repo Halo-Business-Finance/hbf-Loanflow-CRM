@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { useNavigate } from 'react-router-dom'
-import { supabase } from '@/integrations/supabase/client'
+import { authSignOut } from '@/lib/auth-utils'
 import { useToast } from '@/hooks/use-toast'
 
 export function SimpleQuickActions() {
@@ -21,7 +21,7 @@ export function SimpleQuickActions() {
       sessionStorage.clear()
       
       // Sign out
-      await supabase.auth.signOut({ scope: 'global' })
+      await authSignOut()
       
       // Show notification
       toast({

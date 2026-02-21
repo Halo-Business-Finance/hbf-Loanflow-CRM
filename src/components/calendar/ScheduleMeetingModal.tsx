@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
+import { getAuthUser } from '@/lib/auth-utils';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { User, Building2, Search } from 'lucide-react';
@@ -72,7 +73,7 @@ export function ScheduleMeetingModal({
 
   const fetchUsers = async () => {
     try {
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      const currentUser = await getAuthUser();
       
       const { data, error } = await supabase
         .from('profiles')
@@ -88,7 +89,7 @@ export function ScheduleMeetingModal({
     } catch (error) {
       console.error('Error fetching users:', error);
       try {
-        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        const currentUser = await getAuthUser();
         const { data, error: fallbackError } = await supabase
           .from('profiles')
           .select('id, first_name, last_name, email')
@@ -106,7 +107,7 @@ export function ScheduleMeetingModal({
 
   const fetchClients = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getAuthUser();
       if (!user) return;
 
       // Fetch from contact_entities (leads/contacts)
@@ -148,7 +149,7 @@ export function ScheduleMeetingModal({
     setLoading(true);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getAuthUser();
       if (!user) throw new Error('Not authenticated');
 
       const scheduledFor = new Date(`${formData.scheduledDate}T${formData.scheduledTime}`);

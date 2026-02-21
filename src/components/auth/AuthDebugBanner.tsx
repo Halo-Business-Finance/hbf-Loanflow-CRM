@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
+import { getAuthSession } from '@/lib/auth-utils';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Info } from 'lucide-react';
@@ -22,12 +22,12 @@ export function AuthDebugBanner() {
     }
 
     const loadDebugInfo = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+      const session = await getAuthSession();
       if (session) {
         setDebugInfo({
           userId: session.user.id,
           email: session.user.email || 'N/A',
-          tokenExpiry: new Date(session.expires_at! * 1000).toLocaleString()
+          tokenExpiry: new Date(session.expiresAt).toLocaleString()
         });
       } else {
         setDebugInfo(null);

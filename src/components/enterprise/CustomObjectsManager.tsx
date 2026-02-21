@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getAuthUser } from '@/lib/auth-utils';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -125,7 +126,7 @@ export function CustomObjectsManager() {
 
   const handleCreateObject = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getAuthUser();
       if (!user) throw new Error('Not authenticated');
 
       const { error } = await supabase
@@ -159,7 +160,7 @@ export function CustomObjectsManager() {
     if (!selectedObject) return;
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getAuthUser();
       if (!user) throw new Error('Not authenticated');
 
       const picklistValues = fieldForm.field_type === 'picklist' 

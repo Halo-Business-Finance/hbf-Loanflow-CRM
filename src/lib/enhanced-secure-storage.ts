@@ -5,6 +5,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { getAuthUser } from '@/lib/auth-utils';
 
 export interface SecureStorageOptions {
   serverSide?: boolean;
@@ -164,7 +165,7 @@ class EnhancedSecureStorage {
     try {
       if (serverSide) {
         // Use server-side storage for sensitive data
-        const { data: { user } } = await supabase.auth.getUser();
+        const user = await getAuthUser();
         if (!user) return false;
 
         const { error } = await supabase.rpc('store_secure_session_data', {
@@ -199,7 +200,7 @@ class EnhancedSecureStorage {
     try {
       if (serverSide) {
         // Retrieve from server-side storage
-        const { data: { user } } = await supabase.auth.getUser();
+        const user = await getAuthUser();
         if (!user) return null;
 
         const result = await supabase.rpc('get_secure_session_data', {
@@ -234,7 +235,7 @@ class EnhancedSecureStorage {
   async removeItem(key: string): Promise<void> {
     try {
       // Remove from server
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getAuthUser();
       if (user) {
         await supabase.rpc('remove_secure_session_data', { p_key: key });
       }
@@ -297,7 +298,7 @@ class EnhancedSecureStorage {
   async clearAll(): Promise<void> {
     try {
       // Clear server-side data
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getAuthUser();
       if (user) {
         await supabase.rpc('clear_secure_session_data');
       }

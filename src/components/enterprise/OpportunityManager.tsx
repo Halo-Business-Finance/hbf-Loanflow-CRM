@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getAuthUser } from '@/lib/auth-utils';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -131,7 +132,7 @@ export function OpportunityManager() {
 
   const handleCreateOpportunity = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getAuthUser();
       if (!user) throw new Error('Not authenticated');
 
       const { error } = await supabase
@@ -172,7 +173,7 @@ export function OpportunityManager() {
     if (!selectedOpportunity) return;
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getAuthUser();
       if (!user) throw new Error('Not authenticated');
 
       const opportunity = opportunities.find(o => o.id === selectedOpportunity);

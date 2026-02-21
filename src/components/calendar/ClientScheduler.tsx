@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, Clock, Plus, Phone, Video, Users } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { getAuthUser } from '@/lib/auth-utils';
 import { format, isPast, isToday } from 'date-fns';
 import { ScheduleMeetingModal } from './ScheduleMeetingModal';
 import { cn } from '@/lib/utils';
@@ -35,7 +36,7 @@ export function ClientScheduler({ clientId, clientName, clientType, compact = fa
   const fetchClientEvents = async () => {
     try {
       setLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getAuthUser();
       if (!user) return;
 
       const { data, error } = await supabase

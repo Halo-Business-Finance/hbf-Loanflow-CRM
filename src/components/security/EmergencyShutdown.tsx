@@ -5,6 +5,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { ibmDb } from "@/lib/ibm";
 import { supabase } from "@/integrations/supabase/client";
+import { getAuthUser } from '@/lib/auth-utils';
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { 
@@ -49,13 +50,13 @@ export function EmergencyShutdown() {
   // Check authorization level
   const checkAuthorization = useCallback(async () => {
     try {
-      const { data: user } = await supabase.auth.getUser();
-      if (!user.user) return false;
+      const user = await getAuthUser();
+      if (!user) return false;
 
       const { data: roles } = await ibmDb
         .from('user_roles')
         .select('role')
-        .eq('user_id', user.user.id);
+        .eq('user_id', user.id);
 
       const hasAdminRole = (roles as unknown as { role: string }[])?.some(r => 
         ['admin', 'super_admin', 'security_admin'].includes(r.role)
@@ -133,7 +134,7 @@ export function EmergencyShutdown() {
     }
 
     try {
-      const { data: user } = await supabase.auth.getUser();
+      const user = await getAuthUser();
       
       // Log emergency event
       await ibmDb.from('emergency_events').insert({
@@ -142,14 +143,14 @@ export function EmergencyShutdown() {
         trigger_source: 'security_admin',
         auto_shutdown: false,
         manual_override: true,
-        event_data: { reason, level, admin_user: user.user?.email }
+        event_data: { reason, level, admin_user: user?.email }
       });
 
       // Activate shutdown
       await ibmDb.from('emergency_shutdown').insert({
         reason,
         shutdown_level: level,
-        triggered_by: user.user?.email || 'security_admin',
+        triggered_by: user?.email || 'security_admin',
         is_active: true,
         auto_restore_at: level === 'partial' ? 
           new Date(Date.now() + 30 * 60 * 1000).toISOString() : // 30 mins for partial
@@ -160,7 +161,7 @@ export function EmergencyShutdown() {
         is_shutdown: true,
         shutdown_reason: reason,
         shutdown_level: level,
-        triggered_by: user.user?.email || 'security_admin',
+        triggered_by: user?.email || 'security_admin',
         triggered_at: new Date().toISOString()
       });
 

@@ -4,6 +4,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { getAuthUser } from '@/lib/auth-utils';
 
 interface SecureStorageOptions {
   encrypt?: boolean;
@@ -47,7 +48,7 @@ class ZeroLocalStorageManager {
    */
   async setSecureItem(key: string, value: any, options: SecureStorageOptions = {}): Promise<boolean> {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getAuthUser();
       if (!user) {
         console.warn('User not authenticated for secure storage');
         return false;
@@ -106,7 +107,7 @@ class ZeroLocalStorageManager {
    */
   async getSecureItem(key: string): Promise<any | null> {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getAuthUser();
       if (!user) return null;
 
       const { data, error } = await supabase
@@ -151,7 +152,7 @@ class ZeroLocalStorageManager {
    */
   async removeSecureItem(key: string): Promise<boolean> {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getAuthUser();
       if (!user) return false;
 
       const { error } = await supabase
@@ -173,7 +174,7 @@ class ZeroLocalStorageManager {
    */
   async clearAllSecureData(): Promise<boolean> {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getAuthUser();
       if (!user) return false;
 
       const { error } = await supabase

@@ -1,5 +1,6 @@
 // Security manager - server-side encryption should be used for sensitive data
 import { supabase } from "@/integrations/supabase/client";
+import { getAuthUser, getAuthSession } from '@/lib/auth-utils';
 import { logger } from '@/lib/logger';
 
 export interface SecurityConfig {
@@ -106,8 +107,8 @@ export class SecurityManager {
     };
   }> {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
+      const session = await getAuthSession();
+      if (!session?.accessToken) {
         return { valid: false };
       }
 
@@ -327,7 +328,7 @@ export class SecurityManager {
   // Audit logging for frontend actions
   static async logUserAction(action: string, details?: Record<string, any>): Promise<void> {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getAuthUser();
       if (!user) return;
 
       await this.logSecurityEvent({
@@ -364,7 +365,7 @@ export class SecurityManager {
     if (httpsCheck) score += 20;
 
     // Check if session exists
-    const { data: { session } } = await supabase.auth.getSession();
+    const session = await getAuthSession();
     const sessionCheck = !!session;
     checks.push({
       name: 'Authentication',

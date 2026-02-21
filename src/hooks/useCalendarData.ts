@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { getAuthUser } from '@/lib/auth-utils';
 import { useRealtimeSubscription } from './useRealtimeSubscription';
 import { startOfMonth, endOfMonth, format } from 'date-fns';
 
@@ -21,7 +22,7 @@ export function useCalendarData(currentMonth: Date) {
   const fetchEvents = async () => {
     try {
       setLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getAuthUser();
       if (!user) return;
 
       const startDate = startOfMonth(currentMonth);

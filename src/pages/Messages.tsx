@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { getAuthUser } from '@/lib/auth-utils';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
 import { Button } from '@/components/ui/button';
 import { MessageComposer } from '@/components/MessageComposer';
@@ -41,7 +42,7 @@ export default function Messages() {
 
   useEffect(() => {
     const getCurrentUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getAuthUser();
       setCurrentUserId(user?.id || null);
     };
     getCurrentUser();
@@ -50,7 +51,7 @@ export default function Messages() {
   const fetchMessages = async () => {
     try {
       setLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getAuthUser();
       if (!user) {
         setLoading(false);
         return;

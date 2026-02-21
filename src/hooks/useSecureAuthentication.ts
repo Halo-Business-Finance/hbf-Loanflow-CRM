@@ -65,10 +65,8 @@ export const useSecureAuthentication = () => {
 
   const getSessionToken = async (): Promise<string> => {
     try {
-      // Auth still uses supabase for now (Phase 2)
-      const { supabase } = await import('@/integrations/supabase/client');
-      const { data: { session } } = await supabase.auth.getSession();
-      return session?.access_token || '';
+      const { getAccessToken } = await import('@/lib/auth-utils');
+      return getAccessToken() || '';
     } catch { return ''; }
   };
 

@@ -1,10 +1,11 @@
 import { supabase } from "@/integrations/supabase/client"
+import { getAuthUser } from '@/lib/auth-utils'
 
 export class DataIntegrityFixer {
   async checkAuthAndPermissions(): Promise<{ authenticated: boolean; userId: string | null; contactCount: number }> {
     try {
       // Check if user is authenticated
-      const { data: { user } } = await supabase.auth.getUser()
+      const user = await getAuthUser()
       
       if (!user) {
         return { authenticated: false, userId: null, contactCount: 0 }

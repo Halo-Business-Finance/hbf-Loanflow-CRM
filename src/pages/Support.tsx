@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { getAuthUser } from '@/lib/auth-utils';
 import { IBMPageHeader } from "@/components/ui/IBMPageHeader";
 import {
   DropdownMenu,
@@ -88,7 +89,7 @@ export default function Support() {
   const fetchTickets = async () => {
     try {
       setLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getAuthUser();
       if (!user) {
         setLoading(false);
         return;
@@ -126,7 +127,7 @@ export default function Support() {
     }
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getAuthUser();
       if (!user) throw new Error('Not authenticated');
 
       const { error } = await supabase

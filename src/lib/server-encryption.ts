@@ -10,6 +10,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { getAuthUser } from '@/lib/auth-utils';
 
 export interface EncryptionResult {
   success: boolean;
@@ -116,7 +117,7 @@ export class ServerSecureStorage {
       }
 
       // Store encrypted data in Supabase (secure_session_data table)
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getAuthUser();
       if (!user) {
         console.error('User not authenticated');
         return false;
@@ -154,7 +155,7 @@ export class ServerSecureStorage {
    */
   async getItem(key: string, options?: { context?: string }): Promise<any | null> {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getAuthUser();
       if (!user) {
         console.error('User not authenticated');
         return null;
@@ -200,7 +201,7 @@ export class ServerSecureStorage {
    */
   async removeItem(key: string): Promise<boolean> {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getAuthUser();
       if (!user) return false;
 
       const { error } = await supabase
@@ -221,7 +222,7 @@ export class ServerSecureStorage {
    */
   async clear(): Promise<boolean> {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getAuthUser();
       if (!user) return false;
 
       const { error } = await supabase

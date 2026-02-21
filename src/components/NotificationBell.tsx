@@ -9,6 +9,7 @@ import {
 
 import { NotificationCenter } from "./NotificationCenter"
 import { supabase } from "@/integrations/supabase/client"
+import { getAuthSession } from '@/lib/auth-utils'
 import { useAuth } from "@/components/auth/AuthProvider"
 import { useCollaborationNotifications } from "@/hooks/useCollaborationNotifications"
 
@@ -39,8 +40,8 @@ export function NotificationBell() {
 
     try {
       // Ensure we have a valid session before making requests
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-      if (sessionError || !session) {
+      const session = await getAuthSession()
+      if (!session) {
         console.warn('No valid session for notifications')
         setHasError(true)
         return

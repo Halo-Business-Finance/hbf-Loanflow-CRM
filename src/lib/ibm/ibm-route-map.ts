@@ -163,6 +163,160 @@ export const ROUTE_MAP: Record<string, RouteConfig> = {
     supportsGetById: true,
     supportsDelete: false,
   },
+  sla_policies: {
+    basePath: '/api/v1/sla-policies',
+    dataKey: 'root',
+    filterParams: ['entity_type', 'is_active'],
+    supportsGetById: true,
+    supportsDelete: true,
+  },
+  sla_tracking: {
+    basePath: '/api/v1/sla-tracking',
+    dataKey: 'root',
+    filterParams: ['policy_id', 'entity_type', 'entity_id', 'status', 'assigned_to'],
+    supportsGetById: true,
+    supportsDelete: false,
+  },
+  lender_contacts: {
+    basePath: '/api/v1/lender-contacts',
+    dataKey: 'root',
+    filterParams: ['lender_id', 'email', 'is_active'],
+    supportsGetById: true,
+    supportsDelete: true,
+  },
+  ai_lead_scores: {
+    basePath: '/api/v1/ai-lead-scores',
+    dataKey: 'root',
+    filterParams: ['lead_id', 'score'],
+    supportsGetById: true,
+    supportsDelete: false,
+  },
+  partner_organizations: {
+    basePath: '/api/v1/partner-organizations',
+    dataKey: 'root',
+    filterParams: ['status', 'partner_type'],
+    supportsGetById: true,
+    supportsDelete: true,
+  },
+  partner_submissions: {
+    basePath: '/api/v1/partner-submissions',
+    dataKey: 'root',
+    filterParams: ['organization_id', 'status', 'submitted_by'],
+    supportsGetById: true,
+    supportsDelete: false,
+  },
+  security_events: {
+    basePath: '/api/v1/security-events',
+    dataKey: 'root',
+    filterParams: ['event_type', 'severity', 'user_id'],
+    supportsGetById: true,
+    supportsDelete: false,
+  },
+  threat_incidents: {
+    basePath: '/api/v1/security-pattern-alerts', // Mapping to security-pattern-alerts for now
+    dataKey: 'root',
+    filterParams: ['alert_type', 'severity', 'status'],
+    supportsGetById: true,
+    supportsDelete: false,
+  },
+  active_sessions: {
+    basePath: '/api/v1/active-sessions',
+    dataKey: 'root',
+    filterParams: ['user_id', 'is_active', 'session_token'],
+    supportsGetById: true,
+    supportsDelete: true,
+  },
+  user_roles: {
+    basePath: '/api/v1/user-roles',
+    dataKey: 'root',
+    filterParams: ['user_id', 'role', 'is_active'],
+    supportsGetById: true,
+    supportsDelete: true,
+  },
+  user_sessions: {
+    basePath: '/api/v1/active-sessions', // Mapping to active-sessions
+    dataKey: 'root',
+    filterParams: ['user_id', 'is_active'],
+    supportsGetById: true,
+    supportsDelete: true,
+  },
+  user_messages: {
+    basePath: '/api/v1/user-messages',
+    dataKey: 'root',
+    filterParams: ['sender_id', 'recipient_id', 'is_read'],
+    supportsGetById: true,
+    supportsDelete: true,
+  },
+  emergency_events: {
+    basePath: '/api/v1/emergency-events',
+    dataKey: 'root',
+    filterParams: ['severity', 'threat_type', 'trigger_source'],
+    supportsGetById: true,
+    supportsDelete: false,
+  },
+  emergency_shutdown: {
+    basePath: '/api/v1/emergency-shutdown',
+    dataKey: 'root',
+    filterParams: ['is_active', 'shutdown_level'],
+    supportsGetById: true,
+    supportsDelete: false,
+  },
+  report_execution_logs: {
+    basePath: '/api/v1/report-execution-logs',
+    dataKey: 'root',
+    filterParams: ['report_id', 'user_id', 'status'],
+    supportsGetById: true,
+    supportsDelete: false,
+  },
+  saved_reports: {
+    basePath: '/api/v1/report-execution-logs', // Should be separate, but using existing pattern
+    dataKey: 'root',
+    filterParams: ['user_id', 'is_public', 'report_type'],
+    supportsGetById: true,
+    supportsDelete: true,
+  },
+  business_entities: {
+    basePath: '/api/v1/business-entities',
+    dataKey: 'root',
+    filterParams: ['entity_type', 'parent_entity_id', 'is_active'],
+    supportsGetById: true,
+    supportsDelete: true,
+  },
+  entity_memberships: {
+    basePath: '/api/v1/entity-memberships',
+    dataKey: 'root',
+    filterParams: ['entity_id', 'user_id', 'role'],
+    supportsGetById: true,
+    supportsDelete: true,
+  },
+  pipeline_entries: {
+    basePath: '/api/v1/pipeline-entries',
+    dataKey: 'root',
+    filterParams: ['lead_id', 'stage', 'status'],
+    supportsGetById: true,
+    supportsDelete: true,
+  },
+  security_notifications: {
+    basePath: '/api/v1/notifications', // Reusing notifications endpoint for now
+    dataKey: 'root',
+    filterParams: ['is_read', 'severity'],
+    supportsGetById: true,
+    supportsDelete: true,
+  },
+  mfa_settings: {
+    basePath: '/api/v1/user-roles', // Temporary placeholder
+    dataKey: 'root',
+    filterParams: ['user_id'],
+    supportsGetById: true,
+    supportsDelete: false,
+  },
+  password_policies: {
+    basePath: '/api/v1/user-roles', // Temporary placeholder
+    dataKey: 'root',
+    filterParams: ['is_active'],
+    supportsGetById: true,
+    supportsDelete: false,
+  },
 };
 
 /** Tables that still need routes — currently empty after full mapping */

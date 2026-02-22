@@ -154,4 +154,20 @@ jobs:
           URL=$(ibmcloud ce application get --name "${{ env.CE_APP_NAME }}" --output json \
             | python3 -c "import sys,json; a=json.load(sys.stdin); print(a.get('status',{}).get('url',''))" 2>/dev/null || echo "")
           echo "Deployed to: ${URL}"
-          [ -n "${URL}" ] && curl -sf "${URL}/health" && echo "✅ Health check passed" || echo "⚠️  Health check skipped (URL not yet available)"
+          if [ -z "${URL}" ]; then
+            echo "⚠️  Health check skipped (URL not yet available)"
+            exit 0
+          fi
+          echo "⏳ Waiting 30s for cold-start..."
+          sleep 30
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${URL}/health" || true)
+            if [ "$STATUS" = "200" ]; then
+              echo "✅ Health check passed"
+              exit 0
+            fi
+            echo "  Attempt ${i}/10: status=${STATUS}, retrying in 15s..."
+            sleep 15
+          done
+          echo "❌ Health check failed after 10 attempts"
+          exit 1

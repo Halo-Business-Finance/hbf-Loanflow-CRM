@@ -151,7 +151,7 @@ router.post('/mark-mfa-completed', async (req, res) => {
   }
 });
 
-// POST /auth/login — stub for IBM App ID token validation
+// POST /auth/login — IBM App ID token validation (JWKS-verified)
 router.post('/login', async (req, res) => {
   try {
     const { access_token, id_token } = req.body;
@@ -159,9 +159,16 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ error: { message: 'Missing access_token', code: 'BAD_REQUEST' } });
     }
 
-    // TODO: Validate IBM App ID token via JWKS endpoint
-    // For now, decode the JWT payload (without verification) to extract user info
-    const payload = JSON.parse(Buffer.from(access_token.split('.')[1], 'base64').toString());
+    // Verify JWT signature against IBM App ID JWKS endpoint
+    const { verifyToken } = require('../../middleware/jwt-verify');
+    let payload;
+    try {
+      payload = await verifyToken(access_token);
+    } catch (verifyErr) {
+      console.warn('[auth] JWT verification failed:', verifyErr.message);
+      return res.status(401).json({ error: { message: verifyErr.message, code: 'UNAUTHORIZED' } });
+    }
+
     const userId = payload.sub;
     const email = payload.email || '';
 

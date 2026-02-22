@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
 import { DollarSign, TrendingUp, Target, Calendar, AlertCircle, CheckCircle2, Sparkles, ArrowUpRight, ArrowDownRight } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
+const supabase = ibmDb; // IBM migration shim
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, ComposedChart, Bar, ReferenceLine } from 'recharts';
 import { format, addMonths, startOfMonth } from 'date-fns';
 

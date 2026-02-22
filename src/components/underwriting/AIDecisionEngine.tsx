@@ -16,7 +16,8 @@ import {
   ThumbsDown,
   Scale
 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
+const supabase = ibmDb; // IBM migration shim
 import { useToast } from '@/hooks/use-toast';
 
 interface Decision {
@@ -77,19 +78,21 @@ export function AIDecisionEngine({ application, onDecisionGenerated }: AIDecisio
 
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('ai-decision-engine', {
-        body: { application }
-      });
+      const result = await supabase.rpc('ai-decision-engine', {
+        application
+      }) as any;
 
+      const { data, error } = result;
       if (error) throw error;
-      if (data.error) throw new Error(data.error);
+      if (data?.error) throw new Error(data.error);
 
-      setDecision(data);
-      if (onDecisionGenerated) onDecisionGenerated(data);
+      const decision = data as Decision;
+      setDecision(decision);
+      if (onDecisionGenerated) onDecisionGenerated(decision);
 
       toast({
         title: "Decision Generated",
-        description: `Recommendation: ${data.recommendation} (${data.confidenceScore}% confidence)`
+        description: `Recommendation: ${decision.recommendation} (${decision.confidenceScore}% confidence)`
       });
     } catch (error) {
       console.error('Error generating decision:', error);

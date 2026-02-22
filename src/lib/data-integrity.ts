@@ -195,8 +195,8 @@ export class DataIntegrity {
   // Retrieve audit trail - server-side only
   static async getAuditTrail(limit: number = 100): Promise<any[]> {
     try {
-      const { supabase } = await import('@/integrations/supabase/client');
-      const { data, error } = await supabase
+      const { ibmDb } = await import('@/lib/ibm');
+      const { data, error } = await ibmDb
         .from('audit_logs')
         .select('*')
         .order('created_at', { ascending: false })

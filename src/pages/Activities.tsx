@@ -27,7 +27,8 @@ import {
   Check,
   X
 } from 'lucide-react'
-import { supabase } from '@/integrations/supabase/client'
+import { ibmDb } from '@/lib/ibm';
+const supabase = ibmDb; // IBM migration shim
 import {
   AlertDialog,
   AlertDialogAction,

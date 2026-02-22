@@ -18,7 +18,8 @@ import {
   Award,
   AlertTriangle
 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
+const supabase = ibmDb; // IBM migration shim
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Legend } from 'recharts';
 
 interface LenderMetrics {

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
+const supabase = ibmDb; // IBM migration shim
 import { useAuth } from '@/components/auth/AuthProvider';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -32,66 +33,8 @@ export const RealTimeSecurityMonitor: React.FC = () => {
   useEffect(() => {
     if (!user) return;
 
-    let eventSubscription: any;
-    let threatSubscription: any;
-
-    const startMonitoring = async () => {
+    const loadSecurityData = async () => {
       setIsMonitoring(true);
-
-      // Subscribe to real-time security events
-      eventSubscription = supabase
-        .channel('security_events')
-        .on('postgres_changes', 
-          { 
-            event: 'INSERT', 
-            schema: 'public', 
-            table: 'security_events',
-            filter: `user_id=eq.${user.id}`
-          }, 
-          (payload) => {
-            const newEvent = payload.new as SecurityEvent;
-            setSecurityEvents(prev => [newEvent, ...prev.slice(0, 9)]);
-            
-            // Show toast for high severity events
-            if (newEvent.severity === 'high' || newEvent.severity === 'critical') {
-              toast.error(`Security Alert: ${newEvent.event_type}`, {
-                description: 'Check security dashboard for details'
-              });
-            }
-          }
-        )
-        .subscribe();
-
-      // Subscribe to threat detection alerts
-      threatSubscription = supabase
-        .channel('threat_alerts')
-        .on('postgres_changes', 
-          { 
-            event: 'INSERT', 
-            schema: 'public', 
-            table: 'security_notifications',
-            filter: `user_id=eq.${user.id}`
-          }, 
-          (payload) => {
-            const newThreat: ThreatAlert = {
-              id: payload.new.id,
-              type: payload.new.notification_type,
-              severity: payload.new.severity,
-              message: payload.new.message,
-              timestamp: payload.new.created_at
-            };
-            
-            setThreatAlerts(prev => [newThreat, ...prev.slice(0, 4)]);
-            
-            if (newThreat.severity === 'critical') {
-              toast.error('Critical Security Threat Detected!', {
-                description: newThreat.message,
-                duration: 10000
-              });
-            }
-          }
-        )
-        .subscribe();
 
       // Load recent events
       const { data: events } = await supabase
@@ -122,12 +65,14 @@ export const RealTimeSecurityMonitor: React.FC = () => {
       }
     };
 
-    startMonitoring();
+    loadSecurityData();
+
+    // Poll every 30s instead of Supabase realtime channels
+    const interval = setInterval(loadSecurityData, 30_000);
 
     return () => {
       setIsMonitoring(false);
-      if (eventSubscription) eventSubscription.unsubscribe();
-      if (threatSubscription) threatSubscription.unsubscribe();
+      clearInterval(interval);
     };
   }, [user]);
 

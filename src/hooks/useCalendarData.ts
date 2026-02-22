@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
+const supabase = ibmDb; // IBM migration shim
 import { getAuthUser } from '@/lib/auth-utils';
 import { useRealtimeSubscription } from './useRealtimeSubscription';
 import { startOfMonth, endOfMonth, format } from 'date-fns';

@@ -31,7 +31,8 @@ import {
   CalendarClock,
   Target
 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
+const supabase = ibmDb; // IBM migration shim
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatCurrency, formatNumber } from '@/lib/utils';
@@ -221,15 +222,17 @@ export const LoanProcessorDashboard = () => {
         .gte('updated_at', weekAgo);
 
       // Fetch document count
-      const { data: documentsData, count: docsCount } = await supabase
+      const { data: documentsData } = await supabase
         .from('lead_documents')
-        .select('id', { count: 'exact' });
+        .select('id');
+      const docsCount = documentsData?.length || 0;
 
       // Fetch pipeline count (applications in various processing stages)
-      const { data: pipelineData, count: pipelineItemsCount } = await supabase
+      const { data: pipelineData } = await supabase
         .from('contact_entities')
-        .select('id', { count: 'exact' })
+        .select('id')
         .in('stage', PROCESSOR_STAGES);
+      const pipelineItemsCount = pipelineData?.length || 0;
 
       setPendingApps(transformedPending);
       setDocumentCount(docsCount || 0);

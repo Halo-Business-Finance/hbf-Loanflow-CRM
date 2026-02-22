@@ -35,7 +35,8 @@ import {
   Copy,
   Eye
 } from 'lucide-react';
-import { supabase } from "@/integrations/supabase/client";
+import { ibmDb } from "@/lib/ibm";
+const supabase = ibmDb; // IBM migration shim
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";

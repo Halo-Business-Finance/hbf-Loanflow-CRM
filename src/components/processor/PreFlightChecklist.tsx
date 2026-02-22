@@ -13,7 +13,8 @@ import {
   Rocket,
   RefreshCw
 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
+const supabase = ibmDb; // IBM migration shim
 import { useToast } from '@/hooks/use-toast';
 
 interface ChecklistItem {

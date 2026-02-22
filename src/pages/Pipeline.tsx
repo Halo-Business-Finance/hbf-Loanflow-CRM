@@ -25,7 +25,8 @@ import {
   TrendingDown
 } from 'lucide-react';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
+const supabase = ibmDb; // IBM migration shim
 import { useToast } from '@/hooks/use-toast';
 import { InteractivePipeline } from '@/components/InteractivePipeline';
 import { AdvancedAnalytics } from '@/components/analytics/AdvancedAnalytics';

@@ -33,7 +33,8 @@ import {
 } from 'lucide-react';
 import { AutoConditionGenerator } from '@/components/underwriting/AutoConditionGenerator';
 import { RiskScoringDashboard } from '@/components/underwriting/RiskScoringDashboard';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
+const supabase = ibmDb; // IBM migration shim
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency, formatNumber } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -154,121 +155,13 @@ export const UnderwriterDashboard = () => {
   useEffect(() => {
     fetchUnderwriterData();
 
-    // Set up realtime subscriptions for count updates
-    const contactsChannel = supabase
-      .channel('underwriter-contacts-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'contact_entities',
-          filter: 'stage=in.(Application,Pre-approval)'
-        },
-        (payload) => {
-          // New application received - payload logged securely
-          
-          const priority = payload.new.priority || 'medium';
-          const toastStyle = getPriorityToastStyle(priority);
-          
-          toast({
-            ...toastStyle,
-            description: `${payload.new.name || 'A new application'} has been added and requires processing. Priority: ${priority.toUpperCase()}`,
-            duration: priority === 'urgent' ? 10000 : priority === 'high' ? 7000 : 5000,
-          });
-          
-          setUpdatingBadges(prev => ({ ...prev, pending: true, pipeline: true }));
-          fetchUnderwriterData();
-          
-          setTimeout(() => {
-            setUpdatingBadges(prev => ({ ...prev, pending: false, pipeline: false }));
-          }, 2000);
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'contact_entities'
-        },
-        (payload) => {
-          // Application updated - refreshing data
-          setUpdatingBadges(prev => ({ ...prev, pending: true, pipeline: true, completed: true }));
-          fetchUnderwriterData();
-          
-          setTimeout(() => {
-            setUpdatingBadges(prev => ({ ...prev, pending: false, pipeline: false, completed: false }));
-          }, 2000);
-        }
-      )
-      .subscribe();
+    // IBM Cloud does not support Supabase realtime channels.
+    // Poll every 30s as a lightweight alternative.
+    const interval = setInterval(() => {
+      fetchUnderwriterData();
+    }, 30_000);
 
-    const documentsChannel = supabase
-      .channel('underwriter-documents-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'lead_documents'
-        },
-        async (payload) => {
-          // New document uploaded - refreshing count
-          
-          toast({
-            title: "New Document Uploaded",
-            description: `${payload.new.document_name || 'A new document'} has been uploaded.`,
-            duration: 4000,
-          });
-          
-          setUpdatingBadges(prev => ({ ...prev, documents: true }));
-          
-          try {
-            const { count } = await supabase
-              .from('lead_documents')
-              .select('id', { count: 'exact' });
-            setDocumentCount(count || 0);
-          } catch (err) {
-            // Silently handle error in real-time handler
-          }
-          
-          setTimeout(() => {
-            setUpdatingBadges(prev => ({ ...prev, documents: false }));
-          }, 2000);
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'lead_documents'
-        },
-        async () => {
-          // Document updated - refreshing count
-          setUpdatingBadges(prev => ({ ...prev, documents: true }));
-          
-          try {
-            const { count } = await supabase
-              .from('lead_documents')
-              .select('id', { count: 'exact' });
-            setDocumentCount(count || 0);
-          } catch (err) {
-            // Silently handle error in real-time handler
-          }
-          
-          setTimeout(() => {
-            setUpdatingBadges(prev => ({ ...prev, documents: false }));
-          }, 2000);
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(contactsChannel);
-      supabase.removeChannel(documentsChannel);
-    };
+    return () => clearInterval(interval);
   }, [toast]);
 
   const fetchUnderwriterData = async () => {
@@ -357,14 +250,16 @@ export const UnderwriterDashboard = () => {
         .select('id, created_at, updated_at')
         .gte('updated_at', weekAgo);
 
-      const { count: docsCount } = await supabase
+      const { data: docsData } = await supabase
         .from('lead_documents')
-        .select('id', { count: 'exact' });
+        .select('id');
+      const docsCount = docsData?.length || 0;
 
-      const { count: pipelineItemsCount } = await supabase
+      const { data: pipelineStageData } = await supabase
         .from('contact_entities')
-        .select('id', { count: 'exact' })
+        .select('id')
         .in('stage', UNDERWRITER_STAGES);
+      const pipelineItemsCount = pipelineStageData?.length || 0;
 
       setPendingReviews(pendingData || []);
       setPendingApps(transformedPending);

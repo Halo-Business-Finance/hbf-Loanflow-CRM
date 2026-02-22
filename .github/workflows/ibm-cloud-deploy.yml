@@ -119,6 +119,9 @@ jobs:
             --image "${PRIVATE_IMAGE}" \
             --registry-secret hbf-crm \
             --env DATABASE_URL="${{ secrets.IBM_DB_CONNECTION_STRING }}" \
+            --env CRM_API_KEY="${{ secrets.CRM_API_KEY }}" \
+            --env IBM_APPID_DISCOVERY_ENDPOINT="${{ secrets.IBM_APPID_DISCOVERY_ENDPOINT }}" \
+            --env IBM_APPID_CLIENT_ID="${{ secrets.IBM_APPID_CLIENT_ID }}" \
             --env NODE_ENV=production \
             --min-scale 1 --max-scale 10 \
             --cpu 0.5 --memory 1G || \
@@ -128,6 +131,9 @@ jobs:
             --registry-secret hbf-crm \
             --port 8080 \
             --env DATABASE_URL="${{ secrets.IBM_DB_CONNECTION_STRING }}" \
+            --env CRM_API_KEY="${{ secrets.CRM_API_KEY }}" \
+            --env IBM_APPID_DISCOVERY_ENDPOINT="${{ secrets.IBM_APPID_DISCOVERY_ENDPOINT }}" \
+            --env IBM_APPID_CLIENT_ID="${{ secrets.IBM_APPID_CLIENT_ID }}" \
             --env NODE_ENV=production \
             --min-scale 1 --max-scale 10 \
             --cpu 0.5 --memory 1G

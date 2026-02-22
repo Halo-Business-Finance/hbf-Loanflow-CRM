@@ -12,7 +12,7 @@ RUN npm ci --omit=dev --ignore-scripts 2>/dev/null || npm install --omit=dev --i
 
 # Copy application code
 COPY src/ ./src/
-COPY Procfile ./
+
 
 ENV NODE_ENV=production
 ENV PORT=8080

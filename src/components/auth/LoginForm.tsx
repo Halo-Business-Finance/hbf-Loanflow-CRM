@@ -11,16 +11,23 @@ interface LoginFormProps {
 }
 
 export function LoginForm({ onToggleMode }: LoginFormProps) {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const { signIn, resetPassword } = useAuth()
   const [showForgotPassword, setShowForgotPassword] = useState(false)
   const [resetEmail, setResetEmail] = useState('')
   const [isResetting, setIsResetting] = useState(false)
 
-  const handleSignIn = async () => {
+  const handleSignIn = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!email || !password) {
+      toast.error('Please enter your email and password')
+      return
+    }
     setIsLoading(true)
     try {
-      await signIn()
+      await signIn(email, password)
     } catch (error: any) {
       toast.error(sanitizeError(error))
     } finally {
@@ -103,7 +110,7 @@ export function LoginForm({ onToggleMode }: LoginFormProps) {
               Welcome to Halo Business Finance
             </h1>
             <p className="text-muted-foreground">
-              Sign in with your IBM account to continue
+              Sign in with your credentials to continue
             </p>
           </div>
 
@@ -125,22 +132,50 @@ export function LoginForm({ onToggleMode }: LoginFormProps) {
             </button>
           </div>
 
-          {/* IBM App ID Sign-In */}
-          <Button
-            onClick={handleSignIn}
-            disabled={isLoading}
-            className="w-full h-12 font-medium"
-            size="lg"
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                Signing in…
-              </>
-            ) : (
-              'Sign In with IBM'
-            )}
-          </Button>
+          {/* Email & Password Form */}
+          <form onSubmit={handleSignIn} className="space-y-4">
+            <div className="space-y-2">
+              <label htmlFor="email" className="text-sm font-medium text-foreground">Email</label>
+              <input
+                id="email"
+                type="email"
+                placeholder="Enter your email"
+                className="w-full h-12 px-3 rounded-md border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                disabled={isLoading}
+              />
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="password" className="text-sm font-medium text-foreground">Password</label>
+              <input
+                id="password"
+                type="password"
+                placeholder="Enter your password"
+                className="w-full h-12 px-3 rounded-md border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                disabled={isLoading}
+              />
+            </div>
+            <Button
+              type="submit"
+              disabled={isLoading}
+              className="w-full h-12 font-medium"
+              size="lg"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Signing in…
+                </>
+              ) : (
+                'Sign In'
+              )}
+            </Button>
+          </form>
 
           {/* Forgot Password */}
           <div className="text-center">

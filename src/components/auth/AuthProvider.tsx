@@ -1,26 +1,21 @@
 /**
- * AuthProvider — IBM App ID implementation
- *
- * Full swap from Supabase Auth to IBM App ID.
- * Exposes the same useAuth() hook & AuthContextType interface so
- * consuming components require zero changes.
+ * AuthProvider — Supabase email/password authentication
  */
 
 import * as React from 'react'
 import { createContext, useContext, useEffect, useState, useCallback } from 'react'
-import { ibmAuth } from '@/lib/ibm/ibm-auth'
-import type { IBMUser, IBMSession } from '@/lib/ibm/ibm-auth'
-import { ibmDb } from '@/lib/ibm'
+import { supabase } from '@/integrations/supabase/client'
+import type { User, Session } from '@supabase/supabase-js'
 import { useToast } from '@/hooks/use-toast'
-import { sanitizeError, logSecureError } from '@/lib/error-sanitizer'
+import { sanitizeError } from '@/lib/error-sanitizer'
 
 /* ------------------------------------------------------------------ */
-/*  Public interface (unchanged from Supabase version)                */
+/*  Public interface                                                   */
 /* ------------------------------------------------------------------ */
 
 interface AuthContextType {
-  user: IBMUser | null
-  session: IBMSession | null
+  user: User | null
+  session: Session | null
   userRole: string | null
   userRoles: string[]
   loading: boolean
@@ -58,23 +53,21 @@ function deriveHighestRole(roles: string[]): string {
 /* ------------------------------------------------------------------ */
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<IBMUser | null>(null)
-  const [session, setSession] = useState<IBMSession | null>(null)
+  const [user, setUser] = useState<User | null>(null)
+  const [session, setSession] = useState<Session | null>(null)
   const [userRole, setUserRole] = useState<string | null>(null)
   const [userRoles, setUserRoles] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [isEmailVerified, setIsEmailVerified] = useState(false)
   const { toast } = useToast()
 
-  /* ---- role + email-verification fetch ---- */
+  /* ---- role fetch ---- */
 
   const fetchUserRole = useCallback(async (userId: string) => {
     try {
-      console.log('[AuthProvider] Fetching roles for user:', userId)
-
       const [rolesRes, primaryRes] = await Promise.all([
-        ibmDb.from('user_roles').select('*').eq('user_id', userId).eq('is_active', true),
-        ibmDb.rpc('get_user_role', { p_user_id: userId }),
+        supabase.from('user_roles').select('*').eq('user_id', userId).eq('is_active', true),
+        supabase.rpc('get_user_role', { p_user_id: userId }),
       ])
 
       const roles: string[] =
@@ -88,7 +81,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         new Set([...roles, primaryRole].filter(Boolean)),
       ) as string[]
 
-      console.log('[AuthProvider] Final roles:', normalizedRoles, 'Primary:', primaryRole)
       setUserRole(primaryRole)
       setUserRoles(normalizedRoles.length > 0 ? normalizedRoles : ['viewer'])
     } catch (error) {
@@ -98,139 +90,113 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  const checkEmailVerification = useCallback(async (userId: string) => {
-    try {
-      const { data } = await ibmDb.rpc('is_email_verified', { p_user_id: userId })
-      setIsEmailVerified(data === true)
-    } catch {
-      setIsEmailVerified(false)
-    }
-  }, [])
-
   /* ---- bootstrap session on mount ---- */
 
   useEffect(() => {
-    let mounted = true
+    // Set up auth state listener FIRST
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, currentSession) => {
+        setSession(currentSession)
+        setUser(currentSession?.user ?? null)
 
-    const init = async () => {
-      try {
-        const s = await ibmAuth.getSession()
-        if (!mounted) return
-
-        setSession(s)
-        setUser(s?.user ?? null)
-
-        if (s?.user) {
-          try {
-            await fetchUserRole(s.user.id)
-            await checkEmailVerification(s.user.id)
-          } catch {
-            setUserRole('viewer')
-            setUserRoles(['viewer'])
-          }
+        if (currentSession?.user) {
+          setIsEmailVerified(!!currentSession.user.email_confirmed_at)
+          // Defer role fetch to avoid deadlock
+          setTimeout(() => fetchUserRole(currentSession.user.id), 0)
         } else {
           setUserRole(null)
           setUserRoles([])
           setIsEmailVerified(false)
         }
-      } finally {
-        if (mounted) setLoading(false)
+        setLoading(false)
       }
-    }
+    )
 
-    init()
-    return () => { mounted = false }
-  }, [fetchUserRole, checkEmailVerification])
+    // THEN check existing session
+    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      setSession(currentSession)
+      setUser(currentSession?.user ?? null)
+      if (currentSession?.user) {
+        setIsEmailVerified(!!currentSession.user.email_confirmed_at)
+        fetchUserRole(currentSession.user.id)
+      }
+      setLoading(false)
+    })
 
-  /* ---- sign-in (IBM App ID popup) ---- */
+    return () => subscription.unsubscribe()
+  }, [fetchUserRole])
 
-  const signIn = useCallback(async (_email?: string, _password?: string) => {
+  /* ---- sign-in ---- */
+
+  const signIn = useCallback(async (email?: string, password?: string) => {
+    if (!email || !password) throw new Error('Email and password are required')
     setLoading(true)
     try {
-      const s = await ibmAuth.signIn()
-      setSession(s)
-      setUser(s.user)
-
-      await fetchUserRole(s.user.id)
-      await checkEmailVerification(s.user.id)
-
-      // audit log
-      try {
-        await ibmDb.rpc('create_audit_log', {
-          p_action: 'user_login',
-          p_table_name: 'auth.users',
-        })
-      } catch { /* best-effort */ }
-
+      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) throw error
       toast({ title: 'Welcome back!', description: 'You have been signed in successfully.' })
     } catch (error: any) {
-      console.error('[AuthProvider] Sign-in error:', error)
       toast({ title: 'Sign in failed', description: sanitizeError(error), variant: 'destructive' })
       throw error
     } finally {
       setLoading(false)
     }
-  }, [fetchUserRole, checkEmailVerification, toast])
+  }, [toast])
 
-  /* ---- sign-up (IBM App ID popup / Cloud Directory) ---- */
+  /* ---- sign-up ---- */
 
-  const signUp = useCallback(async (_email?: string, _password?: string, _firstName?: string, _lastName?: string) => {
-    // IBM App ID handles registration through its popup flow (Cloud Directory).
-    // Calling signIn which opens the login widget where users can also register.
+  const signUp = useCallback(async (email?: string, password?: string, firstName?: string, lastName?: string) => {
+    if (!email || !password) throw new Error('Email and password are required')
     setLoading(true)
     try {
-      const s = await ibmAuth.signIn()
-      setSession(s)
-      setUser(s.user)
-
-      await fetchUserRole(s.user.id)
-
-      toast({ title: 'Account created!', description: 'Welcome to Halo Business Finance.' })
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: window.location.origin,
+          data: {
+            first_name: firstName || '',
+            last_name: lastName || '',
+            display_name: `${firstName || ''} ${lastName || ''}`.trim(),
+          },
+        },
+      })
+      if (error) throw error
+      toast({ title: 'Account created!', description: 'Please check your email to verify your account.' })
     } catch (error: any) {
-      console.error('[AuthProvider] Sign-up error:', error)
       toast({ title: 'Sign up failed', description: sanitizeError(error), variant: 'destructive' })
       throw error
     } finally {
       setLoading(false)
     }
-  }, [fetchUserRole, toast])
+  }, [toast])
 
   /* ---- sign-out ---- */
 
   const signOut = useCallback(async () => {
     try {
-      // audit log
-      try {
-        await ibmDb.rpc('create_audit_log', {
-          p_action: 'user_logout',
-          p_table_name: 'auth.users',
-        })
-      } catch { /* best-effort */ }
-
-      await ibmAuth.signOut()
+      await supabase.auth.signOut()
       setSession(null)
       setUser(null)
       setUserRole(null)
       setUserRoles([])
       setIsEmailVerified(false)
-
       toast({ title: 'Signed out', description: 'You have been signed out successfully.' })
     } catch (error: any) {
-      console.error('[AuthProvider] Sign-out error:', error)
       toast({ title: 'Sign out failed', description: sanitizeError(error), variant: 'destructive' })
     }
   }, [toast])
 
-  /* ---- reset password (via hbf-api proxy) ---- */
+  /* ---- reset password ---- */
 
   const resetPassword = useCallback(async (email: string) => {
     try {
-      // Cloud Directory password reset is handled by the IBM App ID login widget.
-      // For programmatic reset, route through hbf-api.
-      await ibmDb.rpc('request_password_reset', { p_email: email })
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      })
+      if (error) throw error
       toast({ title: 'Password reset sent', description: 'Check your email for reset instructions.' })
     } catch (error: any) {
-      console.error('[AuthProvider] Password reset error:', error)
       toast({ title: 'Password reset failed', description: sanitizeError(error), variant: 'destructive' })
       throw error
     }
@@ -241,16 +207,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const resendVerificationEmail = useCallback(async () => {
     if (!user?.email) throw new Error('No user email found')
     try {
-      await ibmDb.rpc('resend_verification_email', { p_email: user.email })
+      const { error } = await supabase.auth.resend({ type: 'signup', email: user.email })
+      if (error) throw error
       toast({ title: 'Verification email sent', description: 'Please check your inbox.' })
     } catch (error: any) {
-      console.error('[AuthProvider] Resend verification error:', error)
       toast({ title: 'Failed to resend email', description: sanitizeError(error), variant: 'destructive' })
       throw error
     }
   }, [user, toast])
 
-  /* ---- hasRole (UI-only, same hierarchy logic) ---- */
+  /* ---- hasRole ---- */
 
   const hasRole = useCallback((role: string) => {
     if (!userRoles || userRoles.length === 0) return false

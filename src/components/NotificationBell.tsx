@@ -204,9 +204,9 @@ export function NotificationBell() {
         <Button 
           variant="ghost" 
           size="icon" 
-          className="h-9 w-9 text-foreground dark:text-white hover:bg-transparent border border-transparent hover:border-blue-500 hover:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 transition-colors relative"
+          className="h-9 w-9 hover:bg-transparent border border-transparent hover:border-blue-500 hover:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 transition-colors relative"
         >
-          <Bell className="w-6 h-6" fill="rgb(234, 179, 8)" stroke="rgb(234, 179, 8)" />
+          <Bell className="w-6 h-6" fill="rgb(234, 179, 8)" stroke="black" />
           {unreadCount > 0 && (
             <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full flex items-center justify-center text-xs bg-primary text-primary-foreground">
               {unreadCount > 99 ? '99+' : unreadCount}

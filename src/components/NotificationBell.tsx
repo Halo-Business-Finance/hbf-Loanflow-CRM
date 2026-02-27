@@ -196,7 +196,7 @@ export function NotificationBell() {
     setUnreadCount(generalUnread + collaborationUnread)
   }, [notifications, collaborationNotifications])
 
-  if (!user || hasError) return null
+  if (!user) return null
 
   return (
     <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>

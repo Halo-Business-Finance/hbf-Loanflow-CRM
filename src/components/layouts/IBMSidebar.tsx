@@ -29,6 +29,7 @@ import {
   Menu,
   Workflow,
   Castle,
+  Target,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -81,7 +82,6 @@ const navItems: NavItemData[] = [
     ]
   },
   { icon: Mail, label: 'Messages', to: '/messages' },
-  { icon: Megaphone, label: 'Marketing Hub', to: '/marketing' },
   { 
     icon: Workflow, 
     label: 'Loan Pipeline', 
@@ -113,7 +113,18 @@ const navItems: NavItemData[] = [
   { icon: UserCog, label: 'User Directory', to: '/user-directory' },
   { icon: Landmark, label: 'Banks & Lenders', to: '/lenders' },
   { icon: Castle, label: 'Title & Escrow', to: '/service-providers' },
-  { 
+  {
+    icon: Megaphone,
+    label: 'Marketing Hub',
+    to: '/marketing',
+    subItems: [
+      { icon: Megaphone, label: 'Marketing Analytics', to: '/marketing' },
+      { icon: Mail, label: 'Email Campaigns', to: '/marketing/campaigns' },
+      { icon: Target, label: 'Lead Capture', to: '/marketing/lead-capture' },
+      { icon: TrendingUp, label: 'Conversion Funnel', to: '/marketing/funnel' },
+    ]
+  },
+  {
     icon: Building2, 
     label: 'Enterprise', 
     to: '/enterprise',

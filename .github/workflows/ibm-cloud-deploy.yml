@@ -124,7 +124,8 @@ jobs:
             --env IBM_APPID_CLIENT_ID="${{ secrets.IBM_APPID_CLIENT_ID }}" \
             --env NODE_ENV=production \
             --min-scale 1 --max-scale 10 \
-            --cpu 0.5 --memory 1G || \
+            --cpu 0.5 --memory 1G \
+            --no-wait || \
           ibmcloud ce application create \
             --name "${{ env.CE_APP_NAME }}" \
             --image "${PRIVATE_IMAGE}" \
@@ -136,7 +137,8 @@ jobs:
             --env IBM_APPID_CLIENT_ID="${{ secrets.IBM_APPID_CLIENT_ID }}" \
             --env NODE_ENV=production \
             --min-scale 1 --max-scale 10 \
-            --cpu 0.5 --memory 1G
+            --cpu 0.5 --memory 1G \
+            --no-wait
 
       - name: Wait for revision to become ready
         run: |

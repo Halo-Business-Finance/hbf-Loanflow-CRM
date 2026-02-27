@@ -146,40 +146,13 @@ export function useRealtimeLeads() {
   // Set up real-time subscription for leads
   useRealtimeSubscription({
     table: 'leads',
-    onInsert: () => fetchLeads({ silent: true }),
-    onUpdate: () => fetchLeads({ silent: true }),
-    onDelete: (payload) => {
-      setLeads(prev => prev.filter(lead => lead.id !== payload.old.id))
-      toast({ title: "Lead Deleted", description: `Lead has been removed`, variant: "destructive" })
-    }
+    onChange: () => fetchLeads({ silent: true }),
   })
 
   // Set up real-time subscription for contact entities
   useRealtimeSubscription({
     table: 'contact_entities',
-    onUpdate: (payload) => {
-      setLeads(prev => prev.map(lead => {
-        if (lead.contact_entity_id === payload.new.id) {
-          const computedName = payload.new.first_name || payload.new.last_name
-            ? `${payload.new.first_name || ''} ${payload.new.last_name || ''}`.trim()
-            : (payload.new.name || '')
-          
-          return {
-            ...lead,
-            contact_entity: payload.new,
-            name: computedName,
-            email: payload.new.email,
-            phone: payload.new.phone,
-            business_name: payload.new.business_name,
-            loan_amount: payload.new.loan_amount,
-            loan_type: payload.new.loan_type,
-            stage: payload.new.stage,
-            priority: payload.new.priority
-          }
-        }
-        return lead
-      }))
-    }
+    onChange: () => fetchLeads({ silent: true }),
   })
 
   useEffect(() => {

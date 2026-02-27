@@ -49,13 +49,17 @@ export function useRealtimeSubscription({
     if (!enabled) return
 
     const tick = () => {
-      // In polling mode we can't distinguish event types, so we call
-      // the generic onChange plus all specific handlers with a synthetic payload.
-      const syntheticPayload = { eventType: 'POLL', table }
-      changeRef.current?.(syntheticPayload)
-      insertRef.current?.(syntheticPayload)
-      updateRef.current?.(syntheticPayload)
-      deleteRef.current?.(syntheticPayload)
+      // In polling mode we can't distinguish event types.
+      // Only call onChange (the generic handler). Do NOT call onInsert/onUpdate/onDelete
+      // because they expect real Supabase payloads with .new/.old properties
+      // and will crash with synthetic payloads.
+      if (changeRef.current) {
+        changeRef.current({ eventType: 'POLL', table })
+      } else if (insertRef.current && !deleteRef.current) {
+        // Fallback: if only onInsert is set (no onDelete that would crash),
+        // treat poll as a generic refresh trigger
+        insertRef.current({ eventType: 'POLL', table })
+      }
     }
 
     console.log(`[Polling] Starting ${interval}ms poll for table: ${table}`)

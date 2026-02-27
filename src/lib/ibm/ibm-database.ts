@@ -70,6 +70,61 @@ function getApiOrigins(): string[] {
   return origins;
 }
 
+function getSupabaseProxyUrl(): string | null {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  return supabaseUrl ? `${supabaseUrl}/functions/v1/hbf-api-proxy` : null;
+}
+
+async function fetchViaSupabaseProxy(path: string, init: RequestInit): Promise<Response> {
+  const proxyUrl = getSupabaseProxyUrl();
+  if (!proxyUrl) {
+    throw new Error('Supabase URL not configured for proxy fallback');
+  }
+
+  const headers = new Headers(init.headers ?? {});
+  const authHeader = headers.get('Authorization') ?? headers.get('authorization') ?? undefined;
+  const apiKeyHeader = headers.get('x-api-key') ?? undefined;
+
+  let parsedBody: unknown = undefined;
+  if (init.body != null) {
+    if (typeof init.body === 'string') {
+      try {
+        parsedBody = JSON.parse(init.body);
+      } catch {
+        parsedBody = init.body;
+      }
+    } else {
+      parsedBody = init.body;
+    }
+  }
+
+  const proxyHeaders: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+
+  if (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY) {
+    proxyHeaders['apikey'] = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  }
+
+  if (authHeader) {
+    proxyHeaders['Authorization'] = authHeader;
+  }
+
+  return fetch(proxyUrl, {
+    method: 'POST',
+    headers: proxyHeaders,
+    body: JSON.stringify({
+      path,
+      method: init.method ?? 'GET',
+      body: parsedBody,
+      forwardHeaders: {
+        authorization: authHeader,
+        'x-api-key': apiKeyHeader,
+      },
+    }),
+  });
+}
+
 async function fetchWithOriginFallback(path: string, init: RequestInit): Promise<Response> {
   const origins = getApiOrigins();
   let lastError: unknown = null;
@@ -82,6 +137,13 @@ async function fetchWithOriginFallback(path: string, init: RequestInit): Promise
       lastError = error;
       console.warn(`[ibmDb] Network fetch failed for ${url}, trying next origin...`, error);
     }
+  }
+
+  try {
+    console.warn(`[ibmDb] Direct origins failed, routing through Supabase proxy for ${path}`);
+    return await fetchViaSupabaseProxy(path, init);
+  } catch (proxyError) {
+    lastError = proxyError;
   }
 
   throw lastError instanceof Error

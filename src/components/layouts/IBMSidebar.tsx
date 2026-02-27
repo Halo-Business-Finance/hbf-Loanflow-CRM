@@ -22,6 +22,7 @@ import {
   FileCheck,
   AlertTriangle,
   Mail,
+  Megaphone,
   FileSpreadsheet,
   HandCoins,
   Landmark,
@@ -80,6 +81,7 @@ const navItems: NavItemData[] = [
     ]
   },
   { icon: Mail, label: 'Messages', to: '/messages' },
+  { icon: Megaphone, label: 'Marketing Hub', to: '/marketing' },
   { 
     icon: Workflow, 
     label: 'Loan Pipeline', 

@@ -19,6 +19,7 @@ ENV PORT=8080
 
 # Non-root user for security
 RUN addgroup -S api && adduser -S api -G api && chown -R api:api /app
+RUN apk add --no-cache wget
 USER api
 
 EXPOSE 8080

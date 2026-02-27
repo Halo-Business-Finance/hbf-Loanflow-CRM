@@ -115,7 +115,7 @@ export function IBMTopBar({ onMenuClick, sidebarCollapsed }: IBMTopBarProps) {
   };
 
   return (
-    <header className="h-16 md:h-20 lg:h-24 bg-[#0a1628] border-b border-[#1a2942] flex items-center justify-between flex-shrink-0 w-full px-2 md:px-4">
+    <header className="h-16 md:h-20 lg:h-24 bg-white dark:bg-[#0a1628] border-b border-border dark:border-[#1a2942] flex items-center justify-between flex-shrink-0 w-full px-2 md:px-4">
       {/* Left section with brand */}
       <div className="flex items-center h-full flex-1">
         <BrandLogo
@@ -123,40 +123,40 @@ export function IBMTopBar({ onMenuClick, sidebarCollapsed }: IBMTopBarProps) {
           showText={false} 
           imageSrc={logoAsset}
           className="-ml-10 md:-ml-8 mt-4"
-          imageClassName="brightness-0 invert"
+          imageClassName="dark:brightness-0 dark:invert"
         />
       </div>
 
       {/* Center search bar */}
       <div className="flex justify-center items-center gap-2">
         <div className="relative" ref={searchRef}>
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground dark:text-gray-400" />
           <Input
             placeholder="Search by the borrower or company name..."
-            className="pl-10 h-9 bg-[#1a2942] border-[#2a3952] text-white placeholder:text-gray-400 focus:bg-[#243552] rounded-none w-[280px] md:w-[360px] lg:w-[420px]"
+            className="pl-10 h-9 bg-muted dark:bg-[#1a2942] border-border dark:border-[#2a3952] text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-gray-400 focus:bg-accent dark:focus:bg-[#243552] rounded-none w-[280px] md:w-[360px] lg:w-[420px]"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onFocus={() => searchQuery.length >= 2 && setShowResults(true)}
           />
           {showResults && searchResults.length > 0 && (
-            <div className="absolute top-full left-0 right-0 mt-1 bg-[#1a2942] border border-[#2a3952] rounded-sm shadow-lg max-h-96 overflow-y-auto z-50">
+            <div className="absolute top-full left-0 right-0 mt-1 bg-popover dark:bg-[#1a2942] border border-border dark:border-[#2a3952] rounded-sm shadow-lg max-h-96 overflow-y-auto z-50">
               {searchResults.map((result) => (
                 <div
                   key={result.id}
-                  className="px-4 py-3 hover:bg-[#243552] cursor-pointer border-b border-[#2a3952] last:border-b-0"
+                  className="px-4 py-3 hover:bg-accent dark:hover:bg-[#243552] cursor-pointer border-b border-border dark:border-[#2a3952] last:border-b-0"
                   onClick={() => handleResultClick(result)}
                 >
-                  <div className="text-white font-medium">{result.name}</div>
+                  <div className="text-foreground dark:text-white font-medium">{result.name}</div>
                   {result.businessName && (
-                    <div className="text-gray-400 text-sm">{result.businessName}</div>
+                    <div className="text-muted-foreground dark:text-gray-400 text-sm">{result.businessName}</div>
                   )}
                 </div>
               ))}
             </div>
           )}
           {showResults && searchQuery.length >= 2 && searchResults.length === 0 && (
-            <div className="absolute top-full left-0 right-0 mt-1 bg-[#1a2942] border border-[#2a3952] rounded-sm shadow-lg z-50">
-              <div className="px-4 py-3 text-gray-400 text-sm">
+            <div className="absolute top-full left-0 right-0 mt-1 bg-popover dark:bg-[#1a2942] border border-border dark:border-[#2a3952] rounded-sm shadow-lg z-50">
+              <div className="px-4 py-3 text-muted-foreground dark:text-gray-400 text-sm">
                 No borrowers found matching "{searchQuery}"
               </div>
             </div>
@@ -173,7 +173,7 @@ export function IBMTopBar({ onMenuClick, sidebarCollapsed }: IBMTopBarProps) {
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 md:h-9 md:w-9 text-white hover:bg-transparent border border-transparent hover:border-blue-500 hover:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 transition-colors"
+          className="h-8 w-8 md:h-9 md:w-9 text-foreground dark:text-white hover:bg-transparent border border-transparent hover:border-blue-500 hover:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 transition-colors"
           onClick={() => window.open('https://outlook.office.com', '_blank')}
           title="Open Microsoft 365 Email"
         >
@@ -183,7 +183,7 @@ export function IBMTopBar({ onMenuClick, sidebarCollapsed }: IBMTopBarProps) {
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 md:h-9 md:w-9 text-white hover:bg-transparent border border-transparent hover:border-blue-500 hover:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 transition-colors"
+          className="h-8 w-8 md:h-9 md:w-9 text-foreground dark:text-white hover:bg-transparent border border-transparent hover:border-blue-500 hover:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 transition-colors"
           onClick={() => window.open('https://app.ringcentral.com', '_blank')}
           title="Open RingCentral Dial Pad"
         >
@@ -193,7 +193,7 @@ export function IBMTopBar({ onMenuClick, sidebarCollapsed }: IBMTopBarProps) {
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 md:h-9 md:w-9 text-white hover:bg-transparent border border-transparent hover:border-blue-500 hover:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 transition-colors"
+          className="h-8 w-8 md:h-9 md:w-9 text-foreground dark:text-white hover:bg-transparent border border-transparent hover:border-blue-500 hover:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 transition-colors"
           onClick={() => navigate('/support')}
           title="Support Center"
         >
@@ -207,7 +207,7 @@ export function IBMTopBar({ onMenuClick, sidebarCollapsed }: IBMTopBarProps) {
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 md:h-9 md:w-9 text-white hover:bg-transparent border border-transparent hover:border-blue-500 transition-colors"
+              className="h-8 w-8 md:h-9 md:w-9 text-foreground dark:text-white hover:bg-transparent border border-transparent hover:border-blue-500 transition-colors"
             >
               <User className="h-5 w-5 md:h-6 md:w-6" />
             </Button>

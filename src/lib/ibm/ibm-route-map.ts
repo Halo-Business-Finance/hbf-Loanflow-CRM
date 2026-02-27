@@ -45,7 +45,7 @@ export const ROUTE_MAP: Record<string, RouteConfig> = {
   contact_entities: {
     basePath: '/api/v1/borrowers',
     dataKey: 'root',
-    filterParams: [],
+    filterParams: ['user_id', 'stage', 'priority', 'loan_type', 'email', 'status'],
     supportsGetById: true,
     supportsDelete: false,
   },

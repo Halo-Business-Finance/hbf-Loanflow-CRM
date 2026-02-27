@@ -207,20 +207,52 @@ class IBMQueryBuilder<T = any> {
 
     for (const f of this.state.filters) {
       if (f.type === 'or' && f.column === '__or__') {
-        // Pass PostgREST-style OR filter as `or` query param
         params.set('or', String(f.value));
         continue;
       }
+      // eq filter — only for allowed columns
       if (f.type === 'eq' && allowed.has(f.column) && f.value != null) {
         params.set(f.column, String(f.value));
       }
+      // in filter — pass as comma-separated list
+      if (f.type === 'in' && f.value != null) {
+        const values = Array.isArray(f.value) ? f.value.join(',') : String(f.value);
+        params.set(`${f.column}__in`, values);
+      }
+      // Comparison filters
+      if (f.type === 'gte' && f.value != null) {
+        params.set(`${f.column}__gte`, String(f.value));
+      }
+      if (f.type === 'gt' && f.value != null) {
+        params.set(`${f.column}__gt`, String(f.value));
+      }
+      if (f.type === 'lte' && f.value != null) {
+        params.set(`${f.column}__lte`, String(f.value));
+      }
+      if (f.type === 'lt' && f.value != null) {
+        params.set(`${f.column}__lt`, String(f.value));
+      }
+      if (f.type === 'neq' && f.value != null) {
+        params.set(`${f.column}__neq`, String(f.value));
+      }
       if (f.type === 'ilike' && f.value != null) {
         params.set(`${f.column}__ilike`, String(f.value));
+      }
+      if (f.type === 'like' && f.value != null) {
+        params.set(`${f.column}__like`, String(f.value));
+      }
+      if (f.type === 'is') {
+        params.set(`${f.column}__is`, String(f.value));
       }
     }
 
     if (this.state.limitCount) {
       params.set('limit', String(this.state.limitCount));
+    }
+
+    if (this.state.rangeFrom != null && this.state.rangeTo != null) {
+      params.set('offset', String(this.state.rangeFrom));
+      params.set('limit', String(this.state.rangeTo - this.state.rangeFrom + 1));
     }
 
     return params;

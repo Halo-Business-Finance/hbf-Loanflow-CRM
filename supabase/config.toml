@@ -90,3 +90,6 @@ verify_jwt = true
 
 [functions.scan-document]
 verify_jwt = true
+
+[functions.hbf-api-proxy]
+verify_jwt = false

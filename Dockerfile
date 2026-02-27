@@ -8,7 +8,7 @@ WORKDIR /app
 
 # Install dependencies
 COPY package.json package-lock.json* ./
-RUN npm ci --omit=dev --ignore-scripts 2>/dev/null || npm install --omit=dev --ignore-scripts
+RUN npm ci --omit=dev --ignore-scripts || npm install --omit=dev --ignore-scripts
 
 # Copy application code
 COPY src/ ./src/
@@ -19,6 +19,7 @@ ENV PORT=8080
 
 # Non-root user for security
 RUN addgroup -S api && adduser -S api -G api && chown -R api:api /app
+RUN apk add --no-cache wget
 USER api
 
 EXPOSE 8080

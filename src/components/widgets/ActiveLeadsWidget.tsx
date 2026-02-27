@@ -18,7 +18,7 @@ import {
   FileText
 } from 'lucide-react';
 import { ibmDb } from '@/lib/ibm';
-import { getAuthUser } from '@/lib/auth-utils';
+import { useAuth } from '@/components/auth/AuthProvider';
 import {
   Popover,
   PopoverContent,
@@ -49,6 +49,7 @@ interface LeadStats {
 
 export const ActiveLeadsWidget = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [stats, setStats] = useState<LeadStats>({
     totalLeads: 0,
@@ -67,25 +68,14 @@ export const ActiveLeadsWidget = () => {
     try {
       setLoading(true);
       
-      // Get current user
-      const user = await getAuthUser();
       if (!user) return;
 
-      // Fetch leads assigned to current user or unassigned
+      // Fetch leads — the REST route doesn't support user_id filter
       let query = ibmDb
         .from('leads')
-        .select(`
-          id,
-          contact_entity_id,
-          user_id,
-          created_at
-        `)
+        .select('id, contact_entity_id, user_id, created_at')
         .order('created_at', { ascending: false })
         .limit(50);
-
-      if (showUnassignedOnly) {
-        query = query.is('user_id', null);
-      }
 
       const { data: leadsData, error: leadsError } = await query;
       if (leadsError) throw leadsError;
@@ -102,18 +92,26 @@ export const ActiveLeadsWidget = () => {
         return;
       }
 
-      // Fetch contact entities
-      const contactIds = leadsData.map(l => l.contact_entity_id).filter(Boolean);
-      const { data: contacts, error: contactsError } = await ibmDb
-        .from('contact_entities')
-        .select('id, name, business_name, email, phone, loan_type, loan_amount, stage, priority')
-        .in('id', contactIds as string[]);
+      // Filter client-side for unassigned if needed
+      let filteredLeadsData = leadsData as any[];
+      if (showUnassignedOnly) {
+        filteredLeadsData = filteredLeadsData.filter(l => !l.user_id);
+      }
 
-      if (contactsError) throw contactsError;
+      // Fetch contact entities separately (no join support in REST)
+      const contactIds = filteredLeadsData.map(l => l.contact_entity_id).filter(Boolean);
+      
+      let contactsById = new Map<string, any>();
+      if (contactIds.length > 0) {
+        const { data: contacts, error: contactsError } = await ibmDb
+          .from('contact_entities')
+          .select('id, name, business_name, email, phone, loan_type, loan_amount, stage, priority')
+          .in('id', contactIds as string[]);
+        if (contactsError) throw contactsError;
+        contactsById = new Map((contacts || []).map((c: any) => [c.id, c]));
+      }
 
-      const contactsById = new Map((contacts || []).map(c => [c.id, c]));
-
-      const formattedLeads = leadsData.map(lead => {
+      const formattedLeads = filteredLeadsData.map(lead => {
         const contact: any = contactsById.get(lead.contact_entity_id);
         if (!contact) return null;
         return {

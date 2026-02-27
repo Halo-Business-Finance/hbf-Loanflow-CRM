@@ -40,7 +40,7 @@ export function GlobalSearch() {
 
     setLoading(true)
     try {
-      // First, find matching contact entities
+      // Search contact entities directly
       const { data: matchingContacts } = await supabase
         .from('contact_entities')
         .select('id, name, email, stage, loan_amount')
@@ -48,47 +48,37 @@ export function GlobalSearch() {
         .or(`name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%`)
 
       const contactIds = matchingContacts?.map(c => c.id) || []
+      const contactsMap = new Map((matchingContacts || []).map((c: any) => [c.id, c]))
 
       // Search leads with matching contact entities
-      const { data: leads } = contactIds.length > 0 ? await supabase
-        .from('leads')
-        .select(`
-          id, user_id, contact_entity_id,
-          contact_entity:contact_entities!contact_entity_id (
-            name, email, stage, loan_amount
-          )
-        `)
-        .eq('user_id', user.id)
-        .in('contact_entity_id', contactIds)
-        .limit(5) : { data: [] }
+      let leads: any[] = []
+      if (contactIds.length > 0) {
+        const { data: leadsData } = await supabase
+          .from('leads')
+          .select('id, user_id, contact_entity_id')
+          .eq('user_id', user.id)
+          .in('contact_entity_id', contactIds)
+          .limit(5)
+        leads = (leadsData || []).map((l: any) => ({
+          ...l,
+          contact_entity: contactsMap.get(l.contact_entity_id) || null,
+        }))
+      }
 
       // Search clients with matching contact entities
-      const { data: clients } = contactIds.length > 0 ? await supabase
-        .from('clients')
-        .select(`
-          id, user_id, status, contact_entity_id,
-          contact_entity:contact_entities!contact_entity_id (
-            name, email
-          )
-        `)
-        .eq('user_id', user.id)
-        .in('contact_entity_id', contactIds)
-        .limit(5) : { data: [] }
-
-      // Search loans
-      const { data: loans } = await supabase
-        .from('loans')
-        .select(`
-          id, loan_amount, loan_type, status,
-          clients!inner(
-            contact_entity:contact_entities!contact_entity_id (
-              name
-            )
-          )
-        `)
-        .eq('user_id', user.id)
-        .or(`loan_type.ilike.%${searchQuery}%`)
-        .limit(5)
+      let clients: any[] = []
+      if (contactIds.length > 0) {
+        const { data: clientsData } = await supabase
+          .from('clients')
+          .select('id, user_id, status, contact_entity_id')
+          .eq('user_id', user.id)
+          .in('contact_entity_id', contactIds)
+          .limit(5)
+        clients = (clientsData || []).map((c: any) => ({
+          ...c,
+          contact_entity: contactsMap.get(c.contact_entity_id) || null,
+        }))
+      }
 
       const searchResults: SearchResult[] = []
 
@@ -115,16 +105,8 @@ export function GlobalSearch() {
         })
       })
 
-      // Add loans to results
-      loans?.forEach(loan => {
-        searchResults.push({
-          id: loan.id,
-          type: 'loan',
-          title: `${loan.loan_type} - $${loan.loan_amount?.toLocaleString()}`,
-          subtitle: loan.clients?.contact_entity?.name || 'Unknown Client',
-          stage: loan.status
-        })
-      })
+      // Loans search removed — the loans table doesn't have a REST route
+      // and the nested join syntax won't work with IBM REST
 
       setResults(searchResults)
     } catch (error) {

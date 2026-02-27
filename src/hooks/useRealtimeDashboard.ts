@@ -31,46 +31,63 @@ export function useRealtimeDashboard() {
   const [loading, setLoading] = useState(true)
   const { toast } = useToast()
 
-  // Fetch dashboard data
   const fetchDashboardData = async () => {
     try {
       setLoading(true)
-      
-      // Fetch leads
+
+      // Fetch leads (no joins — IBM REST doesn't support them)
       const { data: leadsData } = await ibmDb
         .from('leads')
-        .select(`
-          id,
-          created_at,
-          contact_entity:contact_entities!contact_entity_id(
-            stage,
-            priority,
-            loan_amount
-          )
-        `)
+        .select('id, contact_entity_id, created_at')
+
+      // Collect contact_entity_ids to fetch separately
+      const contactIds = (leadsData || [])
+        .map((l: any) => l.contact_entity_id)
+        .filter(Boolean)
+
+      let contactsMap = new Map<string, any>()
+
+      if (contactIds.length > 0) {
+        const { data: contactsData } = await ibmDb
+          .from('contact_entities')
+          .select('id, stage, priority, loan_amount')
+          .in('id', contactIds)
+
+        contactsMap = new Map(
+          (contactsData || []).map((c: any) => [c.id, c])
+        )
+      }
 
       // Fetch clients
       const { data: clientsData } = await ibmDb
         .from('clients')
         .select('id, total_loans, total_loan_value')
 
+      // Merge leads with their contact entities
+      const enrichedLeads = (leadsData || []).map((lead: any) => ({
+        ...lead,
+        contact_entity: contactsMap.get(lead.contact_entity_id) || null,
+      }))
+
       // Calculate stats
-      const totalLeads = leadsData?.length || 0
-      const activeLeads = (leadsData as any[])?.filter(lead => 
+      const totalLeads = enrichedLeads.length
+      const activeLeads = enrichedLeads.filter((lead: any) =>
         lead.contact_entity?.stage && !['Loan Funded', 'Archive'].includes(lead.contact_entity.stage)
-      ).length || 0
-      
+      ).length
+
       const totalClients = clientsData?.length || 0
-      const totalLoans = (clientsData as any[])?.reduce((sum, client) => sum + (client.total_loans || 0), 0) || 0
-      
-      const pipelineValue = (leadsData as any[])?.reduce((sum, lead) => 
-        sum + (lead.contact_entity?.loan_amount || 0), 0
+      const totalLoans = (clientsData as any[])?.reduce(
+        (sum, client) => sum + (client.total_loans || 0), 0
       ) || 0
-      
-      const convertedLeads = (leadsData as any[])?.filter(lead => 
-        lead.contact_entity?.stage === 'Loan Funded'
-      ).length || 0
-      
+
+      const pipelineValue = enrichedLeads.reduce(
+        (sum: number, lead: any) => sum + (lead.contact_entity?.loan_amount || 0), 0
+      )
+
+      const convertedLeads = enrichedLeads.filter(
+        (lead: any) => lead.contact_entity?.stage === 'Loan Funded'
+      ).length
+
       const conversionRate = totalLeads > 0 ? (convertedLeads / totalLeads) * 100 : 0
 
       setStats({
@@ -94,35 +111,13 @@ export function useRealtimeDashboard() {
     }
   }
 
-  // Set up real-time subscriptions
-  useRealtimeSubscription({
-    table: 'leads',
-    onChange: () => {
-      fetchDashboardData()
-    }
-  })
-
-  useRealtimeSubscription({
-    table: 'clients',
-    onChange: () => {
-      fetchDashboardData()
-    }
-  })
-
-  useRealtimeSubscription({
-    table: 'contact_entities',
-    onChange: () => {
-      fetchDashboardData()
-    }
-  })
+  useRealtimeSubscription({ table: 'leads', onChange: () => fetchDashboardData() })
+  useRealtimeSubscription({ table: 'clients', onChange: () => fetchDashboardData() })
+  useRealtimeSubscription({ table: 'contact_entities', onChange: () => fetchDashboardData() })
 
   useEffect(() => {
     fetchDashboardData()
   }, [])
 
-  return {
-    stats,
-    loading,
-    refetch: fetchDashboardData
-  }
+  return { stats, loading, refetch: fetchDashboardData }
 }

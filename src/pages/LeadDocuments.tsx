@@ -55,33 +55,20 @@ export default function LeadDocuments() {
   }, [leadId, user])
 
   const fetchLeadDetails = async () => {
-    // Guard for invalid route param
     const isValidUuid = (v?: string) => !!v && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v)
     if (!isValidUuid(leadId)) return
 
     try {
-      const { data, error } = await ibmDb
+      // Fetch lead without join
+      const { data: leadData, error } = await ibmDb
         .from('leads')
-        .select(`
-          id,
-          contact_entity_id,
-          user_id,
-          contact_entity:contact_entities!contact_entity_id(
-            name,
-            email,
-            phone,
-            business_name,
-            loan_amount,
-            loan_type,
-            stage
-          )
-        `)
+        .select('id, contact_entity_id, user_id')
         .eq('id', leadId)
         .maybeSingle()
 
       if (error) throw error
 
-      if (!data) {
+      if (!leadData) {
         toast({
           title: "Error",
           description: "Lead not found or you don't have permission to view it",
@@ -91,7 +78,18 @@ export default function LeadDocuments() {
         return
       }
 
-      setLead(data)
+      // Fetch contact entity separately
+      let contactEntity: any = null
+      if (leadData.contact_entity_id) {
+        const { data: ceData } = await ibmDb
+          .from('contact_entities')
+          .select('name, email, phone, business_name, loan_amount, loan_type, stage')
+          .eq('id', leadData.contact_entity_id)
+          .maybeSingle()
+        contactEntity = ceData
+      }
+
+      setLead({ ...leadData, contact_entity: contactEntity })
     } catch (error) {
       console.error('Error fetching lead details:', error)
       toast({

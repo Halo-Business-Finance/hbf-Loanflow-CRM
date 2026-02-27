@@ -226,17 +226,17 @@ function NavItem({ icon: Icon, label, to, collapsed, subItems }: NavItemProps) {
                 key={subItem.to}
                 to={subItem.to!}
                 className={cn(
-                  'flex items-center h-8 text-xs transition-all duration-300 relative pl-4 rounded mr-1',
+                  'group/sub flex items-center h-8 text-xs transition-all duration-300 relative pl-4 rounded mr-1',
                   location.pathname === subItem.to || location.pathname.startsWith(subItem.to! + '/')
                     ? 'text-foreground dark:text-white font-medium'
                     : 'text-muted-foreground dark:text-gray-400 hover:text-foreground dark:hover:text-white'
                 )}
               >
                 <span className={cn(
-                  'truncate text-xs',
+                  'truncate text-xs border-b-2',
                   (location.pathname === subItem.to || location.pathname.startsWith(subItem.to! + '/'))
-                    ? 'underline underline-offset-4 decoration-blue-500 decoration-2'
-                    : 'hover:underline hover:underline-offset-4 hover:decoration-blue-500 hover:decoration-2'
+                    ? 'border-blue-500'
+                    : 'border-transparent group-hover/sub:border-blue-500'
                 )}>{subItem.label}</span>
               </NavLink>
             ))}

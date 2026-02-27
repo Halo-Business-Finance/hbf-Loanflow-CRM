@@ -100,6 +100,8 @@ const ExecutiveDashboard = lazy(() => import("./pages/ExecutiveDashboard"));
 const PartnerPortal = lazy(() => import("./pages/PartnerPortal"));
 const IntegrationHub = lazy(() => import("./pages/IntegrationHub"));
 const MarketingHub = lazy(() => import("./pages/MarketingHub"));
+const MarketingCampaigns = lazy(() => import("./pages/MarketingCampaigns"));
+const MarketingAutomations = lazy(() => import("./pages/MarketingAutomations"));
 const MultiEntityManagement = lazy(() => import("./pages/MultiEntityManagement"));
 const ComplianceDashboard = lazy(() => import("./pages/ComplianceDashboard"));
 
@@ -252,6 +254,8 @@ function AuthenticatedApp() {
         
         {/* Marketing Hub */}
         <Route path="/marketing" element={<IBMCloudLayout><MarketingHub /></IBMCloudLayout>} errorElement={<RouteErrorBoundary />} />
+        <Route path="/marketing/campaigns" element={<IBMCloudLayout><MarketingCampaigns /></IBMCloudLayout>} errorElement={<RouteErrorBoundary />} />
+        <Route path="/marketing/automations" element={<IBMCloudLayout><MarketingAutomations /></IBMCloudLayout>} errorElement={<RouteErrorBoundary />} />
         
         <Route path="/resources" element={<IBMCloudLayout><Resources /></IBMCloudLayout>} errorElement={<RouteErrorBoundary />} />
         <Route path="/emergency-maintenance" element={<IBMCloudLayout><EmergencyMaintenance /></IBMCloudLayout>} errorElement={<RouteErrorBoundary />} />

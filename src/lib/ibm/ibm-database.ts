@@ -56,6 +56,39 @@ async function buildHeaders(): Promise<Record<string, string>> {
   return headers;
 }
 
+function getApiOrigins(): string[] {
+  const configuredOrigin = (IBM_CONFIG.database.functionsBaseUrl || '').replace(/\/$/, '');
+  const origins = configuredOrigin ? [configuredOrigin] : [];
+
+  if (typeof window !== 'undefined') {
+    const sameOrigin = window.location.origin.replace(/\/$/, '');
+    if (sameOrigin && !origins.includes(sameOrigin)) {
+      origins.push(sameOrigin);
+    }
+  }
+
+  return origins;
+}
+
+async function fetchWithOriginFallback(path: string, init: RequestInit): Promise<Response> {
+  const origins = getApiOrigins();
+  let lastError: unknown = null;
+
+  for (const origin of origins) {
+    const url = `${origin}${path}`;
+    try {
+      return await fetch(url, init);
+    } catch (error) {
+      lastError = error;
+      console.warn(`[ibmDb] Network fetch failed for ${url}, trying next origin...`, error);
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error(`Network request failed for ${path}`);
+}
+
 // ── Query Builder ──────────────────────────────────────────────────────────
 
 class IBMQueryBuilder<T = any> {
@@ -273,7 +306,6 @@ class IBMQueryBuilder<T = any> {
       };
     }
 
-    const baseUrl = IBM_CONFIG.database.functionsBaseUrl;
     const headers = await buildHeaders();
 
     try {
@@ -284,7 +316,7 @@ class IBMQueryBuilder<T = any> {
 
           // GET /:id  — single-resource fetch
           if (id && route.supportsGetById) {
-            const resp = await fetch(`${baseUrl}${route.basePath}/${id}`, { headers });
+            const resp = await fetchWithOriginFallback(`${route.basePath}/${id}`, { headers });
             if (!resp.ok) return this.handleError(resp);
             const json = await resp.json();
             // Single-resource endpoints return the object directly
@@ -294,8 +326,8 @@ class IBMQueryBuilder<T = any> {
           // GET / — list with query params
           const qp = this.buildQueryParams(route);
           const qs = qp.toString();
-          const url = `${baseUrl}${route.basePath}${qs ? `?${qs}` : ''}`;
-          const resp = await fetch(url, { headers });
+          const path = `${route.basePath}${qs ? `?${qs}` : ''}`;
+          const resp = await fetchWithOriginFallback(path, { headers });
           if (!resp.ok) return this.handleError(resp);
           const json = await resp.json();
 
@@ -310,7 +342,7 @@ class IBMQueryBuilder<T = any> {
         // ── INSERT ──────────────────────────────────────────
         case 'insert': {
           const body = Array.isArray(this.state.data) ? this.state.data[0] : this.state.data;
-          const resp = await fetch(`${baseUrl}${route.basePath}`, {
+          const resp = await fetchWithOriginFallback(route.basePath, {
             method: 'POST',
             headers,
             body: JSON.stringify(body),
@@ -326,7 +358,7 @@ class IBMQueryBuilder<T = any> {
           if (!id) {
             return { data: null, error: new Error('update requires .eq("id", value)') };
           }
-          const resp = await fetch(`${baseUrl}${route.basePath}/${id}`, {
+          const resp = await fetchWithOriginFallback(`${route.basePath}/${id}`, {
             method: 'PUT',
             headers,
             body: JSON.stringify(this.state.data),
@@ -345,7 +377,7 @@ class IBMQueryBuilder<T = any> {
           if (!id) {
             return { data: null, error: new Error('delete requires .eq("id", value)') };
           }
-          const resp = await fetch(`${baseUrl}${route.basePath}/${id}`, {
+          const resp = await fetchWithOriginFallback(`${route.basePath}/${id}`, {
             method: 'DELETE',
             headers,
           });
@@ -388,13 +420,12 @@ class IBMDatabaseClient {
   ): Promise<{ data: T | null; error: Error | null }> {
     try {
       const headers = await buildHeaders();
-      const baseUrl = IBM_CONFIG.database.functionsBaseUrl;
 
       const routeConfig = getRpcRouteConfig(fn);
 
       if (routeConfig) {
         // Use individual REST endpoint
-        let url = `${baseUrl}${routeConfig.path}`;
+        let path = routeConfig.path;
 
         if (routeConfig.method === 'GET' && params && routeConfig.paramsIn === 'query') {
           const qp = new URLSearchParams();
@@ -402,7 +433,7 @@ class IBMDatabaseClient {
             if (v != null) qp.set(k, String(v));
           }
           const qs = qp.toString();
-          if (qs) url += `?${qs}`;
+          if (qs) path += `?${qs}`;
         }
 
         const fetchOpts: RequestInit = { method: routeConfig.method, headers };
@@ -410,7 +441,7 @@ class IBMDatabaseClient {
           fetchOpts.body = JSON.stringify(params);
         }
 
-        const response = await fetch(url, fetchOpts);
+        const response = await fetchWithOriginFallback(path, fetchOpts);
         if (!response.ok) {
           const errBody = await response.json().catch(() => ({}));
           return { data: null, error: new Error(errBody.message || errBody.error || response.statusText) };
@@ -421,7 +452,7 @@ class IBMDatabaseClient {
 
       // Fallback: generic /rpc/:name for unmapped functions
       console.warn(`[ibmDb.rpc] No dedicated route for "${fn}", using generic /rpc/${fn}`);
-      const response = await fetch(`${baseUrl}/api/v1/rpc/${fn}`, {
+      const response = await fetchWithOriginFallback(`/api/v1/rpc/${fn}`, {
         method: 'POST',
         headers,
         body: JSON.stringify(params ?? {}),

@@ -120,6 +120,7 @@ const navItems: NavItemData[] = [
     subItems: [
       { icon: Megaphone, label: 'Marketing Analytics', to: '/marketing' },
       { icon: Mail, label: 'Email Campaigns', to: '/marketing/campaigns' },
+      { icon: Workflow, label: 'Drip Automations', to: '/marketing/automations' },
       { icon: Target, label: 'Lead Capture', to: '/marketing/lead-capture' },
       { icon: TrendingUp, label: 'Conversion Funnel', to: '/marketing/funnel' },
     ]

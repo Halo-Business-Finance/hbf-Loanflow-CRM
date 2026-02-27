@@ -3333,6 +3333,69 @@ export type Database = {
           },
         ]
       }
+      marketing_automations: {
+        Row: {
+          automation_type: string
+          completed_count: number | null
+          created_at: string
+          description: string | null
+          ends_at: string | null
+          enrolled_count: number | null
+          id: string
+          is_active: boolean | null
+          name: string
+          performance_metrics: Json | null
+          starts_at: string | null
+          status: string
+          steps: Json | null
+          target_audience: Json | null
+          trigger_conditions: Json | null
+          trigger_type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          automation_type?: string
+          completed_count?: number | null
+          created_at?: string
+          description?: string | null
+          ends_at?: string | null
+          enrolled_count?: number | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          performance_metrics?: Json | null
+          starts_at?: string | null
+          status?: string
+          steps?: Json | null
+          target_audience?: Json | null
+          trigger_conditions?: Json | null
+          trigger_type?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          automation_type?: string
+          completed_count?: number | null
+          created_at?: string
+          description?: string | null
+          ends_at?: string | null
+          enrolled_count?: number | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          performance_metrics?: Json | null
+          starts_at?: string | null
+          status?: string
+          steps?: Json | null
+          target_audience?: Json | null
+          trigger_conditions?: Json | null
+          trigger_type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       mfa_settings: {
         Row: {
           backup_codes: string[] | null

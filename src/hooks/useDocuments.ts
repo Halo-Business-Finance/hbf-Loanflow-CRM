@@ -42,16 +42,35 @@ export function useDocuments() {
     if (!user) return;
     
     try {
-      const { data, error } = await ibmDb
+      // Fetch documents without join
+      const { data: docsData, error } = await ibmDb
         .from('lead_documents')
-        .select(`
-          *,
-          contact_entity:contact_entities!contact_entity_id(name, business_name, loan_amount, loan_type, location, business_city, business_state, business_address)
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setDocuments((data as unknown as LeadDocument[]) || []);
+
+      // Fetch contact entities for these documents
+      const contactIds = (docsData || [])
+        .map((d: any) => d.contact_entity_id)
+        .filter(Boolean);
+
+      let contactsMap = new Map<string, any>();
+      if (contactIds.length > 0) {
+        const { data: contacts } = await ibmDb
+          .from('contact_entities')
+          .select('id, name, business_name, loan_amount, loan_type, location, business_city, business_state, business_address')
+          .in('id', contactIds);
+        contactsMap = new Map((contacts || []).map((c: any) => [c.id, c]));
+      }
+
+      // Merge
+      const enriched = (docsData || []).map((doc: any) => ({
+        ...doc,
+        contact_entity: contactsMap.get(doc.contact_entity_id) || null,
+      }));
+
+      setDocuments(enriched as LeadDocument[]);
     } catch (error) {
       console.error('Error fetching documents:', error);
       toast({

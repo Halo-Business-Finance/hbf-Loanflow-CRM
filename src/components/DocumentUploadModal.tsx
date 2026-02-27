@@ -66,18 +66,33 @@ export function DocumentUploadModal({ isOpen, onClose, onUpload, preSelectedLead
     if (!user) return;
 
     try {
-      const { data, error } = await supabase
+      // Fetch leads without join
+      const { data: leadsData, error: leadsError } = await supabase
         .from('leads')
-        .select(`
-          id,
-          contact_entity_id,
-          contact_entity:contact_entities!contact_entity_id(name, business_name)
-        `)
+        .select('id, contact_entity_id, user_id')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setLeads(data || []);
+      if (leadsError) throw leadsError;
+
+      // Fetch contact entities separately
+      const contactIds = (leadsData || []).map((l: any) => l.contact_entity_id).filter(Boolean);
+      let contactsMap = new Map<string, any>();
+      if (contactIds.length > 0) {
+        const { data: contacts } = await supabase
+          .from('contact_entities')
+          .select('id, name, business_name')
+          .in('id', contactIds);
+        contactsMap = new Map((contacts || []).map((c: any) => [c.id, c]));
+      }
+
+      // Merge
+      const enriched = (leadsData || []).map((lead: any) => ({
+        ...lead,
+        contact_entity: contactsMap.get(lead.contact_entity_id) || { name: '', business_name: '' },
+      }));
+
+      setLeads(enriched);
     } catch (error) {
       console.error('Error fetching leads:', error);
     }

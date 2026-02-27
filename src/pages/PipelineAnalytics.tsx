@@ -22,25 +22,35 @@ export default function PipelineAnalytics() {
 
     let query = ibmDb
       .from('leads')
-      .select(`
-        *,
-        contact_entity:contact_entities!leads_contact_entity_id_fkey(stage)
-      `)
+      .select('id, contact_entity_id, user_id')
 
     if (!isManagerOrAdmin) {
       query = query.eq('user_id', user?.id)
     }
 
-    const { data, error } = await query
+    const { data: leadsData, error } = await query
     if (error) {
       console.warn('[PipelineAnalytics] fetchStages error:', error)
       setPipelineStages([])
       return
     }
 
+    // Fetch contact entities separately
+    const contactIds = (leadsData || []).map((l: any) => l.contact_entity_id).filter(Boolean)
+    let contactsMap = new Map<string, any>()
+
+    if (contactIds.length > 0) {
+      const { data: contacts } = await ibmDb
+        .from('contact_entities')
+        .select('id, stage')
+        .in('id', contactIds)
+      contactsMap = new Map((contacts || []).map((c: any) => [c.id, c]))
+    }
+
     const map = new Map<string, number>()
-    ;(data as any[] | null | undefined)?.forEach((l: any) => {
-      const stage = l?.contact_entity?.stage ?? l?.stage ?? 'New Lead'
+    ;(leadsData as any[] | null | undefined)?.forEach((l: any) => {
+      const ce = contactsMap.get(l.contact_entity_id)
+      const stage = ce?.stage ?? 'New Lead'
       map.set(stage, (map.get(stage) || 0) + 1)
     })
 

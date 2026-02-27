@@ -71,87 +71,41 @@ export default function LoanHistory() {
       // Managers and admins can see all clients, others see only their own
       const isManagerOrAdmin = hasRole('manager') || hasRole('admin') || hasRole('super_admin');
       
-      // Try embedded join first
-      let query = ibmDb
+      // Fetch clients without join (IBM REST doesn't support joins)
+      let clientsQuery = ibmDb
         .from('clients')
-        .select(`
-          id,
-          user_id,
-          contact_entity_id,
-          contact_entity:contact_entities!clients_contact_entity_id_fkey(
-            name,
-            business_name,
-            loan_type,
-            loan_amount,
-            interest_rate,
-            stage,
-            maturity_date
-          ),
-          created_at,
-          updated_at
-        `)
+        .select('id, user_id, contact_entity_id, created_at, updated_at')
         .order('created_at', { ascending: false });
       
       if (!isManagerOrAdmin) {
-        query = query.eq('user_id', user?.id);
+        clientsQuery = clientsQuery.eq('user_id', user?.id);
       }
       
-      const respAny = await (query as any);
-      let data = (respAny?.data as any[]) || null;
-      let error = respAny?.error as any;
+      const { data: clients, error: clientsError } = await clientsQuery;
+      if (clientsError) throw clientsError;
       
-      // Fallback: If join fails, fetch separately
-      if (error) {
-        console.warn('[LoanHistory] Embedded join failed, using fallback:', error);
-        
-        let clientsQuery = ibmDb
-          .from('clients')
-          .select('*')
-          .order('created_at', { ascending: false });
-        
-        if (!isManagerOrAdmin) {
-          clientsQuery = clientsQuery.eq('user_id', user?.id);
-        }
-        
-        const { data: clients, error: clientsError } = await clientsQuery;
-        
-        if (clientsError) throw clientsError;
-        
-        // Fetch contact entities
-        const contactIds = (clients || [])
-          .map((c: any) => c.contact_entity_id)
-          .filter(Boolean);
-        
-        let contactsData: any[] = [];
-        if (contactIds.length > 0) {
-          const { data: contacts, error: contactsError } = await ibmDb
-            .from('contact_entities')
-            .select('*')
-            .in('id', contactIds as string[]);
-          
-          if (contactsError) {
-            console.warn('[LoanHistory] Contact entities fetch failed:', contactsError);
-          } else {
-            contactsData = contacts || [];
-          }
-        }
-        
-        // Map contacts by id
-        const contactsMap = new Map(contactsData.map((c: any) => [c.id, c]));
-        
-        // Combine data
-        data = (clients || []).map((client: any) => ({
-          ...client,
-          contact_entity: contactsMap.get(client.contact_entity_id) || null
-        }));
-        
-        error = null;
+      // Fetch contact entities separately
+      const contactIds = (clients || [])
+        .map((c: any) => c.contact_entity_id)
+        .filter(Boolean);
+      
+      let contactsData: any[] = [];
+      if (contactIds.length > 0) {
+        const { data: contacts, error: contactsError2 } = await ibmDb
+          .from('contact_entities')
+          .select('id, name, business_name, loan_type, loan_amount, interest_rate, stage, maturity_date')
+          .in('id', contactIds as string[]);
+        if (!contactsError2) contactsData = contacts || [];
       }
       
-      if (error) {
-        console.error('Error fetching loan history:', error);
-        throw error;
-      }
+      // Map contacts by id
+      const contactsMap = new Map(contactsData.map((c: any) => [c.id, c]));
+      
+      // Combine data
+      const data = (clients || []).map((client: any) => ({
+        ...client,
+        contact_entity: contactsMap.get(client.contact_entity_id) || null
+      }));
       
       // Transform the data
       const transformedLoans: LoanRecord[] = (data || []).map((client: any) => {

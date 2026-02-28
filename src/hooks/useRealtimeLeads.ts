@@ -127,8 +127,9 @@ export function useRealtimeLeads() {
       const errorMsg = err?.message || 'Failed to load leads'
       console.error('❌ Leads fetch failed:', err)
       setError(errorMsg)
-      setLeads([])
+      // Only clear leads on initial load failure — preserve existing data on silent refetch failures
       if (!opts?.silent) {
+        setLeads([])
         toast({ title: "Error loading leads", description: errorMsg, variant: "destructive" })
       }
     } finally {
@@ -137,16 +138,11 @@ export function useRealtimeLeads() {
     }
   }
 
-  // Set up real-time subscription for leads
+  // Single polling subscription — covers both leads & contact entity changes
   useRealtimeSubscription({
     table: 'leads',
     onChange: () => fetchLeads({ silent: true }),
-  })
-
-  // Set up real-time subscription for contact entities
-  useRealtimeSubscription({
-    table: 'contact_entities',
-    onChange: () => fetchLeads({ silent: true }),
+    interval: 30000,
   })
 
   useEffect(() => {

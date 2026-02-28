@@ -35,6 +35,8 @@ serve(async (req) => {
       Deno.env.get("VITE_IBM_FUNCTIONS_API_KEY") ||
       "";
 
+    console.log(`[hbf-api-proxy] API key source: ${Deno.env.get("HBF_API_KEY") ? "HBF_API_KEY" : Deno.env.get("CRM_API_KEY") ? "CRM_API_KEY" : Deno.env.get("VITE_IBM_FUNCTIONS_API_KEY") ? "VITE_IBM_FUNCTIONS_API_KEY" : "NONE"}, length: ${internalApiKey.length}`);
+
     const forwardedApiKey = forwardHeaders?.["x-api-key"] || forwardHeaders?.["X-API-KEY"];
     if (forwardedApiKey || internalApiKey) {
       backendHeaders["x-api-key"] = forwardedApiKey || internalApiKey;

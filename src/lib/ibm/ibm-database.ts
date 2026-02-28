@@ -56,7 +56,17 @@ async function buildHeaders(): Promise<Record<string, string>> {
   return headers;
 }
 
+function isLovablePreview(): boolean {
+  if (typeof window === 'undefined') return false;
+  return window.location.hostname.includes('lovable.app') || 
+         window.location.hostname.includes('lovableproject.com');
+}
+
 function getApiOrigins(): string[] {
+  // In Lovable preview, direct origins will always fail due to CORS,
+  // so skip them entirely and let fetchWithOriginFallback use the proxy.
+  if (isLovablePreview()) return [];
+
   const configuredOrigin = (IBM_CONFIG.database.functionsBaseUrl || '').replace(/\/$/, '');
   const origins = configuredOrigin ? [configuredOrigin] : [];
 
@@ -125,7 +135,37 @@ async function fetchViaSupabaseProxy(path: string, init: RequestInit): Promise<R
   });
 }
 
+// ── Request deduplication & rate-limit backoff ────────────────────────────
+
+const inflightRequests = new Map<string, Promise<Response>>();
+let rateLimitBackoffUntil = 0;
+
+function dedupeKey(path: string, init: RequestInit): string {
+  return `${init.method || 'GET'}:${path}:${init.body || ''}`;
+}
+
 async function fetchWithOriginFallback(path: string, init: RequestInit): Promise<Response> {
+  // If we're in a rate-limit backoff window, reject immediately
+  if (Date.now() < rateLimitBackoffUntil) {
+    throw new Error(`Rate limited — retrying after backoff (${Math.ceil((rateLimitBackoffUntil - Date.now()) / 1000)}s remaining)`);
+  }
+
+  // Deduplicate identical in-flight requests
+  const key = dedupeKey(path, init);
+  const existing = inflightRequests.get(key);
+  if (existing) {
+    console.info(`[ibmDb] ↩ Deduped ${init.method || 'GET'} ${path}`);
+    return existing.then(r => r.clone());
+  }
+
+  const promise = _doFetch(path, init).finally(() => {
+    inflightRequests.delete(key);
+  });
+  inflightRequests.set(key, promise);
+  return promise;
+}
+
+async function _doFetch(path: string, init: RequestInit): Promise<Response> {
   const origins = getApiOrigins();
   let lastError: unknown = null;
 
@@ -133,8 +173,6 @@ async function fetchWithOriginFallback(path: string, init: RequestInit): Promise
     const url = `${origin}${path}`;
     try {
       const resp = await fetch(url, init);
-      // Guard against SPA fallback: if a 200 response returns HTML instead of JSON,
-      // skip this origin and try the next one.
       const ct = resp.headers.get('content-type') || '';
       if (resp.ok && ct.includes('text/html')) {
         console.warn(`[ibmDb] Got HTML response from ${url}, skipping...`);
@@ -152,6 +190,14 @@ async function fetchWithOriginFallback(path: string, init: RequestInit): Promise
   try {
     console.info(`[ibmDb] → Routing through Supabase proxy for ${path}`);
     const proxyResp = await fetchViaSupabaseProxy(path, init);
+
+    // Handle rate limiting with exponential backoff
+    if (proxyResp.status === 429) {
+      rateLimitBackoffUntil = Date.now() + 15_000; // 15s backoff
+      console.warn(`[ibmDb] ⚠ Proxy rate limited, backing off 15s`);
+      throw new Error('Proxy rate limited');
+    }
+
     console.info(`[ibmDb] ✓ Proxy ${path} → ${proxyResp.status}`);
     return proxyResp;
   } catch (proxyError) {

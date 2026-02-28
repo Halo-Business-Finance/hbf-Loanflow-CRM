@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { IBMPageHeader } from '@/components/ui/IBMPageHeader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { MessageSquare, Send, Users, Clock, BarChart3, Plus, Search } from 'lucide-react';
+import { MessageSquare, Send, Users, Clock, BarChart3, Plus, Search, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface SMSCampaign {
@@ -66,6 +67,7 @@ const statusColors: Record<string, string> = {
 };
 
 export default function SMSMarketing() {
+  const navigate = useNavigate();
   const [campaigns] = useState<SMSCampaign[]>(mockCampaigns);
   const [searchQuery, setSearchQuery] = useState('');
   const [newMessage, setNewMessage] = useState('');
@@ -98,6 +100,11 @@ export default function SMSMarketing() {
       />
 
       <div className="p-6 space-y-6">
+        <div className="flex justify-end">
+          <Button variant="outline" onClick={() => navigate('/marketing/sms-templates')} className="gap-1.5">
+            <FileText className="h-4 w-4" /> Templates
+          </Button>
+        </div>
         {/* KPI Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>

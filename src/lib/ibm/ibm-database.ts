@@ -138,19 +138,24 @@ async function fetchWithOriginFallback(path: string, init: RequestInit): Promise
       const ct = resp.headers.get('content-type') || '';
       if (resp.ok && ct.includes('text/html')) {
         console.warn(`[ibmDb] Got HTML response from ${url}, skipping...`);
+        lastError = new Error(`HTML response from ${url}`);
         continue;
       }
+      console.info(`[ibmDb] ✓ ${init.method || 'GET'} ${url} → ${resp.status}`);
       return resp;
     } catch (error) {
       lastError = error;
-      console.warn(`[ibmDb] Network fetch failed for ${url}, trying next origin...`, error);
+      console.warn(`[ibmDb] ✗ Network fetch failed for ${url}:`, (error as Error)?.message);
     }
   }
 
   try {
-    console.warn(`[ibmDb] Direct origins failed, routing through Supabase proxy for ${path}`);
-    return await fetchViaSupabaseProxy(path, init);
+    console.info(`[ibmDb] → Routing through Supabase proxy for ${path}`);
+    const proxyResp = await fetchViaSupabaseProxy(path, init);
+    console.info(`[ibmDb] ✓ Proxy ${path} → ${proxyResp.status}`);
+    return proxyResp;
   } catch (proxyError) {
+    console.warn(`[ibmDb] ✗ Proxy failed for ${path}:`, (proxyError as Error)?.message);
     lastError = proxyError;
   }
 

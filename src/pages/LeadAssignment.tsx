@@ -70,24 +70,26 @@ export default function LeadAssignmentPage() {
   // Fetch unassigned leads (leads without user assignment)
   const fetchUnassignedLeads = async () => {
     try {
-      // Step 1: get unassigned leads ids only (avoid cross-table RLS join issues)
+      // Fetch all leads and filter client-side (IBM REST adapter doesn't support .is(null) / .not() filters)
       const { data: leads, error: leadsError } = await ibmDb
         .from('leads')
-        .select(`id, contact_entity_id, created_at`)
-        .is('user_id', null)
+        .select('id, contact_entity_id, user_id, created_at, assigned_at')
         .order('created_at', { ascending: false })
-        .limit(50)
+        .limit(200)
 
       if (leadsError) throw leadsError
 
-      if (!leads || leads.length === 0) {
+      // Filter unassigned leads client-side
+      const unassigned = (leads || []).filter((l: any) => !l.user_id)
+
+      if (unassigned.length === 0) {
         setUnassignedLeads([])
         return
       }
 
-      const contactIds = leads.map(l => l.contact_entity_id).filter(Boolean)
+      const contactIds = unassigned.map((l: any) => l.contact_entity_id).filter(Boolean)
 
-      // Step 2: fetch related contact details
+      // Fetch related contact details
       const { data: contacts, error: contactsError } = await ibmDb
         .from('contact_entities')
         .select('id, name, email, stage, priority')
@@ -95,9 +97,9 @@ export default function LeadAssignmentPage() {
 
       if (contactsError) throw contactsError
 
-      const contactsById = new Map((contacts || []).map(c => [c.id, c]))
+      const contactsById = new Map((contacts || []).map((c: any) => [c.id, c]))
 
-      const formattedLeads = (leads || []).map(lead => {
+      const formattedLeads = unassigned.map((lead: any) => {
         const ce: any = contactsById.get(lead.contact_entity_id)
         return ce ? {
           id: ce.id,
@@ -123,51 +125,46 @@ export default function LeadAssignmentPage() {
   // Fetch recently assigned leads (assigned in the last 24 hours)
   const fetchRecentlyAssignedLeads = async () => {
     try {
-      const twentyFourHoursAgo = new Date()
-      twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24)
-
-      // Step 1: Get recently assigned leads
+      // Fetch all leads with assignments and filter client-side
       const { data: leads, error: leadsError } = await ibmDb
         .from('leads')
-        .select(`id, contact_entity_id, user_id, assigned_at, created_at`)
-        .not('user_id', 'is', null)
-        .not('assigned_at', 'is', null)
-        .gte('assigned_at', twentyFourHoursAgo.toISOString())
-        .order('assigned_at', { ascending: false })
-        .limit(50)
+        .select('id, contact_entity_id, user_id, assigned_at, created_at')
+        .order('created_at', { ascending: false })
+        .limit(200)
 
       if (leadsError) throw leadsError
 
-      if (!leads || leads.length === 0) {
+      const twentyFourHoursAgo = new Date()
+      twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24)
+
+      // Filter client-side: has user_id, has assigned_at, assigned within 24h
+      const recentlyAssigned = (leads || []).filter((l: any) =>
+        l.user_id && l.assigned_at && new Date(l.assigned_at) >= twentyFourHoursAgo
+      )
+
+      if (recentlyAssigned.length === 0) {
         setRecentlyAssignedLeads([])
         return
       }
 
-      const contactIds = leads.map(l => l.contact_entity_id).filter(Boolean)
-      const userIds = leads.map(l => l.user_id).filter(Boolean)
+      const contactIds = recentlyAssigned.map((l: any) => l.contact_entity_id).filter(Boolean)
+      const userIds = [...new Set(recentlyAssigned.map((l: any) => l.user_id).filter(Boolean))]
 
-      // Step 2: Fetch contact details
-      const { data: contacts, error: contactsError } = await ibmDb
-        .from('contact_entities')
-        .select('id, name, email, stage, priority')
-        .in('id', contactIds as string[])
+      // Fetch contact details and profiles in parallel
+      const [contactsResult, profilesResult] = await Promise.all([
+        ibmDb.from('contact_entities').select('id, name, email, stage, priority').in('id', contactIds as string[]),
+        ibmDb.from('profiles').select('id, first_name, last_name').in('id', userIds as string[]),
+      ])
 
-      if (contactsError) throw contactsError
+      if (contactsResult.error) throw contactsResult.error
+      if (profilesResult.error) throw profilesResult.error
 
-      // Step 3: Fetch user profiles
-      const { data: profiles, error: profilesError } = await ibmDb
-        .from('profiles')
-        .select('id, first_name, last_name')
-        .in('id', userIds as string[])
+      const contactsById = new Map((contactsResult.data || []).map((c: any) => [c.id, c]))
+      const profilesById = new Map((profilesResult.data || []).map((p: any) => [p.id, p]))
 
-      if (profilesError) throw profilesError
-
-      const contactsById = new Map((contacts || []).map(c => [c.id, c]))
-      const profilesById = new Map((profiles || []).map(p => [p.id, p]))
-
-      const formattedLeads = (leads || []).map(lead => {
+      const formattedLeads = recentlyAssigned.map((lead: any) => {
         const ce: any = contactsById.get(lead.contact_entity_id)
-        const profile: any = profilesById.get(lead.user_id!)
+        const profile: any = profilesById.get(lead.user_id)
         return ce && profile ? {
           id: ce.id,
           lead_id: lead.id,
@@ -175,9 +172,9 @@ export default function LeadAssignmentPage() {
           email: ce.email,
           stage: ce.stage || 'New',
           priority: ce.priority || 'Medium',
-          assigned_to: lead.user_id!,
+          assigned_to: lead.user_id,
           assigned_to_name: `${profile.first_name} ${profile.last_name}`,
-          assigned_at: lead.assigned_at!
+          assigned_at: lead.assigned_at
         } : null
       }).filter(Boolean) as RecentlyAssignedLead[]
 
@@ -195,26 +192,27 @@ export default function LeadAssignmentPage() {
   // Fetch team members with lead counts
   const fetchTeamMembers = async () => {
     try {
-      // Get all active team members
-      const { data: profiles, error: profilesError } = await ibmDb
-        .from('profiles')
-        .select('id, first_name, last_name')
-        .eq('is_active', true)
+      // Fetch profiles and leads in parallel, compute counts client-side
+      const [profilesResult, leadsResult] = await Promise.all([
+        ibmDb.from('profiles').select('id, first_name, last_name, is_active'),
+        ibmDb.from('leads').select('id, user_id').limit(1000),
+      ])
 
-      if (profilesError) throw profilesError
+      if (profilesResult.error) throw profilesResult.error
 
-      // Get lead counts using secure RPC function
-      const { data: leadCounts, error: countsError } = await ibmDb
-        .rpc('get_lead_counts')
+      const activeProfiles = (profilesResult.data || []).filter((p: any) => p.is_active)
 
-      if (countsError) throw countsError
+      // Count leads per user client-side
+      const countsMap = new Map<string, number>()
+      for (const lead of (leadsResult.data || []) as any[]) {
+        if (lead.user_id) {
+          countsMap.set(lead.user_id, (countsMap.get(lead.user_id) || 0) + 1)
+        }
+      }
 
-      // Combine profiles with lead counts
-      const countsMap = new Map(((leadCounts as any[]) || []).map((lc: any) => [lc.user_id, lc.lead_count]))
-      
-      const membersWithCounts = (profiles || []).map((profile) => ({
-        ...(profile as any),
-        leadCount: countsMap.get((profile as any).id) || 0
+      const membersWithCounts = activeProfiles.map((profile: any) => ({
+        ...profile,
+        leadCount: countsMap.get(profile.id) || 0
       })) as TeamMember[]
 
       setTeamMembers(membersWithCounts)

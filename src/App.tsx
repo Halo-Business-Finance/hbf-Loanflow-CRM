@@ -1,4 +1,5 @@
 import React, { Suspense, lazy, useEffect } from "react";
+import { lazyRetry } from "@/lib/lazyRetry";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -11,14 +12,14 @@ import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 import { useRoleBasedAccess } from "@/hooks/useRoleBasedAccess";
 
 // Lazy load CSP headers - not critical for initial render
-const CSPHeaders = lazy(() => import("@/components/security/CSPHeaders").then(m => ({ default: m.CSPHeaders })));
+const CSPHeaders = lazyRetry(() => import("@/components/security/CSPHeaders").then(m => ({ default: m.CSPHeaders })));
 
 // Lazy load layout component (biggest bundle reduction - sidebar, topbar, etc.)
-const IBMCloudLayout = lazy(() => import("@/components/layouts/IBMCloudLayout").then(m => ({ default: m.IBMCloudLayout })));
+const IBMCloudLayout = lazyRetry(() => import("@/components/layouts/IBMCloudLayout").then(m => ({ default: m.IBMCloudLayout })));
 
 // Lazy load auth pages
-const AuthPage = lazy(() => import("@/components/auth/AuthPage").then(m => ({ default: m.AuthPage })));
-const CallbackHandler = lazy(() => import("@/components/auth/CallbackHandler").then(m => ({ default: m.CallbackHandler })));
+const AuthPage = lazyRetry(() => import("@/components/auth/AuthPage").then(m => ({ default: m.AuthPage })));
+const CallbackHandler = lazyRetry(() => import("@/components/auth/CallbackHandler").then(m => ({ default: m.CallbackHandler })));
 
 // Lazy-loading wrapper for keyboard shortcuts
 function KeyboardShortcutsProvider() {
@@ -40,77 +41,77 @@ function SecurityProvider() {
 }
 
 // Lazy load page components for code splitting
-const Dashboard = lazy(() => import("./pages/Dashboard"));
-const Leads = lazy(() => import("./pages/Leads"));
-const NewLead = lazy(() => import("./pages/NewLead"));
-const LeadStats = lazy(() => import("./pages/LeadStats"));
-const LeadAssignment = lazy(() => import("./pages/LeadAssignment"));
-const LeadDetail = lazy(() => import("./pages/LeadDetail"));
-const LeadDocuments = lazy(() => import("./pages/LeadDocuments"));
-const Pipeline = lazy(() => import("./pages/Pipeline"));
-const PipelineAnalytics = lazy(() => import("./pages/PipelineAnalytics"));
-const StageManagement = lazy(() => import("./pages/StageManagement"));
-const Underwriter = lazy(() => import("./pages/Underwriter"));
-const Clients = lazy(() => import("./pages/Clients"));
-const BorrowerDetails = lazy(() => import("./pages/BorrowerDetails"));
-const LoanHistory = lazy(() => import("./pages/LoanHistory"));
-const ClientDetail = lazy(() => import("./pages/ClientDetail"));
-const Documents = lazy(() => import("./pages/Documents"));
-const LoanDocumentsFolder = lazy(() => import("./pages/LoanDocumentsFolder"));
-const Activities = lazy(() => import("./pages/Activities"));
-const Reports = lazy(() => import("./pages/Reports"));
-const Support = lazy(() => import("./pages/Support"));
-const Settings = lazy(() => import("./pages/Settings"));
-const UserDirectory = lazy(() => import("./pages/UserDirectory"));
-const Resources = lazy(() => import("./pages/Resources"));
-const Lenders = lazy(() => import('./pages/Lenders'));
-const LenderAnalytics = lazy(() => import('./pages/LenderAnalytics'));
-const LenderDetail = lazy(() => import('./pages/LenderDetail'));
-const NewLender = lazy(() => import('./pages/NewLender'));
-const NewLenderContact = lazy(() => import('./pages/NewLenderContact'));
-const ServiceProviderDetail = lazy(() => import('./pages/ServiceProviderDetail'));
-const ServiceProviders = lazy(() => import('./pages/ServiceProviders'));
-const NewServiceProvider = lazy(() => import('./pages/NewServiceProvider'));
-const Enterprise = lazy(() => import("./pages/Enterprise"));
-const AdvancedAnalytics = lazy(() => import("./pages/AdvancedAnalytics"));
-const Integrations = lazy(() => import("./pages/Integrations"));
-const AITools = lazy(() => import("./pages/AITools"));
+const Dashboard = lazyRetry(() => import("./pages/Dashboard"));
+const Leads = lazyRetry(() => import("./pages/Leads"));
+const NewLead = lazyRetry(() => import("./pages/NewLead"));
+const LeadStats = lazyRetry(() => import("./pages/LeadStats"));
+const LeadAssignment = lazyRetry(() => import("./pages/LeadAssignment"));
+const LeadDetail = lazyRetry(() => import("./pages/LeadDetail"));
+const LeadDocuments = lazyRetry(() => import("./pages/LeadDocuments"));
+const Pipeline = lazyRetry(() => import("./pages/Pipeline"));
+const PipelineAnalytics = lazyRetry(() => import("./pages/PipelineAnalytics"));
+const StageManagement = lazyRetry(() => import("./pages/StageManagement"));
+const Underwriter = lazyRetry(() => import("./pages/Underwriter"));
+const Clients = lazyRetry(() => import("./pages/Clients"));
+const BorrowerDetails = lazyRetry(() => import("./pages/BorrowerDetails"));
+const LoanHistory = lazyRetry(() => import("./pages/LoanHistory"));
+const ClientDetail = lazyRetry(() => import("./pages/ClientDetail"));
+const Documents = lazyRetry(() => import("./pages/Documents"));
+const LoanDocumentsFolder = lazyRetry(() => import("./pages/LoanDocumentsFolder"));
+const Activities = lazyRetry(() => import("./pages/Activities"));
+const Reports = lazyRetry(() => import("./pages/Reports"));
+const Support = lazyRetry(() => import("./pages/Support"));
+const Settings = lazyRetry(() => import("./pages/Settings"));
+const UserDirectory = lazyRetry(() => import("./pages/UserDirectory"));
+const Resources = lazyRetry(() => import("./pages/Resources"));
+const Lenders = lazyRetry(() => import('./pages/Lenders'));
+const LenderAnalytics = lazyRetry(() => import('./pages/LenderAnalytics'));
+const LenderDetail = lazyRetry(() => import('./pages/LenderDetail'));
+const NewLender = lazyRetry(() => import('./pages/NewLender'));
+const NewLenderContact = lazyRetry(() => import('./pages/NewLenderContact'));
+const ServiceProviderDetail = lazyRetry(() => import('./pages/ServiceProviderDetail'));
+const ServiceProviders = lazyRetry(() => import('./pages/ServiceProviders'));
+const NewServiceProvider = lazyRetry(() => import('./pages/NewServiceProvider'));
+const Enterprise = lazyRetry(() => import("./pages/Enterprise"));
+const AdvancedAnalytics = lazyRetry(() => import("./pages/AdvancedAnalytics"));
+const Integrations = lazyRetry(() => import("./pages/Integrations"));
+const AITools = lazyRetry(() => import("./pages/AITools"));
 
 
-const Security = lazy(() => import("./pages/Security"));
-const EmergencyMaintenance = lazy(() => import("./pages/EmergencyMaintenance"));
-const NotFound = lazy(() => import("./pages/NotFound"));
-const DocumentTemplates = lazy(() => import("./pages/DocumentTemplates"));
-const ActivitiesCalendar = lazy(() => import("./pages/ActivitiesCalendar"));
-const ActivitiesTasks = lazy(() => import("./pages/ActivitiesTasks"));
-const SecurityAccess = lazy(() => import("./pages/SecurityAccess"));
-const SecurityAudit = lazy(() => import("./pages/SecurityAudit"));
-const SecurityThreats = lazy(() => import("./pages/SecurityThreats"));
-const SecurityCompliance = lazy(() => import("./pages/SecurityCompliance"));
-const SettingsSystem = lazy(() => import("./pages/SettingsSystem"));
-const Messages = lazy(() => import("./pages/Messages"));
-const LeadAccessDiagnostics = lazy(() => import("./pages/LeadAccessDiagnostics"));
-const RoleDiagnostics = lazy(() => import("./pages/RoleDiagnostics"));
-const Automation = lazy(() => import("./pages/Automation"));
-const AdvancedReports = lazy(() => import("./pages/AdvancedReports"));
-const ReportBuilder = lazy(() => import("./pages/ReportBuilder"));
-const SLAManagement = lazy(() => import("./pages/SLAManagement"));
-const AILeadScoring = lazy(() => import("./pages/AILeadScoring"));
-const ExecutiveDashboard = lazy(() => import("./pages/ExecutiveDashboard"));
-const PartnerPortal = lazy(() => import("./pages/PartnerPortal"));
-const IntegrationHub = lazy(() => import("./pages/IntegrationHub"));
-const MarketingHub = lazy(() => import("./pages/MarketingHub"));
-const MarketingCampaigns = lazy(() => import("./pages/MarketingCampaigns"));
-const MarketingAutomations = lazy(() => import("./pages/MarketingAutomations"));
-const MultiEntityManagement = lazy(() => import("./pages/MultiEntityManagement"));
-const ComplianceDashboard = lazy(() => import("./pages/ComplianceDashboard"));
+const Security = lazyRetry(() => import("./pages/Security"));
+const EmergencyMaintenance = lazyRetry(() => import("./pages/EmergencyMaintenance"));
+const NotFound = lazyRetry(() => import("./pages/NotFound"));
+const DocumentTemplates = lazyRetry(() => import("./pages/DocumentTemplates"));
+const ActivitiesCalendar = lazyRetry(() => import("./pages/ActivitiesCalendar"));
+const ActivitiesTasks = lazyRetry(() => import("./pages/ActivitiesTasks"));
+const SecurityAccess = lazyRetry(() => import("./pages/SecurityAccess"));
+const SecurityAudit = lazyRetry(() => import("./pages/SecurityAudit"));
+const SecurityThreats = lazyRetry(() => import("./pages/SecurityThreats"));
+const SecurityCompliance = lazyRetry(() => import("./pages/SecurityCompliance"));
+const SettingsSystem = lazyRetry(() => import("./pages/SettingsSystem"));
+const Messages = lazyRetry(() => import("./pages/Messages"));
+const LeadAccessDiagnostics = lazyRetry(() => import("./pages/LeadAccessDiagnostics"));
+const RoleDiagnostics = lazyRetry(() => import("./pages/RoleDiagnostics"));
+const Automation = lazyRetry(() => import("./pages/Automation"));
+const AdvancedReports = lazyRetry(() => import("./pages/AdvancedReports"));
+const ReportBuilder = lazyRetry(() => import("./pages/ReportBuilder"));
+const SLAManagement = lazyRetry(() => import("./pages/SLAManagement"));
+const AILeadScoring = lazyRetry(() => import("./pages/AILeadScoring"));
+const ExecutiveDashboard = lazyRetry(() => import("./pages/ExecutiveDashboard"));
+const PartnerPortal = lazyRetry(() => import("./pages/PartnerPortal"));
+const IntegrationHub = lazyRetry(() => import("./pages/IntegrationHub"));
+const MarketingHub = lazyRetry(() => import("./pages/MarketingHub"));
+const MarketingCampaigns = lazyRetry(() => import("./pages/MarketingCampaigns"));
+const MarketingAutomations = lazyRetry(() => import("./pages/MarketingAutomations"));
+const MultiEntityManagement = lazyRetry(() => import("./pages/MultiEntityManagement"));
+const ComplianceDashboard = lazyRetry(() => import("./pages/ComplianceDashboard"));
 
 // Lazy load dashboard components for code splitting (with named export handling)
-const LoanCloserDashboard = lazy(() => import("@/components/dashboards/LoanCloserDashboard").then(m => ({ default: m.LoanCloserDashboard })));
-const LoanProcessorDashboard = lazy(() => import("@/components/dashboards/LoanProcessorDashboard").then(m => ({ default: m.LoanProcessorDashboard })));
-const UnderwriterDashboard = lazy(() => import("@/components/dashboards/UnderwriterDashboard").then(m => ({ default: m.UnderwriterDashboard })));
-const LoanOriginatorDashboard = lazy(() => import("@/components/dashboards/LoanOriginatorDashboard").then(m => ({ default: m.LoanOriginatorDashboard })));
-const DataIntegrityDashboard = lazy(() => import("@/components/DataIntegrityDashboard").then(m => ({ default: m.DataIntegrityDashboard })));
+const LoanCloserDashboard = lazyRetry(() => import("@/components/dashboards/LoanCloserDashboard").then(m => ({ default: m.LoanCloserDashboard })));
+const LoanProcessorDashboard = lazyRetry(() => import("@/components/dashboards/LoanProcessorDashboard").then(m => ({ default: m.LoanProcessorDashboard })));
+const UnderwriterDashboard = lazyRetry(() => import("@/components/dashboards/UnderwriterDashboard").then(m => ({ default: m.UnderwriterDashboard })));
+const LoanOriginatorDashboard = lazyRetry(() => import("@/components/dashboards/LoanOriginatorDashboard").then(m => ({ default: m.LoanOriginatorDashboard })));
+const DataIntegrityDashboard = lazyRetry(() => import("@/components/DataIntegrityDashboard").then(m => ({ default: m.DataIntegrityDashboard })));
 
 const queryClient = new QueryClient();
 

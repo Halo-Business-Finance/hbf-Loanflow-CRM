@@ -122,13 +122,7 @@ export function useRealtimeLeads() {
       setLeads(transformedLeads)
       initializedRef.current = true
 
-      if (transformedLeads.length === 0 && !roleRetryRef.current) {
-        roleRetryRef.current = true
-        setTimeout(() => {
-          console.log('[useRealtimeLeads] No leads on first fetch, retrying after short delay...')
-          fetchLeads({ silent: true })
-        }, 800)
-      }
+      // Removed aggressive 800ms retry — it causes request storms
     } catch (err: any) {
       const errorMsg = err?.message || 'Failed to load leads'
       console.error('❌ Leads fetch failed:', err)

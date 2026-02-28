@@ -132,7 +132,15 @@ async function fetchWithOriginFallback(path: string, init: RequestInit): Promise
   for (const origin of origins) {
     const url = `${origin}${path}`;
     try {
-      return await fetch(url, init);
+      const resp = await fetch(url, init);
+      // Guard against SPA fallback: if a 200 response returns HTML instead of JSON,
+      // skip this origin and try the next one.
+      const ct = resp.headers.get('content-type') || '';
+      if (resp.ok && ct.includes('text/html')) {
+        console.warn(`[ibmDb] Got HTML response from ${url}, skipping...`);
+        continue;
+      }
+      return resp;
     } catch (error) {
       lastError = error;
       console.warn(`[ibmDb] Network fetch failed for ${url}, trying next origin...`, error);

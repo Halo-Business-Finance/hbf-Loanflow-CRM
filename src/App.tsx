@@ -103,6 +103,7 @@ const IntegrationHub = lazyRetry(() => import("./pages/IntegrationHub"));
 const MarketingHub = lazyRetry(() => import("./pages/MarketingHub"));
 const MarketingCampaigns = lazyRetry(() => import("./pages/MarketingCampaigns"));
 const MarketingAutomations = lazyRetry(() => import("./pages/MarketingAutomations"));
+const SMSMarketing = lazyRetry(() => import("./pages/SMSMarketing"));
 const MultiEntityManagement = lazyRetry(() => import("./pages/MultiEntityManagement"));
 const ComplianceDashboard = lazyRetry(() => import("./pages/ComplianceDashboard"));
 
@@ -257,6 +258,7 @@ function AuthenticatedApp() {
         <Route path="/marketing" element={<IBMCloudLayout><MarketingHub /></IBMCloudLayout>} errorElement={<RouteErrorBoundary />} />
         <Route path="/marketing/campaigns" element={<IBMCloudLayout><MarketingCampaigns /></IBMCloudLayout>} errorElement={<RouteErrorBoundary />} />
         <Route path="/marketing/automations" element={<IBMCloudLayout><MarketingAutomations /></IBMCloudLayout>} errorElement={<RouteErrorBoundary />} />
+        <Route path="/marketing/sms" element={<IBMCloudLayout><SMSMarketing /></IBMCloudLayout>} errorElement={<RouteErrorBoundary />} />
         
         <Route path="/resources" element={<IBMCloudLayout><Resources /></IBMCloudLayout>} errorElement={<RouteErrorBoundary />} />
         <Route path="/emergency-maintenance" element={<IBMCloudLayout><EmergencyMaintenance /></IBMCloudLayout>} errorElement={<RouteErrorBoundary />} />

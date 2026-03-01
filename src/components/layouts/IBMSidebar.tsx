@@ -191,7 +191,7 @@ function NavItem({ icon: Icon, label, to, collapsed, subItems }: NavItemProps) {
 
   const folderTabClasses = cn(
     'sidebar-folder-tab',
-    'flex items-center text-xs transition-all duration-200 relative group',
+    'flex items-center text-sm transition-all duration-200 relative group',
     collapsed ? 'justify-center w-full px-0 h-10' : 'pl-2 pr-3 h-10',
     isHighlighted
       ? 'sidebar-folder-tab--active'
@@ -236,13 +236,13 @@ function NavItem({ icon: Icon, label, to, collapsed, subItems }: NavItemProps) {
                   key={subItem.to}
                   to={subItem.to!}
                   className={cn(
-                    'flex items-center h-8 text-[11px] transition-all duration-200 relative pl-4 pr-2',
+                    'flex items-center h-8 text-xs transition-all duration-200 relative pl-4 pr-2',
                     subActive
                       ? 'font-medium text-foreground'
                       : 'text-muted-foreground hover:text-foreground'
                   )}
                 >
-                  <span className="truncate text-xs">{subItem.label}</span>
+                  <span className="truncate text-sm">{subItem.label}</span>
                 </NavLink>
               );
             })}

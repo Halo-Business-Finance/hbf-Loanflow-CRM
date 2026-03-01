@@ -8,8 +8,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 
 import { NotificationCenter } from "./NotificationCenter"
-import { ibmDb } from "@/lib/ibm"
-const supabase = ibmDb; // IBM migration shim
+import { ibmDb, supabase } from "@/lib/ibm";
 import { getAuthSession } from '@/lib/auth-utils'
 import { useAuth } from "@/components/auth/AuthProvider"
 import { useCollaborationNotifications } from "@/hooks/useCollaborationNotifications"

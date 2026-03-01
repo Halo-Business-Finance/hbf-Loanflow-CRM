@@ -33,8 +33,7 @@ import {
 } from 'lucide-react';
 import { AutoConditionGenerator } from '@/components/underwriting/AutoConditionGenerator';
 import { RiskScoringDashboard } from '@/components/underwriting/RiskScoringDashboard';
-import { ibmDb } from '@/lib/ibm';
-const supabase = ibmDb; // IBM migration shim
+import { ibmDb, supabase } from '@/lib/ibm';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency, formatNumber } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';

@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ibmDb } from '@/lib/ibm';
+import { ibmDb, supabase } from '@/lib/ibm';
 import { getAuthUser } from '@/lib/auth-utils';
-const supabase = ibmDb;
 import { StandardKPICard } from '@/components/StandardKPICard';
 import { StandardContentCard } from '@/components/StandardContentCard';
 import { Button } from '@/components/ui/button';

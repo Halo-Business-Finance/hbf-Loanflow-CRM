@@ -15,8 +15,7 @@ import {
   RefreshCw
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { ibmDb } from "@/lib/ibm";
-const supabase = ibmDb;
+import { ibmDb, supabase } from "@/lib/ibm";
 import { useAuth } from "@/components/auth/AuthProvider";
 import {
   Select,

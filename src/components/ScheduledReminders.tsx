@@ -3,8 +3,7 @@ import { format } from "date-fns"
 import { Bell, Phone, Mail, Trash2, Calendar } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { ibmDb } from "@/lib/ibm"
-const supabase = ibmDb; // IBM migration shim
+import { ibmDb, supabase } from "@/lib/ibm"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/components/auth/AuthProvider"
 

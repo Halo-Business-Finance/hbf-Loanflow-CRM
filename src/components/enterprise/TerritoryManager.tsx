@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
-import { ibmDb } from "@/lib/ibm";
-const supabase = ibmDb;
+import { ibmDb, supabase } from "@/lib/ibm";
 import { getAuthUser } from '@/lib/auth-utils';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";

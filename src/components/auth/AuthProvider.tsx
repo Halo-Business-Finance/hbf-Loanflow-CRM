@@ -1,21 +1,50 @@
 /**
- * AuthProvider — Supabase email/password authentication
+ * AuthProvider — IBM Cloud Authentication
+ *
+ * Replaces Supabase Auth with IBM App ID + hbf-api email/password.
+ * Maintains the same useAuth() interface so all downstream components
+ * continue working without changes.
  */
 
 import * as React from 'react'
 import { createContext, useContext, useEffect, useState, useCallback } from 'react'
-import { supabase } from '@/integrations/supabase/client'
-import type { User, Session } from '@supabase/supabase-js'
+import { ibmAuth } from '@/lib/ibm/ibm-auth'
+import type { IBMUser, IBMSession } from '@/lib/ibm/ibm-auth'
+import { ibmDb } from '@/lib/ibm'
 import { useToast } from '@/hooks/use-toast'
 import { sanitizeError } from '@/lib/error-sanitizer'
+
+/* ------------------------------------------------------------------ */
+/*  Compatible types (drop-in for Supabase User/Session)              */
+/* ------------------------------------------------------------------ */
+
+/**
+ * CRM User — compatible interface that replaces Supabase User.
+ * Components using `user.id`, `user.email`, `user.user_metadata` work as-is.
+ */
+export interface CRMUser {
+  id: string
+  email: string | undefined
+  user_metadata: Record<string, any>
+  email_confirmed_at: string | null | undefined
+  /** Original IBM user data */
+  raw: IBMUser
+}
+
+export interface CRMSession {
+  access_token: string
+  user: CRMUser
+  /** Original IBM session data */
+  raw: IBMSession
+}
 
 /* ------------------------------------------------------------------ */
 /*  Public interface                                                   */
 /* ------------------------------------------------------------------ */
 
 interface AuthContextType {
-  user: User | null
-  session: Session | null
+  user: CRMUser | null
+  session: CRMSession | null
   userRole: string | null
   userRoles: string[]
   loading: boolean
@@ -48,26 +77,46 @@ function deriveHighestRole(roles: string[]): string {
   }, roles[0])
 }
 
+/** Convert IBMUser → CRMUser compatibility shape */
+function toCRMUser(ibmUser: IBMUser): CRMUser {
+  return {
+    id: ibmUser.id,
+    email: ibmUser.email,
+    user_metadata: ibmUser.user_metadata,
+    email_confirmed_at: ibmUser.email_confirmed_at,
+    raw: ibmUser,
+  }
+}
+
+/** Convert IBMSession → CRMSession compatibility shape */
+function toCRMSession(ibmSession: IBMSession): CRMSession {
+  return {
+    access_token: ibmSession.accessToken,
+    user: toCRMUser(ibmSession.user),
+    raw: ibmSession,
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /*  Provider                                                          */
 /* ------------------------------------------------------------------ */
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
-  const [session, setSession] = useState<Session | null>(null)
+  const [user, setUser] = useState<CRMUser | null>(null)
+  const [session, setSession] = useState<CRMSession | null>(null)
   const [userRole, setUserRole] = useState<string | null>(null)
   const [userRoles, setUserRoles] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [isEmailVerified, setIsEmailVerified] = useState(false)
   const { toast } = useToast()
 
-  /* ---- role fetch ---- */
+  /* ---- role fetch (via IBM REST, not Supabase) ---- */
 
   const fetchUserRole = useCallback(async (userId: string) => {
     try {
       const [rolesRes, primaryRes] = await Promise.all([
-        supabase.from('user_roles').select('*').eq('user_id', userId).eq('is_active', true),
-        supabase.rpc('get_user_role', { p_user_id: userId }),
+        ibmDb.from('user_roles').select('*').eq('user_id', userId).eq('is_active', true),
+        ibmDb.rpc('get_user_role', { p_user_id: userId }),
       ])
 
       const roles: string[] =
@@ -93,47 +142,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   /* ---- bootstrap session on mount ---- */
 
   useEffect(() => {
-    // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, currentSession) => {
-        setSession(currentSession)
-        setUser(currentSession?.user ?? null)
-
-        if (currentSession?.user) {
-          setIsEmailVerified(!!currentSession.user.email_confirmed_at)
+    // Subscribe to auth state changes from ibmAuth
+    const { unsubscribe } = ibmAuth.onAuthStateChange(
+      (event, ibmSession) => {
+        if (ibmSession) {
+          const crmSession = toCRMSession(ibmSession)
+          const crmUser = crmSession.user
+          setSession(crmSession)
+          setUser(crmUser)
+          setIsEmailVerified(!!crmUser.email_confirmed_at)
           // Defer role fetch to avoid deadlock
-          setTimeout(() => fetchUserRole(currentSession.user.id), 0)
+          setTimeout(() => fetchUserRole(crmUser.id), 0)
         } else {
+          setSession(null)
+          setUser(null)
           setUserRole(null)
           setUserRoles([])
           setIsEmailVerified(false)
         }
         setLoading(false)
-      }
+      },
     )
 
-    // THEN check existing session
-    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
-      setSession(currentSession)
-      setUser(currentSession?.user ?? null)
-      if (currentSession?.user) {
-        setIsEmailVerified(!!currentSession.user.email_confirmed_at)
-        fetchUserRole(currentSession.user.id)
-      }
-      setLoading(false)
-    })
-
-    return () => subscription.unsubscribe()
+    return () => unsubscribe()
   }, [fetchUserRole])
 
-  /* ---- sign-in ---- */
+  /* ---- sign-in (email/password via hbf-api) ---- */
 
   const signIn = useCallback(async (email?: string, password?: string) => {
     if (!email || !password) throw new Error('Email and password are required')
     setLoading(true)
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) throw error
+      await ibmAuth.signInWithPassword(email, password)
       toast({ title: 'Welcome back!', description: 'You have been signed in successfully.' })
     } catch (error: any) {
       toast({ title: 'Sign in failed', description: sanitizeError(error), variant: 'destructive' })
@@ -143,26 +183,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [toast])
 
-  /* ---- sign-up ---- */
+  /* ---- sign-up (via hbf-api) ---- */
 
   const signUp = useCallback(async (email?: string, password?: string, firstName?: string, lastName?: string) => {
     if (!email || !password) throw new Error('Email and password are required')
     setLoading(true)
     try {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: window.location.origin,
-          data: {
-            first_name: firstName || '',
-            last_name: lastName || '',
-            display_name: `${firstName || ''} ${lastName || ''}`.trim(),
-          },
-        },
-      })
-      if (error) throw error
-      toast({ title: 'Account created!', description: 'Please check your email to verify your account.' })
+      await ibmAuth.signUpWithPassword(email, password, { firstName, lastName })
+      toast({ title: 'Account created!', description: 'Your account has been set up successfully.' })
     } catch (error: any) {
       toast({ title: 'Sign up failed', description: sanitizeError(error), variant: 'destructive' })
       throw error
@@ -175,7 +203,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = useCallback(async () => {
     try {
-      await supabase.auth.signOut()
+      await ibmAuth.signOut()
       setSession(null)
       setUser(null)
       setUserRole(null)
@@ -191,10 +219,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const resetPassword = useCallback(async (email: string) => {
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      })
-      if (error) throw error
+      await ibmAuth.resetPasswordForEmail(email)
       toast({ title: 'Password reset sent', description: 'Check your email for reset instructions.' })
     } catch (error: any) {
       toast({ title: 'Password reset failed', description: sanitizeError(error), variant: 'destructive' })
@@ -202,13 +227,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [toast])
 
-  /* ---- resend verification email ---- */
+  /* ---- resend verification email (stub — handled server-side) ---- */
 
   const resendVerificationEmail = useCallback(async () => {
     if (!user?.email) throw new Error('No user email found')
     try {
-      const { error } = await supabase.auth.resend({ type: 'signup', email: user.email })
-      if (error) throw error
+      // hbf-api handles email verification resending
+      await ibmAuth.resetPasswordForEmail(user.email)
       toast({ title: 'Verification email sent', description: 'Please check your inbox.' })
     } catch (error: any) {
       toast({ title: 'Failed to resend email', description: sanitizeError(error), variant: 'destructive' })

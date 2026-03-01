@@ -509,14 +509,14 @@ All colors MUST be HSL.
   }
 
   .sidebar-folder-tab--active {
-    background: hsl(var(--foreground));
+    background: transparent;
     border-color: hsl(var(--foreground));
-    color: hsl(var(--background));
+    color: hsl(var(--foreground));
     font-weight: 500;
   }
 
   .sidebar-folder-tab--active::after {
-    background: hsl(var(--foreground));
+    background: transparent;
   }
 
   .sidebar-folder-tab--inactive {
@@ -538,13 +538,13 @@ All colors MUST be HSL.
   }
 
   .dark .sidebar-folder-tab--active {
-    background: hsl(var(--foreground));
+    background: transparent;
     border-color: hsl(var(--foreground));
-    color: hsl(var(--background));
+    color: hsl(var(--foreground));
   }
 
   .dark .sidebar-folder-tab--active::after {
-    background: hsl(var(--foreground));
+    background: transparent;
   }
 
   .dark .sidebar-folder-tab--inactive:hover {

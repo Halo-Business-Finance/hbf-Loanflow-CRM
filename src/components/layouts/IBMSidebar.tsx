@@ -238,8 +238,8 @@ function NavItem({ icon: Icon, label, to, collapsed, subItems }: NavItemProps) {
                   className={cn(
                     'flex items-center h-8 text-[11px] transition-all duration-200 relative pl-4 pr-2',
                     subActive
-                      ? 'font-medium bg-foreground text-background'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                      ? 'font-medium text-foreground'
+                      : 'text-muted-foreground hover:text-foreground'
                   )}
                 >
                   <span className="truncate text-xs">{subItem.label}</span>

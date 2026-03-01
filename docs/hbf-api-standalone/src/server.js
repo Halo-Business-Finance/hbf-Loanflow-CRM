@@ -6,7 +6,15 @@ const app = express();
 const PORT = process.env.PORT || 8080;
 
 // ── Middleware ────────────────────────────────────────────────
-app.use(cors());
+app.use(cors({
+  origin: [
+    'https://crm.halobusinessfinance.com',
+    'https://halobusinessfinance.com',
+    /\.codeengine\.appdomain\.cloud$/,
+    /\.lovable\.app$/,
+  ],
+  credentials: true,
+}));
 app.use(express.json({ limit: '10mb' }));
 
 // ── API Key Auth ─────────────────────────────────────────────

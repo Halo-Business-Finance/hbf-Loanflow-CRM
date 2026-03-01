@@ -2,7 +2,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { MessageSquare, Send, Eye } from "lucide-react"
-import { supabase } from "@/integrations/supabase/client"
+import { ibmDb } from "@/lib/ibm"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { format } from "date-fns"
 import { useNavigate } from "react-router-dom"
@@ -36,12 +36,9 @@ export function CompactMessagesWidget() {
     }
 
     try {
-      const { data, error } = await supabase
+      const { data, error } = await ibmDb
         .from('user_messages')
-        .select(`
-          *,
-          sender_profile:profiles!user_messages_sender_id_fkey(first_name, last_name, email)
-        `)
+        .select('*')
         .eq('recipient_id', user.id)
         .order('created_at', { ascending: false })
         .limit(5)
@@ -68,25 +65,13 @@ export function CompactMessagesWidget() {
   useEffect(() => {
     fetchRecentMessages()
 
-    // Subscribe to real-time updates
-    const channel = supabase
-      .channel('messages-widget')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'user_messages',
-          filter: `recipient_id=eq.${user?.id}`
-        },
-        () => {
-          fetchRecentMessages()
-        }
-      )
-      .subscribe()
+    // Poll for updates instead of Supabase realtime
+    const interval = setInterval(() => {
+      fetchRecentMessages()
+    }, 15000)
 
     return () => {
-      supabase.removeChannel(channel)
+      clearInterval(interval)
     }
   }, [user])
 

@@ -268,31 +268,11 @@ function NavItem({ icon: Icon, label, to, collapsed, subItems }: NavItemProps) {
 export function IBMSidebar({ collapsed, onToggle }: IBMSidebarProps) {
   return (
     <aside
-      className={cn(
-        'bg-white dark:bg-[#0a1628] border-r border-border dark:border-[#1a2942] flex-shrink-0 transition-all duration-300 overflow-y-auto no-scrollbar',
-        collapsed ? 'w-16' : 'w-60'
-      )}
+      className="bg-white dark:bg-[#0a1628] border-r border-border dark:border-[#1a2942] flex-shrink-0 transition-all duration-300 overflow-y-auto no-scrollbar w-60"
     >
-      <div className="pt-2 pb-1">
-        <button
-          type="button"
-          onClick={onToggle}
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          className={cn(
-            'group flex items-center h-10 text-muted-foreground dark:text-gray-400 hover:text-foreground dark:hover:text-white transition-colors rounded',
-            collapsed ? 'justify-center w-full px-0' : 'pl-2 pr-4'
-          )}
-        >
-          <div className="w-12 flex items-center justify-center">
-            <span className="inline-flex p-0.5 rounded border border-transparent group-hover:border-blue-500 transition-colors duration-200">
-              <Menu className="h-5 w-5 text-foreground dark:text-white" />
-            </span>
-          </div>
-        </button>
-      </div>
-      <nav className="space-y-0 pt-1">
+      <nav className="space-y-0 pt-3 px-1">
         {navItems.map((item) => (
-          <NavItem key={item.to || item.label} {...item} collapsed={collapsed} />
+          <NavItem key={item.to || item.label} {...item} collapsed={false} />
         ))}
       </nav>
     </aside>

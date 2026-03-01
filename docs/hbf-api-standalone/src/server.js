@@ -23,6 +23,14 @@ app.use('/api/v1', (req, res, next) => {
 const apiRouter = express.Router();
 const crudRoutes = require('./crud-factory');
 
+// ── Auth Routes (no API key required — issues its own tokens) ─
+const authRoutes = require('./routes/auth');
+apiRouter.use('/auth', authRoutes);
+
+// ── Storage Routes ───────────────────────────────────────────
+const storageRoutes = require('./routes/storage');
+apiRouter.use('/', storageRoutes);
+
 // ── CRUD Routes ──────────────────────────────────────────────
 apiRouter.use('/leads',              require('./routes/leads'));
 apiRouter.use('/contact-entities',   require('./routes/contact-entities'));

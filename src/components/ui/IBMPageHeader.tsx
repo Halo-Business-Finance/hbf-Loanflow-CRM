@@ -46,7 +46,7 @@ export function IBMPageHeader({
   };
 
   return (
-    <div className={cn('bg-card px-4 md:px-6 lg:px-8 py-4 md:py-6 border-b border-border', className)}>
+    <div className={cn('bg-background px-4 md:px-6 lg:px-8 py-4 md:py-6 border-b border-border', className)}>
       {showBreadcrumbs && breadcrumbs.length > 1 && (
         <div className="flex items-center gap-2 mb-3">
           <div className="flex items-center gap-1">

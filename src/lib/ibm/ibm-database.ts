@@ -590,6 +590,35 @@ class IBMDatabaseClient {
       return { data: null, error: err instanceof Error ? err : new Error(String(err)) };
     }
   }
+
+
+  /**
+   * Edge-function-style invocations routed through hbf-api.
+   * Mirrors `supabase.functions.invoke(name, { body })`.
+   */
+  get functions() {
+    const self = this;
+    return {
+      async invoke(fnName: string, options?: { body?: Record<string, unknown> }) {
+        try {
+          const headers = await buildHeaders();
+          const response = await fetchWithOriginFallback(`/api/v1/functions/${fnName}`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(options?.body ?? {}),
+          });
+          if (!response.ok) {
+            const errBody = await response.json().catch(() => ({}));
+            return { data: null, error: new Error(errBody.message || errBody.error || response.statusText) };
+          }
+          const result = await response.json();
+          return { data: result, error: null };
+        } catch (err) {
+          return { data: null, error: err instanceof Error ? err : new Error(String(err)) };
+        }
+      },
+    };
+  }
 }
 
 export const ibmDb = new IBMDatabaseClient();

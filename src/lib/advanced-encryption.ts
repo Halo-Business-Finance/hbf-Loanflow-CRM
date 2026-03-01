@@ -1,4 +1,5 @@
-import { supabase } from "@/integrations/supabase/client"
+import { ibmDb } from "@/lib/ibm"
+const supabase = ibmDb;
 
 export interface EncryptionConfig {
   algorithm: string

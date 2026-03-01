@@ -28,7 +28,8 @@ import {
   Sparkles
 } from 'lucide-react';
 import { LineChart, Line, AreaChart, Area, BarChart, Bar, PieChart as RechartsPieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart } from 'recharts';
-import { supabase } from "@/integrations/supabase/client";
+import { ibmDb } from "@/lib/ibm";
+const supabase = ibmDb;
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";

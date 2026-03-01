@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
+import { getAuthUser } from '@/lib/auth-utils';
+const supabase = ibmDb;
 import { StandardKPICard } from '@/components/StandardKPICard';
 import { StandardContentCard } from '@/components/StandardContentCard';
 import { Button } from '@/components/ui/button';
@@ -110,7 +112,7 @@ export function DripSequenceAutomation() {
   // ── Mutations ────────────────────────────────
   const createMutation = useMutation({
     mutationFn: async (automation: Record<string, unknown>) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getAuthUser();
       if (!user) throw new Error('Not authenticated');
       const { error } = await supabase
         .from('marketing_automations')

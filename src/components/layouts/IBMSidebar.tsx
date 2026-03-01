@@ -292,7 +292,7 @@ export function IBMSidebar({ collapsed, onToggle }: IBMSidebarProps) {
     <aside
       className={cn(
         'bg-white dark:bg-[#0a1628] border-r border-border dark:border-[#1a2942] flex-shrink-0 transition-all duration-300 overflow-y-auto no-scrollbar',
-        collapsed ? 'w-16' : 'w-48'
+        collapsed ? 'w-16' : 'w-60'
       )}
     >
       <div className="pt-2 pb-1">

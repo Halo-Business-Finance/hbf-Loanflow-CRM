@@ -98,6 +98,21 @@ apiRouter.use('/reports',     reportsRpc);   // /reports/dashboard-metrics
 apiRouter.use('/compliance',  reportsRpc);   // /compliance/generate-report
 apiRouter.use('/email',       reportsRpc);   // /email/get-tokens-secure, store-tokens-secure
 
+// ── Edge Function Routes (migrated from Supabase) ────────────
+const { jwtMiddleware } = require('./middleware/jwt-verify');
+const adminUsersRoutes   = require('./routes/functions/admin-users');
+const microsoftAuthRoutes = require('./routes/functions/microsoft-auth');
+const securityRoutes     = require('./routes/functions/security');
+const documentsRoutes    = require('./routes/functions/documents');
+const integrationsRoutes = require('./routes/functions/integrations');
+
+// Mount with JWT middleware for authenticated endpoints
+apiRouter.use('/functions', jwtMiddleware, adminUsersRoutes);
+apiRouter.use('/functions', jwtMiddleware, microsoftAuthRoutes);
+apiRouter.use('/functions', jwtMiddleware, securityRoutes);
+apiRouter.use('/functions', jwtMiddleware, documentsRoutes);
+apiRouter.use('/functions', jwtMiddleware, integrationsRoutes);
+
 // ── Generic RPC fallback ─────────────────────────────────────
 apiRouter.post('/rpc/:fn_name', async (req, res) => {
   try {

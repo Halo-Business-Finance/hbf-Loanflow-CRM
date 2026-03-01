@@ -50,7 +50,7 @@ export default function SimpleLayout({ children }: SimpleLayoutProps) {
           <NotificationBell />
         </div>
       </header>
-      <main className="flex-1 p-6 bg-muted/30 overflow-auto no-scrollbar">
+      <main className="flex-1 p-6 bg-background overflow-auto no-scrollbar">
         {children}
       </main>
     </div>

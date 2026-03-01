@@ -24,8 +24,8 @@ All colors MUST be HSL.
     --primary-glow: 217 100% 47%; /* #0353e9 */
     
     /* IBM Carbon Gray Scale */
-    --ibm-gray-10: 0 0% 98%; /* #fafafa */
-    --ibm-gray-20: 0 0% 96%; /* #f4f4f4 */
+    --ibm-gray-10: 0 0% 100%;
+    --ibm-gray-20: 0 0% 100%;
     --ibm-gray-30: 0 0% 88%; /* #e0e0e0 */
     --ibm-gray-40: 0 0% 78%; /* #c6c6c6 */
     --ibm-gray-50: 0 0% 64%; /* #a8a8a8 */
@@ -35,13 +35,13 @@ All colors MUST be HSL.
     --ibm-gray-90: 0 0% 15%; /* #262626 */
     --ibm-gray-100: 0 0% 9%; /* #161616 */
 
-    --secondary: 210 40% 96%;
+    --secondary: 0 0% 100%;
     --secondary-foreground: 222 84% 4.9%;
 
-    --muted: 0 0% 96%;
+    --muted: 0 0% 100%;
     --muted-foreground: 0 0% 32%;
 
-    --accent: 210 40% 94%;
+    --accent: 0 0% 100%;
     --accent-foreground: 222 84% 4.9%;
 
     --warning: 38 92% 50%;
@@ -51,7 +51,7 @@ All colors MUST be HSL.
     --destructive-foreground: 210 40% 98%;
 
     --border: 0 0% 88%; /* #e0e0e0 */
-    --input: 0 0% 96%;
+    --input: 0 0% 100%;
     --ring: 217 91% 53%;
 
     /* Enhanced borders for enterprise look */
@@ -61,8 +61,8 @@ All colors MUST be HSL.
 
     /* Enterprise gradients */
     --gradient-primary: linear-gradient(135deg, hsl(221 83% 53%), hsl(221 70% 65%));
-    --gradient-card: linear-gradient(145deg, hsl(0 0% 100%), hsl(210 40% 98%));
-    --gradient-accent: linear-gradient(135deg, hsl(210 40% 94%), hsl(210 30% 97%));
+    --gradient-card: linear-gradient(145deg, hsl(0 0% 100%), hsl(0 0% 100%));
+    --gradient-accent: linear-gradient(135deg, hsl(0 0% 100%), hsl(0 0% 100%));
     --gradient-blue: linear-gradient(135deg, hsl(221 83% 53%), hsl(221 70% 65%));
     --gradient-navy: linear-gradient(135deg, hsl(222 84% 25%), hsl(222 70% 35%));
     --gradient-green: linear-gradient(135deg, hsl(142 76% 36%), hsl(142 60% 50%));
@@ -103,7 +103,7 @@ All colors MUST be HSL.
     --sidebar-foreground: 222 84% 4.9%;
     --sidebar-primary: 221 83% 53%;
     --sidebar-primary-foreground: 210 40% 98%;
-    --sidebar-accent: 210 40% 96%;
+    --sidebar-accent: 0 0% 100%;
     --sidebar-accent-foreground: 222 84% 4.9%;
     --sidebar-border: 214 32% 91%;
     --sidebar-ring: 221 83% 53%;

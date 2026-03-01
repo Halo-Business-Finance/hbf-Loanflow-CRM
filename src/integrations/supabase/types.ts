@@ -1328,6 +1328,33 @@ export type Database = {
           },
         ]
       }
+      crm_performance_log: {
+        Row: {
+          entered_at: string | null
+          exited_at: string | null
+          lead_source: string | null
+          loan_id: number | null
+          log_id: number
+          stage_name: string | null
+        }
+        Insert: {
+          entered_at?: string | null
+          exited_at?: string | null
+          lead_source?: string | null
+          loan_id?: number | null
+          log_id?: never
+          stage_name?: string | null
+        }
+        Update: {
+          entered_at?: string | null
+          exited_at?: string | null
+          lead_source?: string | null
+          loan_id?: number | null
+          log_id?: never
+          stage_name?: string | null
+        }
+        Relationships: []
+      }
       custom_fields: {
         Row: {
           api_name: string

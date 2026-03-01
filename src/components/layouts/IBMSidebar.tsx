@@ -32,8 +32,6 @@ import {
   Castle,
   Target,
   MessageSquare,
-  Folder,
-  FolderOpen,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -190,23 +188,22 @@ function NavItem({ icon: Icon, label, to, collapsed, subItems }: NavItemProps) {
 
   const isHighlighted = isActive || hasActiveSubItem;
   const hasChildren = subItems && subItems.length > 0;
-  const FolderIconEl = isOpen && hasChildren ? FolderOpen : Folder;
+
+  const folderTabClasses = cn(
+    'sidebar-folder-tab',
+    'flex items-center text-xs transition-all duration-200 relative group',
+    collapsed ? 'justify-center w-full px-0 h-10' : 'pl-2 pr-3 h-10',
+    isHighlighted
+      ? 'sidebar-folder-tab--active'
+      : 'sidebar-folder-tab--inactive'
+  );
 
   // Collapsed with sub-items
   if (hasChildren && collapsed && to) {
     return (
-      <NavLink
-        to={to}
-        className={cn(
-          'flex items-center h-10 text-xs transition-all duration-200 relative group',
-          'justify-center w-full px-0 rounded-sm',
-          isHighlighted
-            ? 'bg-primary/10 text-primary dark:text-primary'
-            : 'text-muted-foreground dark:text-gray-400 hover:bg-primary/5 hover:text-foreground dark:hover:text-white'
-        )}
-      >
+      <NavLink to={to} className={folderTabClasses}>
         <div className="w-12 flex items-center justify-center">
-          <FolderIconEl className={cn('h-4 w-4 flex-shrink-0', isHighlighted ? 'text-primary' : 'text-amber-500 dark:text-amber-400')} />
+          <Icon className="h-4 w-4 flex-shrink-0" />
         </div>
       </NavLink>
     );
@@ -215,20 +212,10 @@ function NavItem({ icon: Icon, label, to, collapsed, subItems }: NavItemProps) {
   // Expanded parent with sub-items
   if (hasChildren) {
     return (
-      <div className="mb-0.5">
-        <div
-          onClick={handleClick}
-          className={cn(
-            'flex items-center h-10 text-xs transition-all duration-200 relative group cursor-pointer',
-            collapsed ? 'justify-center w-full px-0' : 'pl-2 pr-3',
-            'rounded-sm',
-            isHighlighted
-              ? 'bg-primary/10 text-primary font-medium'
-              : 'text-muted-foreground dark:text-gray-400 hover:bg-primary/5 hover:text-foreground dark:hover:text-white'
-          )}
-        >
+      <div className="mb-0.5 mx-1">
+        <div onClick={handleClick} className={cn(folderTabClasses, 'cursor-pointer')}>
           <div className="w-8 flex items-center justify-center mr-1">
-            <FolderIconEl className={cn('h-4 w-4 flex-shrink-0', isHighlighted ? 'text-primary' : 'text-amber-500 dark:text-amber-400')} />
+            <Icon className="h-4 w-4 flex-shrink-0" />
           </div>
           {!collapsed && (
             <>
@@ -241,7 +228,7 @@ function NavItem({ icon: Icon, label, to, collapsed, subItems }: NavItemProps) {
           )}
         </div>
         {!collapsed && isOpen && (
-          <div className="ml-5 pl-3 border-l border-primary/20 dark:border-primary/30 py-0.5">
+          <div className="sidebar-folder-contents ml-1 mr-1 mb-1">
             {subItems.map((subItem) => {
               const subActive = location.pathname === subItem.to || location.pathname.startsWith(subItem.to! + '/');
               return (
@@ -249,13 +236,12 @@ function NavItem({ icon: Icon, label, to, collapsed, subItems }: NavItemProps) {
                   key={subItem.to}
                   to={subItem.to!}
                   className={cn(
-                    'group/sub flex items-center h-7 text-[11px] transition-all duration-200 relative pl-2 rounded-sm mr-1',
+                    'flex items-center h-8 text-[11px] transition-all duration-200 relative pl-4 pr-2',
                     subActive
-                      ? 'text-primary font-medium bg-primary/5'
-                      : 'text-muted-foreground dark:text-gray-400 hover:text-foreground dark:hover:text-white hover:bg-primary/5'
+                      ? 'text-primary font-medium bg-primary/10'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-primary/5'
                   )}
                 >
-                  <FileText className={cn('h-3 w-3 mr-2 flex-shrink-0', subActive ? 'text-primary' : 'text-muted-foreground/60')} />
                   <span className="truncate text-xs">{subItem.label}</span>
                 </NavLink>
               );
@@ -266,24 +252,16 @@ function NavItem({ icon: Icon, label, to, collapsed, subItems }: NavItemProps) {
     );
   }
 
-  // Single item (no children) - show as a file
+  // Single item (no children)
   return (
-    <NavLink
-      to={to!}
-      className={cn(
-        'flex items-center h-10 text-xs transition-all duration-200 relative group',
-        collapsed ? 'justify-center w-full px-0' : 'pl-2 pr-3',
-        'rounded-sm',
-        isActive
-          ? 'bg-primary/10 text-primary font-medium'
-          : 'text-muted-foreground dark:text-gray-400 hover:bg-primary/5 hover:text-foreground dark:hover:text-white'
-      )}
-    >
-      <div className={cn(collapsed ? 'w-12' : 'w-8', 'flex items-center justify-center', !collapsed && 'mr-1')}>
-        <FileText className={cn('h-4 w-4 flex-shrink-0', isActive ? 'text-primary' : 'text-foreground dark:text-white')} />
-      </div>
-      {!collapsed && <span className="truncate">{label}</span>}
-    </NavLink>
+    <div className="mx-1">
+      <NavLink to={to!} className={folderTabClasses}>
+        <div className={cn(collapsed ? 'w-12' : 'w-8', 'flex items-center justify-center', !collapsed && 'mr-1')}>
+          <Icon className="h-4 w-4 flex-shrink-0" />
+        </div>
+        {!collapsed && <span className="truncate">{label}</span>}
+      </NavLink>
+    </div>
   );
 }
 

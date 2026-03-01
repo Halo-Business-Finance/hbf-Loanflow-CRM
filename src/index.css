@@ -488,4 +488,72 @@ All colors MUST be HSL.
   .bg-info {
     background-color: hsl(var(--info));
   }
+
+  /* Sidebar folder-tab styles */
+  .sidebar-folder-tab {
+    border-radius: 6px 6px 0 0;
+    border: 1px solid transparent;
+    border-bottom: none;
+    margin-bottom: -1px;
+    position: relative;
+  }
+
+  .sidebar-folder-tab::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: hsl(var(--border));
+  }
+
+  .sidebar-folder-tab--active {
+    background: hsl(var(--primary) / 0.08);
+    border-color: hsl(var(--primary) / 0.3);
+    color: hsl(var(--primary));
+    font-weight: 500;
+  }
+
+  .sidebar-folder-tab--active::after {
+    background: hsl(var(--primary) / 0.08);
+  }
+
+  .sidebar-folder-tab--inactive {
+    color: hsl(var(--muted-foreground));
+  }
+
+  .sidebar-folder-tab--inactive:hover {
+    background: hsl(var(--primary) / 0.04);
+    border-color: hsl(var(--border));
+    color: hsl(var(--foreground));
+  }
+
+  .sidebar-folder-contents {
+    border: 1px solid hsl(var(--border));
+    border-top: none;
+    border-radius: 0 0 6px 6px;
+    background: hsl(var(--background));
+    overflow: hidden;
+  }
+
+  .dark .sidebar-folder-tab--active {
+    background: hsl(var(--primary) / 0.12);
+    border-color: hsl(var(--primary) / 0.4);
+    color: hsl(var(--primary));
+  }
+
+  .dark .sidebar-folder-tab--active::after {
+    background: hsl(var(--primary) / 0.12);
+  }
+
+  .dark .sidebar-folder-tab--inactive:hover {
+    background: hsl(var(--primary) / 0.06);
+    color: hsl(var(--foreground));
+  }
+
+  .dark .sidebar-folder-contents {
+    border-color: hsl(var(--border));
+    background: hsl(222 47% 10%);
+  }
 }

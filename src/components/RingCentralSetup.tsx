@@ -6,7 +6,8 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
 import { useToast } from "@/hooks/use-toast"
-import { supabase } from "@/integrations/supabase/client"
+import { ibmDb } from "@/lib/ibm"
+const supabase = ibmDb;
 import { getAuthUser } from '@/lib/auth-utils'
 import { Phone, Settings, CheckCircle, AlertCircle } from "lucide-react"
 

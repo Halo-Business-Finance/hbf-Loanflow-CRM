@@ -16,7 +16,8 @@ import {
   Eye, Target, ArrowUpRight, Calendar, Filter, Download,
   Megaphone, BarChart3, PieChart as PieChartIcon, Activity,
 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { ibmDb } from '@/lib/ibm';
+const supabase = ibmDb;
 
 // ── Mock/seed analytics data ───────────────────────────────────────────────
 const monthlyTraffic = [
@@ -76,9 +77,9 @@ export function MarketingAnalyticsDashboard() {
   useEffect(() => {
     supabase
       .from('email_campaigns')
-      .select('id', { count: 'exact', head: true })
-      .then(({ count }) => {
-        if (count !== null) setDbCampaignCount(count);
+      .select('id')
+      .then(({ data }) => {
+        if (data) setDbCampaignCount(data.length);
       });
   }, []);
 

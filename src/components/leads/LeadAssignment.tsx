@@ -5,7 +5,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { supabase } from "@/integrations/supabase/client"
+import { ibmDb } from "@/lib/ibm"
+const supabase = ibmDb;
 import { useAuth } from "@/components/auth/AuthProvider"
 import { useToast } from "@/hooks/use-toast"
 import { UserPlus, Users, Save, X } from "lucide-react"

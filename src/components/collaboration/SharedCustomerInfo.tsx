@@ -34,7 +34,8 @@ import {
   Share2,
   Eye
 } from 'lucide-react';
-import { supabase } from "@/integrations/supabase/client";
+import { ibmDb } from "@/lib/ibm";
+const supabase = ibmDb;
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";

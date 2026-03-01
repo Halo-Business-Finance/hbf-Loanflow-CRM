@@ -10,7 +10,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Plus, Settings, Trash2, GripVertical } from "lucide-react"
 import { useEffect, useState } from "react"
-import { supabase } from "@/integrations/supabase/client"
+import { ibmDb } from "@/lib/ibm"
+const supabase = ibmDb;
 import { useToast } from "@/hooks/use-toast"
 
 interface LoanStage {

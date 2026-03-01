@@ -10,6 +10,7 @@ import {
   Database,
   Briefcase,
   ChevronDown,
+  ChevronRight,
   BarChart3,
   Building2,
   UserCog,
@@ -31,6 +32,8 @@ import {
   Castle,
   Target,
   MessageSquare,
+  Folder,
+  FolderOpen,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -171,7 +174,6 @@ function NavItem({ icon: Icon, label, to, collapsed, subItems }: NavItemProps) {
     item.to && (location.pathname === item.to || location.pathname.startsWith(item.to + '/'))
   );
 
-  // Auto-expand if a sub-item is active
   React.useEffect(() => {
     if (hasActiveSubItem && !collapsed) {
       setIsOpen(true);
@@ -179,7 +181,6 @@ function NavItem({ icon: Icon, label, to, collapsed, subItems }: NavItemProps) {
   }, [hasActiveSubItem, collapsed]);
 
   const handleClick = (e: React.MouseEvent) => {
-    // Only toggle submenu when expanded and has sub-items
     if (subItems && subItems.length > 0 && !collapsed) {
       e.preventDefault();
       e.stopPropagation();
@@ -187,99 +188,99 @@ function NavItem({ icon: Icon, label, to, collapsed, subItems }: NavItemProps) {
     }
   };
 
-  if (subItems && subItems.length > 0) {
-    // When collapsed, use NavLink to navigate; when expanded, use div to toggle
-    if (collapsed && to) {
-      return (
-        <NavLink
-          to={to}
-          className={cn(
-            'flex items-center h-10 text-xs transition-all duration-300 relative group rounded',
-            'justify-center w-full px-0',
-            (isActive || hasActiveSubItem)
-              ? 'outline outline-2 outline-blue-500 outline-offset-[-2px] text-foreground dark:text-white font-medium'
-              : 'text-muted-foreground dark:text-gray-400 hover:outline hover:outline-2 hover:outline-blue-500 hover:outline-offset-[-2px] hover:text-foreground dark:hover:text-white'
-          )}
-        >
-          <div className="w-12 flex items-center justify-center">
-            <Icon className="h-4 w-4 flex-shrink-0 text-foreground dark:text-white" />
-          </div>
-        </NavLink>
-      );
-    }
-    
+  const isHighlighted = isActive || hasActiveSubItem;
+  const hasChildren = subItems && subItems.length > 0;
+  const FolderIconEl = isOpen && hasChildren ? FolderOpen : Folder;
+
+  // Collapsed with sub-items
+  if (hasChildren && collapsed && to) {
     return (
-      <div>
+      <NavLink
+        to={to}
+        className={cn(
+          'flex items-center h-10 text-xs transition-all duration-200 relative group',
+          'justify-center w-full px-0 rounded-sm',
+          isHighlighted
+            ? 'bg-primary/10 text-primary dark:text-primary'
+            : 'text-muted-foreground dark:text-gray-400 hover:bg-primary/5 hover:text-foreground dark:hover:text-white'
+        )}
+      >
+        <div className="w-12 flex items-center justify-center">
+          <FolderIconEl className={cn('h-4 w-4 flex-shrink-0', isHighlighted ? 'text-primary' : 'text-amber-500 dark:text-amber-400')} />
+        </div>
+      </NavLink>
+    );
+  }
+
+  // Expanded parent with sub-items
+  if (hasChildren) {
+    return (
+      <div className="mb-0.5">
         <div
           onClick={handleClick}
           className={cn(
-            'flex items-center h-10 text-xs transition-all duration-300 relative group cursor-pointer rounded',
-            collapsed ? 'justify-center w-full px-0' : 'pl-2 pr-4',
-            (isActive || hasActiveSubItem)
-              ? 'outline outline-2 outline-blue-500 outline-offset-[-2px] text-foreground dark:text-white font-medium'
-              : 'text-muted-foreground dark:text-gray-400 hover:outline hover:outline-2 hover:outline-blue-500 hover:outline-offset-[-2px] hover:text-foreground dark:hover:text-white'
+            'flex items-center h-10 text-xs transition-all duration-200 relative group cursor-pointer',
+            collapsed ? 'justify-center w-full px-0' : 'pl-2 pr-3',
+            'rounded-sm',
+            isHighlighted
+              ? 'bg-primary/10 text-primary font-medium'
+              : 'text-muted-foreground dark:text-gray-400 hover:bg-primary/5 hover:text-foreground dark:hover:text-white'
           )}
         >
-          {(isActive || hasActiveSubItem) && !collapsed && (
-            <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-primary" />
-          )}
-          <div className="w-12 flex items-center justify-center">
-            <Icon className="h-4 w-4 flex-shrink-0 text-foreground dark:text-white" />
+          <div className="w-8 flex items-center justify-center mr-1">
+            <FolderIconEl className={cn('h-4 w-4 flex-shrink-0', isHighlighted ? 'text-primary' : 'text-amber-500 dark:text-amber-400')} />
           </div>
           {!collapsed && (
             <>
-              <span className="truncate flex-1">{label}</span>
-              {isOpen ? (
-                <ChevronDown className="h-3 w-3 ml-auto" />
-              ) : (
-                <ChevronDown className="h-3 w-3 ml-auto" />
-              )}
+              <span className="truncate flex-1 font-medium">{label}</span>
+              <ChevronRight className={cn(
+                'h-3 w-3 ml-auto transition-transform duration-200',
+                isOpen && 'rotate-90'
+              )} />
             </>
           )}
         </div>
         {!collapsed && isOpen && (
-          <div className="ml-4 border-l border-border dark:border-[#1a2942] pb-4">
-            {subItems.map((subItem) => (
-              <NavLink
-                key={subItem.to}
-                to={subItem.to!}
-                className={cn(
-                  'group/sub flex items-center h-8 text-xs transition-all duration-300 relative pl-4 rounded mr-1',
-                  location.pathname === subItem.to || location.pathname.startsWith(subItem.to! + '/')
-                    ? 'text-foreground dark:text-white font-medium'
-                    : 'text-muted-foreground dark:text-gray-400 hover:text-foreground dark:hover:text-white'
-                )}
-              >
-                <span className={cn(
-                  'truncate text-xs border-b-2',
-                  (location.pathname === subItem.to || location.pathname.startsWith(subItem.to! + '/'))
-                    ? 'border-blue-500'
-                    : 'border-transparent group-hover/sub:border-blue-500'
-                )}>{subItem.label}</span>
-              </NavLink>
-            ))}
+          <div className="ml-5 pl-3 border-l border-primary/20 dark:border-primary/30 py-0.5">
+            {subItems.map((subItem) => {
+              const subActive = location.pathname === subItem.to || location.pathname.startsWith(subItem.to! + '/');
+              return (
+                <NavLink
+                  key={subItem.to}
+                  to={subItem.to!}
+                  className={cn(
+                    'group/sub flex items-center h-7 text-[11px] transition-all duration-200 relative pl-2 rounded-sm mr-1',
+                    subActive
+                      ? 'text-primary font-medium bg-primary/5'
+                      : 'text-muted-foreground dark:text-gray-400 hover:text-foreground dark:hover:text-white hover:bg-primary/5'
+                  )}
+                >
+                  <FileText className={cn('h-3 w-3 mr-2 flex-shrink-0', subActive ? 'text-primary' : 'text-muted-foreground/60')} />
+                  <span className="truncate text-xs">{subItem.label}</span>
+                </NavLink>
+              );
+            })}
           </div>
         )}
       </div>
     );
   }
 
+  // Single item (no children) - show as a file
   return (
     <NavLink
       to={to!}
       className={cn(
-        'flex items-center h-10 text-xs transition-all duration-300 relative group rounded',
-        collapsed ? 'justify-center w-full px-0' : 'pl-2 pr-4',
+        'flex items-center h-10 text-xs transition-all duration-200 relative group',
+        collapsed ? 'justify-center w-full px-0' : 'pl-2 pr-3',
+        'rounded-sm',
         isActive
-          ? 'outline outline-2 outline-blue-500 outline-offset-[-2px] text-foreground dark:text-white font-medium'
-          : 'text-muted-foreground dark:text-gray-400 hover:outline hover:outline-2 hover:outline-blue-500 hover:outline-offset-[-2px] hover:text-foreground dark:hover:text-white'
+          ? 'bg-primary/10 text-primary font-medium'
+          : 'text-muted-foreground dark:text-gray-400 hover:bg-primary/5 hover:text-foreground dark:hover:text-white'
       )}
     >
-      {isActive && !collapsed && (
-        <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-primary" />
-      )}
-      <div className="w-12 flex items-center justify-center">
-        <Icon className="h-4 w-4 flex-shrink-0 text-foreground dark:text-white" />
+      <div className={cn(collapsed ? 'w-12' : 'w-8', 'flex items-center justify-center', !collapsed && 'mr-1')}>
+        <FileText className={cn('h-4 w-4 flex-shrink-0', isActive ? 'text-primary' : 'text-foreground dark:text-white')} />
       </div>
       {!collapsed && <span className="truncate">{label}</span>}
     </NavLink>

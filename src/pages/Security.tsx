@@ -19,8 +19,7 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { useNavigate } from 'react-router-dom';
 import { RefreshCw } from 'lucide-react';
-import { ibmDb } from '@/lib/ibm';
-const supabase = ibmDb; // IBM migration shim
+import { ibmDb, supabase } from '@/lib/ibm';
 
 const SecurityPage: React.FC = () => {
   const navigate = useNavigate();

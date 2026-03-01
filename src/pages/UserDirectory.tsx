@@ -6,8 +6,7 @@ import { UserCog, Plus, Search, Filter, Mail, Calendar, Phone, Edit, Trash2, X, 
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { ibmDb } from '@/lib/ibm';
-const supabase = ibmDb;
+import { ibmDb, supabase } from '@/lib/ibm';
 import { logger } from '@/lib/logger';
 import { useToast } from '@/hooks/use-toast';
 import {

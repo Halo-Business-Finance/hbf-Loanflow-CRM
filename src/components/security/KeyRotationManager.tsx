@@ -14,8 +14,7 @@ import {
   History,
   Zap
 } from "lucide-react";
-import { ibmDb } from "@/lib/ibm";
-const supabase = ibmDb;
+import { ibmDb, supabase } from "@/lib/ibm";
 import { useToast } from "@/hooks/use-toast";
 
 interface EncryptionKey {

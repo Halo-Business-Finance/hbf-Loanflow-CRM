@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-import { ibmDb } from "@/lib/ibm"
-const supabase = ibmDb; // IBM migration shim
+import { ibmDb, supabase } from "@/lib/ibm"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"

@@ -16,8 +16,7 @@ import {
   Eye, Target, ArrowUpRight, Calendar, Filter, Download,
   Megaphone, BarChart3, PieChart as PieChartIcon, Activity,
 } from 'lucide-react';
-import { ibmDb } from '@/lib/ibm';
-const supabase = ibmDb;
+import { ibmDb, supabase } from '@/lib/ibm';
 
 // ── Mock/seed analytics data ───────────────────────────────────────────────
 const monthlyTraffic = [

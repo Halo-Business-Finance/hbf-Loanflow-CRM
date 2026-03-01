@@ -5,8 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
-import { ibmDb } from "@/lib/ibm"
-const supabase = ibmDb;
+import { ibmDb, supabase } from "@/lib/ibm";
 import { 
   Target, 
   TrendingUp, 

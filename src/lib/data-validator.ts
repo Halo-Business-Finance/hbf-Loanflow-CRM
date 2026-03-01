@@ -1,5 +1,4 @@
-import { ibmDb } from "@/lib/ibm"
-const supabase = ibmDb;
+import { ibmDb, supabase } from "@/lib/ibm"
 import { getAuthUser } from '@/lib/auth-utils'
 
 interface DataValidationResult {

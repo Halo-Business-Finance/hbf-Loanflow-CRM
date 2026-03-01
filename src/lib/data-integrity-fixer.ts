@@ -1,19 +1,16 @@
 import { ibmDb } from "@/lib/ibm"
-const supabase = ibmDb; // IBM migration shim
 import { getAuthUser } from '@/lib/auth-utils'
 
 export class DataIntegrityFixer {
   async checkAuthAndPermissions(): Promise<{ authenticated: boolean; userId: string | null; contactCount: number }> {
     try {
-      // Check if user is authenticated
       const user = await getAuthUser()
       
       if (!user) {
         return { authenticated: false, userId: null, contactCount: 0 }
       }
       
-      // Check how many contacts the user can access
-      const { data: contacts, error } = await supabase
+      const { data: contacts, error } = await ibmDb
         .from('contact_entities')
         .select('id')
         
@@ -34,7 +31,6 @@ export class DataIntegrityFixer {
     try {
       console.log('🔧 Starting auto-fix for current user data...')
       
-      // First check if user is authenticated
       const authCheck = await this.checkAuthAndPermissions()
       console.log('🔐 Auth check:', authCheck)
       
@@ -50,8 +46,7 @@ export class DataIntegrityFixer {
       
       console.log(`👤 Authenticated as user ${authCheck.userId} with ${authCheck.contactCount} contacts`)
       
-      // Fix null loan amounts for current user's contact entities
-      const { data: userContacts, error: fetchError } = await supabase
+      const { data: userContacts, error: fetchError } = await ibmDb
         .from('contact_entities')
         .select('id, loan_amount, business_name, name, phone')
         .is('loan_amount', null)
@@ -67,16 +62,13 @@ export class DataIntegrityFixer {
       if (userContacts && userContacts.length > 0) {
         for (const contact of userContacts) {
           try {
-            // Set reasonable default based on business type
             const defaultLoanAmount = contact.business_name ? 100000 : 50000
             
             console.log(`🔨 Fixing ${contact.name} (${contact.id}): Setting loan amount to $${defaultLoanAmount}`)
             
-            const { error: updateError } = await supabase
+            const { error: updateError } = await ibmDb
               .from('contact_entities')
-              .update({ 
-                loan_amount: defaultLoanAmount 
-              })
+              .update({ loan_amount: defaultLoanAmount })
               .eq('id', contact.id)
             
             if (!updateError) {
@@ -93,8 +85,7 @@ export class DataIntegrityFixer {
         }
       }
 
-      // Fix contacts with large loan amounts but missing business names
-      const { data: largeLoans, error: largeLoansError } = await supabase
+      const { data: largeLoans, error: largeLoansError } = await ibmDb
         .from('contact_entities')
         .select('id, name, loan_amount, business_name')
         .gt('loan_amount', 100000)
@@ -107,12 +98,11 @@ export class DataIntegrityFixer {
         
         for (const contact of largeLoans) {
           try {
-            // Generate a reasonable business name based on the contact name
             const businessName = contact.name ? `${contact.name} Business` : 'Business Entity'
             
             console.log(`🔨 Adding business name to ${contact.name}: ${businessName}`)
             
-            const { error: updateError } = await supabase
+            const { error: updateError } = await ibmDb
               .from('contact_entities')
               .update({ business_name: businessName })
               .eq('id', contact.id)
@@ -131,8 +121,7 @@ export class DataIntegrityFixer {
         }
       }
 
-      // Fix contacts with invalid phone number formats
-      const { data: phoneContacts, error: phoneError } = await supabase
+      const { data: phoneContacts, error: phoneError } = await ibmDb
         .from('contact_entities')
         .select('id, name, phone')
         .not('phone', 'is', null)
@@ -146,7 +135,6 @@ export class DataIntegrityFixer {
         for (const contact of phoneContacts) {
           try {
             const phone = contact.phone
-            // Check if phone needs formatting (only digits, no formatting)
             if (phone && /^\d{10}$/.test(phone.replace(/\D/g, ''))) {
               const digits = phone.replace(/\D/g, '')
               if (digits.length === 10) {
@@ -155,7 +143,7 @@ export class DataIntegrityFixer {
                 if (formattedPhone !== phone) {
                   console.log(`🔨 Formatting phone for ${contact.name}: ${phone} → ${formattedPhone}`)
                   
-                  const { error: updateError } = await supabase
+                  const { error: updateError } = await ibmDb
                     .from('contact_entities')
                     .update({ phone: formattedPhone })
                     .eq('id', contact.id)
@@ -177,8 +165,7 @@ export class DataIntegrityFixer {
         }
       }
       
-      // Fix pipeline entries with missing amounts
-      const { data: pipelineIssues, error: pipelineError } = await supabase
+      const { data: pipelineIssues, error: pipelineError } = await ibmDb
         .from('pipeline_entries')
         .select('id, amount, stage, lead_id')
         .or('amount.is.null,amount.eq.0')
@@ -191,9 +178,8 @@ export class DataIntegrityFixer {
         
         for (const pipeline of pipelineIssues) {
           try {
-            let defaultAmount = 50000 // Default amount
+            let defaultAmount = 50000
             
-            // Set amount based on stage
             if (pipeline.stage) {
               switch (pipeline.stage.toLowerCase()) {
                 case 'application':
@@ -213,7 +199,7 @@ export class DataIntegrityFixer {
             
             console.log(`🔨 Fixing pipeline entry ${pipeline.id}: Setting amount to $${defaultAmount}`)
             
-            const { error: updateError } = await supabase
+            const { error: updateError } = await ibmDb
               .from('pipeline_entries')
               .update({ amount: defaultAmount })
               .eq('id', pipeline.id)
@@ -232,8 +218,7 @@ export class DataIntegrityFixer {
         }
       }
 
-      // Fix contacts missing priority field
-      const { data: missingPriority, error: priorityError } = await supabase
+      const { data: missingPriority, error: priorityError } = await ibmDb
         .from('contact_entities')
         .select('id, name, priority')
         .or('priority.is.null,priority.eq.""')
@@ -247,7 +232,7 @@ export class DataIntegrityFixer {
           try {
             console.log(`🔨 Setting default priority for ${contact.name}`)
             
-            const { error: updateError } = await supabase
+            const { error: updateError } = await ibmDb
               .from('contact_entities')
               .update({ priority: 'medium' })
               .eq('id', contact.id)
@@ -266,8 +251,7 @@ export class DataIntegrityFixer {
         }
       }
 
-      // Fix contacts missing stage field
-      const { data: missingStage, error: stageError } = await supabase
+      const { data: missingStage, error: stageError } = await ibmDb
         .from('contact_entities')
         .select('id, name, stage')
         .or('stage.is.null,stage.eq.""')
@@ -281,7 +265,7 @@ export class DataIntegrityFixer {
           try {
             console.log(`🔨 Setting default stage for ${contact.name}`)
             
-            const { error: updateError } = await supabase
+            const { error: updateError } = await ibmDb
               .from('contact_entities')
               .update({ stage: 'New Lead' })
               .eq('id', contact.id)
@@ -303,7 +287,6 @@ export class DataIntegrityFixer {
       console.log(`🎉 Auto-fix completed: ${result.fixed} fixes, ${result.errors.length} errors`)
       
       if (result.fixed === 0 && result.errors.length === 0) {
-        // Check if there are actually any issues to fix by doing a quick validation
         const issueCheck = await this.checkForRemainingIssues()
         if (issueCheck.hasIssues) {
           result.errors.push('Some data integrity issues were detected but could not be automatically fixed. Please check the audit results for details.')
@@ -324,37 +307,32 @@ export class DataIntegrityFixer {
     try {
       let issueCount = 0
 
-      // Check for contacts without proper priority
-      const { data: priorityIssues } = await supabase
+      const { data: priorityIssues } = await ibmDb
         .from('contact_entities')
         .select('id')
         .or('priority.is.null,priority.eq.""')
       issueCount += priorityIssues?.length || 0
 
-      // Check for contacts without proper stage
-      const { data: stageIssues } = await supabase
+      const { data: stageIssues } = await ibmDb
         .from('contact_entities')
         .select('id')
         .or('stage.is.null,stage.eq.""')
       issueCount += stageIssues?.length || 0
 
-      // Check for null loan amounts
-      const { data: loanIssues } = await supabase
+      const { data: loanIssues } = await ibmDb
         .from('contact_entities')
         .select('id')
         .is('loan_amount', null)
       issueCount += loanIssues?.length || 0
 
-      // Check for large loans without business names
-      const { data: businessIssues } = await supabase
+      const { data: businessIssues } = await ibmDb
         .from('contact_entities')
         .select('id')
         .gt('loan_amount', 100000)
         .or('business_name.is.null,business_name.eq.""')
       issueCount += businessIssues?.length || 0
 
-      // Check for pipeline entries without amounts
-      const { data: pipelineIssues } = await supabase
+      const { data: pipelineIssues } = await ibmDb
         .from('pipeline_entries')
         .select('id')
         .or('amount.is.null,amount.eq.0')

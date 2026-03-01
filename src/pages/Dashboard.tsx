@@ -52,8 +52,7 @@ import {
   Label
 } from 'recharts';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { ibmDb } from '@/lib/ibm';
-const supabase = ibmDb; // IBM migration shim
+import { ibmDb, supabase } from '@/lib/ibm';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { useCalendarData } from '@/hooks/useCalendarData';

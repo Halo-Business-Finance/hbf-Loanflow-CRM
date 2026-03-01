@@ -11,8 +11,7 @@ import { StandardContentCard } from "@/components/StandardContentCard"
 import { ResponsiveContainer } from "@/components/ResponsiveContainer"
 import { LOAN_TYPES, STAGES, PRIORITIES } from "@/types/lead"
 import { useToast } from "@/hooks/use-toast"
-import { ibmDb } from "@/lib/ibm"
-const supabase = ibmDb;
+import { ibmDb, supabase } from "@/lib/ibm";
 import { useAuth } from "@/components/auth/AuthProvider"
 import { useSecureForm } from "@/hooks/useSecureForm"
 import { User, Building2, DollarSign, CreditCard, Landmark, FileText, UserPlus } from "lucide-react"

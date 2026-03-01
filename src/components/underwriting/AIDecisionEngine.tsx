@@ -16,8 +16,7 @@ import {
   ThumbsDown,
   Scale
 } from 'lucide-react';
-import { ibmDb } from '@/lib/ibm';
-const supabase = ibmDb; // IBM migration shim
+import { ibmDb, supabase } from '@/lib/ibm';
 import { useToast } from '@/hooks/use-toast';
 
 interface Decision {

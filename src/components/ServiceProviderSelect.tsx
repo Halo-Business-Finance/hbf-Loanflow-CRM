@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { ibmDb } from "@/lib/ibm";
-const supabase = ibmDb; // IBM migration shim
+import { ibmDb, supabase } from "@/lib/ibm";
 import {
   Select,
   SelectContent,

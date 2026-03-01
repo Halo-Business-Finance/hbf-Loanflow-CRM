@@ -37,8 +37,7 @@ import {
   Database,
   Activity
 } from 'lucide-react';
-import { ibmDb } from "@/lib/ibm";
-const supabase = ibmDb;
+import { ibmDb, supabase } from "@/lib/ibm";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
 import { useRoleBasedAccess } from "@/hooks/useRoleBasedAccess";

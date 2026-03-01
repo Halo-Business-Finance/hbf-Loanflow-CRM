@@ -6,8 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Upload, FileText } from 'lucide-react';
-import { ibmDb } from '@/lib/ibm';
-const supabase = ibmDb; // IBM migration shim
+import { ibmDb, supabase } from '@/lib/ibm';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useToast } from '@/hooks/use-toast';
 

@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-import { ibmDb } from "@/lib/ibm"
-const supabase = ibmDb;
+import { ibmDb, supabase } from "@/lib/ibm";
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {

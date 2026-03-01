@@ -6,8 +6,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { BarChart3, TrendingUp, TrendingDown, Users, Target, Clock } from "lucide-react"
 import { IBMPageHeader } from "@/components/ui/IBMPageHeader"
 import { StandardContentCard } from "@/components/StandardContentCard"
-import { ibmDb } from "@/lib/ibm"
-const supabase = ibmDb; // IBM migration shim
+import { ibmDb, supabase } from "@/lib/ibm";
 import { useAuth } from "@/components/auth/AuthProvider"
 
 interface LeadStats {

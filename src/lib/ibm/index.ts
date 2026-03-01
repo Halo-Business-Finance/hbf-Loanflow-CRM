@@ -1,10 +1,9 @@
 /**
  * IBM Cloud Unified Client
  *
- * Single import point that mirrors the Supabase client API shape.
- * Swap `import { supabase } from '@/integrations/supabase/client'`
- * with `import { ibmClient as supabase } from '@/lib/ibm/ibm-client'`
- * to route all calls through IBM Cloud services.
+ * Single import point for the IBM Cloud data layer.
+ * `ibmDb` is the primary export; `supabase` is a convenience alias
+ * so files can use either name without a per-file shim variable.
  */
 
 export { ibmAuth } from './ibm-auth';
@@ -21,6 +20,9 @@ export type { RpcRouteConfig } from './ibm-rpc-routes';
 import { ibmAuth } from './ibm-auth';
 import { ibmDb } from './ibm-database';
 import { ibmStorage } from './ibm-storage';
+
+/** Convenience alias — lets files use `supabase.from(...)` without a local shim */
+export const supabase = ibmDb;
 
 /**
  * Unified IBM client — mirrors the `supabase` client interface

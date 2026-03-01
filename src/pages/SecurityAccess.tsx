@@ -15,8 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useState, useEffect } from "react"
-import { ibmDb } from "@/lib/ibm"
-const supabase = ibmDb; // IBM migration shim
+import { ibmDb, supabase } from "@/lib/ibm";
 import { useToast } from "@/hooks/use-toast"
 import { formatDistanceToNow } from "date-fns"
 import { useNavigate } from "react-router-dom"

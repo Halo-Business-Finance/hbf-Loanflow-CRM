@@ -10,8 +10,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 
-import { ibmDb } from "@/lib/ibm"
-const supabase = ibmDb; // IBM migration shim
+import { ibmDb, supabase } from "@/lib/ibm";
 import { useAuth } from "@/components/auth/AuthProvider"
 import { useNavigate } from "react-router-dom"
 

@@ -46,8 +46,7 @@ import {
   Eye,
   Edit
 } from 'lucide-react';
-import { ibmDb } from "@/lib/ibm";
-const supabase = ibmDb;
+import { ibmDb, supabase } from "@/lib/ibm";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";

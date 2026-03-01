@@ -34,8 +34,7 @@ import {
 import { formatPhoneNumber } from "@/lib/utils"
 import { Lead, STAGES, LEAD_SOURCES } from "@/types/lead"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ibmDb } from "@/lib/ibm"
-const supabase = ibmDb;
+import { ibmDb, supabase } from "@/lib/ibm";
 import { toast } from "sonner"
 
 interface LeadCardProps {

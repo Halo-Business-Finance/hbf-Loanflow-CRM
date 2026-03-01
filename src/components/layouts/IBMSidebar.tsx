@@ -270,7 +270,7 @@ export function IBMSidebar({ collapsed, onToggle }: IBMSidebarProps) {
     <aside
       className="bg-white dark:bg-[#0a1628] border-r border-border dark:border-[#1a2942] flex-shrink-0 transition-all duration-300 overflow-y-auto no-scrollbar w-60"
     >
-      <nav className="space-y-0 pt-3 px-1">
+      <nav className="space-y-0 pt-8 px-1">
         {navItems.map((item) => (
           <NavItem key={item.to || item.label} {...item} collapsed={false} />
         ))}

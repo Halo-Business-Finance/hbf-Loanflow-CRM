@@ -56,10 +56,13 @@ export const PRODUCTION_CSP: CSPConfig = {
   ],
   'connect-src': [
     "'self'",
+    'https://*.codeengine.appdomain.cloud',
     'https://gshxxsniwytjgcnthyfq.supabase.co',
     'https://*.supabase.co',
-    'wss://gshxxsniwytjgcnthyfq.supabase.co', // WebSocket for realtime
-    'https://maps.googleapis.com'
+    'wss://gshxxsniwytjgcnthyfq.supabase.co',
+    'https://maps.googleapis.com',
+    'https://*.lovable.app',
+    'https://*.lovableproject.com'
   ],
   'frame-ancestors': ["'none'"], // Prevent clickjacking
   'base-uri': ["'self'"],

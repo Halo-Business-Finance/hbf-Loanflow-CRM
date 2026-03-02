@@ -85,7 +85,9 @@ async function apiRequest(
     throw new Error('No API endpoint available for authentication');
   }
 
-  return fetch(`${base}${path}`, { ...options, headers });
+  // Auth routes are mounted under /api/v1 on hbf-api
+  const prefix = path.startsWith('/api') ? '' : '/api/v1';
+  return fetch(`${base}${prefix}${path}`, { ...options, headers });
 }
 
 // ── Auth Service ───────────────────────────────────────────────────────────

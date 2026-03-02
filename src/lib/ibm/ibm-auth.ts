@@ -64,20 +64,8 @@ function getApiBaseUrl(): string {
   return '';
 }
 
-function getSupabaseProxyUrl(): string | null {
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  return supabaseUrl ? `${supabaseUrl}/functions/v1/hbf-api-proxy` : null;
-}
-
-function isLovablePreview(): boolean {
-  if (typeof window === 'undefined') return false;
-  return window.location.hostname.includes('lovable.app') ||
-         window.location.hostname.includes('lovableproject.com');
-}
-
 /**
- * Make an authenticated request to hbf-api, falling back to Supabase proxy
- * in preview environments (same pattern as ibm-database.ts).
+ * Make an authenticated request to hbf-api directly.
  */
 async function apiRequest(
   path: string,
@@ -92,51 +80,12 @@ async function apiRequest(
     headers['x-api-key'] = IBM_CONFIG.database.apiKey;
   }
 
-  // In Lovable preview, skip direct and go through proxy
-  if (!isLovablePreview()) {
-    const base = getApiBaseUrl();
-    if (base) {
-      try {
-        const resp = await fetch(`${base}${path}`, { ...options, headers });
-        if (!resp.ok && resp.status !== 401 && resp.status !== 403) {
-          // Fall through to proxy
-        } else {
-          return resp;
-        }
-      } catch {
-        // Fall through to proxy
-      }
-    }
-  }
-
-  // Proxy fallback
-  const proxyUrl = getSupabaseProxyUrl();
-  if (!proxyUrl) {
+  const base = getApiBaseUrl();
+  if (!base) {
     throw new Error('No API endpoint available for authentication');
   }
 
-  let parsedBody: unknown;
-  if (options.body && typeof options.body === 'string') {
-    try { parsedBody = JSON.parse(options.body); } catch { parsedBody = options.body; }
-  }
-
-  const proxyHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY) {
-    proxyHeaders['apikey'] = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-  }
-
-  return fetch(proxyUrl, {
-    method: 'POST',
-    headers: proxyHeaders,
-    body: JSON.stringify({
-      path,
-      method: options.method ?? 'POST',
-      body: parsedBody,
-      forwardHeaders: {
-        'x-api-key': IBM_CONFIG.database.apiKey || undefined,
-      },
-    }),
-  });
+  return fetch(`${base}${path}`, { ...options, headers });
 }
 
 // ── Auth Service ───────────────────────────────────────────────────────────

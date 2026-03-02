@@ -56,17 +56,8 @@ async function buildHeaders(): Promise<Record<string, string>> {
   return headers;
 }
 
-function isLovablePreview(): boolean {
-  if (typeof window === 'undefined') return false;
-  return window.location.hostname.includes('lovable.app') || 
-         window.location.hostname.includes('lovableproject.com');
-}
 
 function getApiOrigins(): string[] {
-  // In Lovable preview, direct origins will always fail due to CORS,
-  // so skip them entirely and let fetchWithOriginFallback use the proxy.
-  if (isLovablePreview()) return [];
-
   const configuredOrigin = (IBM_CONFIG.database.functionsBaseUrl || '').replace(/\/$/, '');
   const origins = configuredOrigin ? [configuredOrigin] : [];
 
@@ -78,61 +69,6 @@ function getApiOrigins(): string[] {
   }
 
   return origins;
-}
-
-function getSupabaseProxyUrl(): string | null {
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  return supabaseUrl ? `${supabaseUrl}/functions/v1/hbf-api-proxy` : null;
-}
-
-async function fetchViaSupabaseProxy(path: string, init: RequestInit): Promise<Response> {
-  const proxyUrl = getSupabaseProxyUrl();
-  if (!proxyUrl) {
-    throw new Error('Supabase URL not configured for proxy fallback');
-  }
-
-  const headers = new Headers(init.headers ?? {});
-  const authHeader = headers.get('Authorization') ?? headers.get('authorization') ?? undefined;
-  const apiKeyHeader = headers.get('x-api-key') ?? undefined;
-
-  let parsedBody: unknown = undefined;
-  if (init.body != null) {
-    if (typeof init.body === 'string') {
-      try {
-        parsedBody = JSON.parse(init.body);
-      } catch {
-        parsedBody = init.body;
-      }
-    } else {
-      parsedBody = init.body;
-    }
-  }
-
-  const proxyHeaders: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
-
-  if (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY) {
-    proxyHeaders['apikey'] = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-  }
-
-  if (authHeader) {
-    proxyHeaders['Authorization'] = authHeader;
-  }
-
-  return fetch(proxyUrl, {
-    method: 'POST',
-    headers: proxyHeaders,
-    body: JSON.stringify({
-      path,
-      method: init.method ?? 'GET',
-      body: parsedBody,
-      forwardHeaders: {
-        authorization: authHeader,
-        'x-api-key': apiKeyHeader,
-      },
-    }),
-  });
 }
 
 // ── Request deduplication & rate-limit backoff ────────────────────────────
@@ -185,24 +121,6 @@ async function _doFetch(path: string, init: RequestInit): Promise<Response> {
       lastError = error;
       console.warn(`[ibmDb] ✗ Network fetch failed for ${url}:`, (error as Error)?.message);
     }
-  }
-
-  try {
-    console.info(`[ibmDb] → Routing through Supabase proxy for ${path}`);
-    const proxyResp = await fetchViaSupabaseProxy(path, init);
-
-    // Handle rate limiting with exponential backoff
-    if (proxyResp.status === 429) {
-      rateLimitBackoffUntil = Date.now() + 15_000; // 15s backoff
-      console.warn(`[ibmDb] ⚠ Proxy rate limited, backing off 15s`);
-      throw new Error('Proxy rate limited');
-    }
-
-    console.info(`[ibmDb] ✓ Proxy ${path} → ${proxyResp.status}`);
-    return proxyResp;
-  } catch (proxyError) {
-    console.warn(`[ibmDb] ✗ Proxy failed for ${path}:`, (proxyError as Error)?.message);
-    lastError = proxyError;
   }
 
   throw lastError instanceof Error

@@ -10,7 +10,7 @@ try {
   setupCSPReporting()
 } catch (e) {
   // Prevent a hard white-screen if a browser blocks security APIs
-  console.error('[boot] security init failed', e)
+  console.error('[boot] Security init skipped:', e)
 }
 
 createRoot(document.getElementById("root")!).render(

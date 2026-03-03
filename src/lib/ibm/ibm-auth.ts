@@ -135,7 +135,8 @@ class IBMAuthService {
 
     if (!resp.ok) {
       const body = await resp.json().catch(() => ({}));
-      throw new Error(body.error || body.message || `Authentication failed (${resp.status})`);
+      const msg = typeof body.error === 'object' ? body.error?.message : body.error;
+      throw new Error(msg || body.message || `Authentication failed (${resp.status})`);
     }
 
     const data = await resp.json();
@@ -162,7 +163,8 @@ class IBMAuthService {
 
     if (!resp.ok) {
       const body = await resp.json().catch(() => ({}));
-      throw new Error(body.error || body.message || `Registration failed (${resp.status})`);
+      const msg = typeof body.error === 'object' ? body.error?.message : body.error;
+      throw new Error(msg || body.message || `Registration failed (${resp.status})`);
     }
 
     const data = await resp.json();
@@ -180,7 +182,8 @@ class IBMAuthService {
 
     if (!resp.ok) {
       const body = await resp.json().catch(() => ({}));
-      throw new Error(body.error || body.message || 'Password reset failed');
+      const msg = typeof body.error === 'object' ? body.error?.message : body.error;
+      throw new Error(msg || body.message || 'Password reset failed');
     }
   }
 

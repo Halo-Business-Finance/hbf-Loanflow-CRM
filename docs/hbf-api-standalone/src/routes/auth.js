@@ -189,7 +189,7 @@ router.post('/register', async (req, res) => {
   }
 });
 
-// ── POST /auth/login ────────────────────────────────────────────
+// ── POST /auth/login (IBM App ID ROPC) ──────────────────────────
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -198,40 +198,101 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
-    const rows = await query('SELECT * FROM users WHERE email = $1', [email.toLowerCase()]);
-    if (!rows.length) {
-      return res.status(401).json({ error: 'Invalid email or password' });
+    // ── 1. Discover App ID token endpoint ───────────────────────
+    const discoveryUrl = process.env.IBM_APPID_DISCOVERY_ENDPOINT;
+    const clientId = process.env.IBM_APPID_CLIENT_ID;
+
+    if (!discoveryUrl || !clientId) {
+      console.error('[auth/login] IBM_APPID_DISCOVERY_ENDPOINT or IBM_APPID_CLIENT_ID not set');
+      return res.status(500).json({ error: 'Authentication service not configured' });
     }
 
-    const row = rows[0];
-    const valid = await verifyPassword(password, row.password_hash);
-    if (!valid) {
+    // Cache-friendly: in production you'd cache this, but for correctness we fetch each time
+    const discoResp = await fetch(discoveryUrl);
+    if (!discoResp.ok) {
+      console.error('[auth/login] App ID discovery failed:', discoResp.status);
+      return res.status(502).json({ error: 'Authentication service unavailable' });
+    }
+    const disco = await discoResp.json();
+    const tokenEndpoint = disco.token_endpoint;
+
+    // ── 2. Resource Owner Password flow ─────────────────────────
+    const params = new URLSearchParams();
+    params.append('grant_type', 'password');
+    params.append('username', email);
+    params.append('password', password);
+    params.append('client_id', clientId);
+
+    const tokenResp = await fetch(tokenEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params.toString(),
+    });
+
+    if (!tokenResp.ok) {
+      const errBody = await tokenResp.json().catch(() => ({}));
+      console.error('[auth/login] App ID ROPC failed:', tokenResp.status, errBody);
+
       // Log failed attempt
-      try {
-        await query(
-          `INSERT INTO audit_logs (id, action, user_id, table_name, new_values, created_at)
-           VALUES ($1, 'login_failed', $2, 'users', '{"reason":"invalid_password"}', $3)`,
-          [uuidv4(), row.id, new Date().toISOString()],
-        );
-      } catch { /* best-effort */ }
+      const rows = await query('SELECT id FROM users WHERE email = $1', [email.toLowerCase()]).catch(() => []);
+      if (rows.length) {
+        try {
+          await query(
+            `INSERT INTO audit_logs (id, action, user_id, table_name, new_values, created_at)
+             VALUES ($1, 'login_failed', $2, 'users', '{"reason":"appid_rejected"}', $3)`,
+            [uuidv4(), rows[0].id, new Date().toISOString()],
+          );
+        } catch { /* best-effort */ }
+      }
 
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
-    const user = buildUserResponse(row);
-    const tokens = issueTokens(user);
+    const appIdTokens = await tokenResp.json();
 
-    // Create active session
+    // ── 3. Decode id_token to extract user info ─────────────────
+    let idPayload = {};
+    try {
+      const idParts = appIdTokens.id_token.split('.');
+      idPayload = JSON.parse(base64urlDecode(idParts[1]).toString());
+    } catch { /* proceed with defaults */ }
+
+    // ── 4. Upsert local user record ─────────────────────────────
+    const sub = idPayload.sub || email.toLowerCase();
+    const firstName = idPayload.given_name || idPayload.name || '';
+    const lastName = idPayload.family_name || '';
+    const displayName = idPayload.name || `${firstName} ${lastName}`.trim() || email.split('@')[0];
     const now = new Date().toISOString();
+
+    let userRows = await query('SELECT * FROM users WHERE email = $1', [email.toLowerCase()]);
+
+    if (!userRows.length) {
+      // First App ID login — create local record (no password_hash needed)
+      const id = uuidv4();
+      await query(
+        `INSERT INTO users (id, email, password_hash, first_name, last_name, display_name, roles, email_verified, created_at, updated_at)
+         VALUES ($1, $2, 'appid', $3, $4, $5, $6, true, $7, $7)`,
+        [id, email.toLowerCase(), firstName, lastName, displayName, JSON.stringify(['viewer']), now],
+      );
+      userRows = await query('SELECT * FROM users WHERE id = $1', [id]);
+    } else {
+      // Update last login timestamp
+      await query('UPDATE users SET updated_at = $1 WHERE id = $2', [now, userRows[0].id]);
+    }
+
+    const row = userRows[0];
+    const user = buildUserResponse(row);
+
+    // ── 5. Create active session ────────────────────────────────
     const sessionId = uuidv4();
     try {
       await query(
         `INSERT INTO active_sessions (id, user_id, session_token, is_active, created_at, last_activity, expires_at, ip_address)
          VALUES ($1, $2, $3, true, $4, $4, $5, $6)`,
         [
-          sessionId, row.id, tokens.access_token.slice(-40),
+          sessionId, row.id, appIdTokens.access_token.slice(-40),
           now,
-          new Date(Date.now() + ACCESS_TOKEN_TTL * 1000).toISOString(),
+          new Date(Date.now() + (appIdTokens.expires_in || ACCESS_TOKEN_TTL) * 1000).toISOString(),
           req.ip || '0.0.0.0',
         ],
       );
@@ -246,7 +307,14 @@ router.post('/login', async (req, res) => {
       );
     } catch { /* best-effort */ }
 
-    res.json(tokens);
+    // ── 6. Return App ID tokens + user info ─────────────────────
+    res.json({
+      access_token: appIdTokens.access_token,
+      id_token: appIdTokens.id_token,
+      refresh_token: appIdTokens.refresh_token || null,
+      expires_in: appIdTokens.expires_in || ACCESS_TOKEN_TTL,
+      user,
+    });
   } catch (err) {
     console.error('[auth/login] error:', err.message);
     res.status(500).json({ error: 'Authentication failed' });

@@ -1,7 +1,7 @@
 /**
  * IBM Cloud Service Configuration
  * All values are read from environment variables set at build/deploy time.
- * Replace Supabase env vars with IBM Cloud equivalents in your IBM Cloud deployment.
+ * Configured for hbf-api backend communication.
  */
 
 export const IBM_CONFIG = {
